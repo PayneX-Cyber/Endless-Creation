@@ -92,7 +92,7 @@ export function App() {
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               type="button"
             >
-              ☀ 浅色
+              {theme === 'dark' ? '☀ 浅色' : '☾ 深色'}
             </button>
           </div>
           <div className="canvasflow-footer__row canvasflow-footer__row--muted">
