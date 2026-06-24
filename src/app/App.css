@@ -21,17 +21,19 @@
 }
 
 .app-shell[data-theme='light'] {
-  --sidebar-bg: #F7F8FC;
+  --sidebar-bg: #FFFFFF;
   --sidebar-bg-elevated: #FFFFFF;
-  --sidebar-hover: #ECEFF6;
-  --sidebar-active: rgba(91, 140, 255, 0.08);
-  --sidebar-border: #DDE2EC;
-  --sidebar-divider: #E4E8F1;
-  --sidebar-text: #596174;
-  --sidebar-text-strong: #151A2D;
-  --sidebar-text-muted: #8A91A3;
-  --badge-bg: #E7EBF3;
-  --badge-text: #737C90;
+  --sidebar-hover: #F5F8FC;
+  --sidebar-active: #F3F7FF;
+  --sidebar-border: #E6ECF5;
+  --sidebar-divider: #EEF3F8;
+  --sidebar-text: #5F6B7A;
+  --sidebar-text-strong: #1F2A3D;
+  --sidebar-text-muted: #9AA7B8;
+  --brand-blue: #4BA3FF;
+  --brand-cyan: #4BA3FF;
+  --badge-bg: #F1F5FA;
+  --badge-text: #A7B3C3;
 }
 
 .canvasflow-sidebar {
@@ -44,6 +46,10 @@
   border-right: 1px solid var(--sidebar-border);
   color: var(--sidebar-text);
   background: var(--sidebar-bg);
+}
+
+.app-shell[data-theme='light'] .canvasflow-sidebar {
+  box-shadow: 1px 0 0 rgba(230, 236, 245, 0.72);
 }
 
 .canvasflow-brand {
@@ -70,6 +76,10 @@
   box-shadow: 0 0 18px rgba(91, 140, 255, 0.16);
 }
 
+.app-shell[data-theme='light'] .canvasflow-brand__mark {
+  box-shadow: none;
+}
+
 .canvasflow-brand__name {
   min-width: 0;
   flex: 1;
@@ -85,6 +95,12 @@
   white-space: nowrap;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+.app-shell[data-theme='light'] .canvasflow-brand__name {
+  background: none;
+  color: var(--brand-blue);
+  -webkit-text-fill-color: currentColor;
 }
 
 .canvasflow-collapse {
@@ -261,6 +277,11 @@
   font-weight: 700;
   cursor: pointer;
   transition: background 140ms ease, transform 140ms ease;
+}
+
+.app-shell[data-theme='light'] .canvasflow-theme-button {
+  color: var(--sidebar-text-strong);
+  background: #F1F5FA;
 }
 
 .canvasflow-theme-button:hover {
