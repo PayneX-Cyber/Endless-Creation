@@ -424,9 +424,9 @@
 .canvasflow-sidebar--collapsed .canvasflow-brand {
   flex-direction: column;
   justify-content: center;
-  gap: 9px;
-  height: 112px;
-  padding: 12px 0;
+  gap: 0;
+  height: 74px;
+  padding: 0;
 }
 
 .canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-brand {
