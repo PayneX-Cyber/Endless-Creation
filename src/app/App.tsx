@@ -35,13 +35,22 @@ const assetItems: Array<{ Icon: SidebarIcon; label: string; count: number }> = [
 export function App() {
   const [theme, setTheme] = usePersistentTheme();
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isSidebarPreviewed, setSidebarPreviewed] = useState(false);
   const ThemeIcon = theme === 'dark' ? SunIcon : MoonIcon;
+  const isSidebarVisuallyCollapsed = isSidebarCollapsed && !isSidebarPreviewed;
 
   return (
-    <div className={`app-shell ${isSidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''}`} data-theme={theme}>
+    <div
+      className={`app-shell ${isSidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''} ${isSidebarPreviewed ? 'app-shell--sidebar-previewed' : ''}`}
+      data-theme={theme}
+    >
       <aside
-        className={`canvasflow-sidebar ${isSidebarCollapsed ? 'canvasflow-sidebar--collapsed' : ''}`}
+        className={`canvasflow-sidebar ${isSidebarCollapsed ? 'canvasflow-sidebar--collapsed' : ''} ${isSidebarPreviewed ? 'canvasflow-sidebar--previewed' : ''}`}
         aria-label="CanvasFlow 侧边栏"
+        onMouseEnter={() => {
+          if (isSidebarCollapsed) setSidebarPreviewed(true);
+        }}
+        onMouseLeave={() => setSidebarPreviewed(false)}
       >
         <header className="canvasflow-brand">
           <span className="canvasflow-brand__mark" aria-hidden="true">
@@ -55,7 +64,10 @@ export function App() {
             aria-expanded={!isSidebarCollapsed}
             className="canvasflow-collapse glass-icon-btn"
             aria-label={isSidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
-            onClick={() => setSidebarCollapsed((current) => !current)}
+            onClick={() => {
+              setSidebarCollapsed((current) => !current);
+              setSidebarPreviewed(false);
+            }}
             type="button"
           >
             <span className="glass-icon-btn__back" aria-hidden="true" />
@@ -71,7 +83,7 @@ export function App() {
           {sidebarNavItems.map(({ Icon, ...item }) => (
             <button
               aria-current={item.active ? 'page' : undefined}
-              aria-label={isSidebarCollapsed ? item.label : undefined}
+              aria-label={isSidebarVisuallyCollapsed ? item.label : undefined}
               className={`canvasflow-nav__item ${item.active ? 'canvasflow-nav__item--active' : ''}`}
               key={item.id}
               type="button"
@@ -82,7 +94,7 @@ export function App() {
           ))}
 
           <section className="canvasflow-nav__group" aria-label="资产管理">
-            <button aria-label={isSidebarCollapsed ? '资产管理' : undefined} className="canvasflow-nav__item" type="button">
+            <button aria-label={isSidebarVisuallyCollapsed ? '资产管理' : undefined} className="canvasflow-nav__item" type="button">
               <span className="canvasflow-nav__icon" aria-hidden="true"><FolderIcon /></span>
               <span className="canvasflow-nav__label">资产管理</span>
               <span className="canvasflow-nav__chevron" aria-hidden="true"><ChevronDownIcon /></span>
