@@ -67,13 +67,14 @@
   height: 30px;
   place-items: center;
   flex: 0 0 auto;
-  border: 2px solid var(--brand-blue);
-  border-radius: 8px;
   color: var(--brand-cyan);
-  font-size: 24px;
-  font-weight: 500;
-  line-height: 1;
   box-shadow: 0 0 18px rgba(91, 140, 255, 0.16);
+}
+
+.canvasflow-brand__mark svg {
+  width: 30px;
+  height: 30px;
+  stroke-width: 1.9;
 }
 
 .app-shell[data-theme='light'] .canvasflow-brand__mark {
@@ -114,10 +115,13 @@
   color: var(--sidebar-text-muted);
   background: transparent;
   font: inherit;
-  font-size: 22px;
-  line-height: 1;
   cursor: pointer;
   transition: background 140ms ease, color 140ms ease;
+}
+
+.canvasflow-collapse svg {
+  width: 22px;
+  height: 22px;
 }
 
 .canvasflow-collapse:hover {
@@ -181,8 +185,11 @@
   place-items: center;
   flex: 0 0 auto;
   color: var(--sidebar-text-muted);
-  font-size: 22px;
-  line-height: 1;
+}
+
+.canvasflow-nav__icon svg {
+  width: 22px;
+  height: 22px;
 }
 
 .canvasflow-nav__item:hover .canvasflow-nav__icon,
@@ -192,9 +199,17 @@
 }
 
 .canvasflow-nav__chevron {
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
   margin-left: auto;
   color: var(--sidebar-text-muted);
-  font-size: 18px;
+}
+
+.canvasflow-nav__chevron svg {
+  width: 18px;
+  height: 18px;
 }
 
 .canvasflow-nav__group {
@@ -266,6 +281,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   height: 34px;
   padding: 0 14px;
   border: 0;
@@ -277,6 +293,11 @@
   font-weight: 700;
   cursor: pointer;
   transition: background 140ms ease, transform 140ms ease;
+}
+
+.canvasflow-theme-button svg {
+  width: 16px;
+  height: 16px;
 }
 
 .app-shell[data-theme='light'] .canvasflow-theme-button {
