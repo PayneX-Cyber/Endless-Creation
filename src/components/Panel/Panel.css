@@ -1,0 +1,10 @@
+﻿.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+}
+
+.panel__header { margin-bottom: 0.9rem; }
+.panel__eyebrow { color: var(--accent); font-size: 0.75rem; font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; }
+.panel h2 { margin: 0.15rem 0 0; font-size: 1rem; }

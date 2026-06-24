@@ -1,0 +1,18 @@
+﻿{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "../dist-electron",
+    "rootDir": ".",
+    "types": ["node"],
+    "ignoreDeprecations": "6.0"
+  },
+  "include": ["main/**/*.ts", "preload/**/*.ts"],
+  "exclude": ["../node_modules", "../dist", "../dist-electron"]
+}

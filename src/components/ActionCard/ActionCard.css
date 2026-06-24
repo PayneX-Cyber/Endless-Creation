@@ -1,0 +1,19 @@
+﻿.action-card {
+  display: grid;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 8.5rem;
+  text-align: left;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  cursor: pointer;
+}
+
+.action-card:hover { border-color: var(--accent); }
+.action-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.action-card__meta { width: fit-content; border-radius: 999px; padding: 0.25rem 0.5rem; color: var(--accent); background: var(--accent-soft); font-size: 0.75rem; font-weight: 700; }
+.action-card strong { font-size: 1rem; }
+.action-card span:last-child { color: var(--muted); line-height: 1.6; }
