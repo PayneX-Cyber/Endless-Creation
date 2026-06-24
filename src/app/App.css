@@ -112,28 +112,76 @@
 }
 
 .canvasflow-collapse {
-  display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
+  position: relative;
+  width: 36px;
+  height: 36px;
   flex: 0 0 auto;
   border: 0;
-  border-radius: 8px;
-  color: var(--sidebar-text-muted);
+  outline: none;
+  color: #ffffff;
   background: transparent;
   font: inherit;
   cursor: pointer;
-  transition: background 140ms ease, color 140ms ease;
+  perspective: 12em;
+  transform-style: preserve-3d;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.canvasflow-collapse svg {
-  width: 22px;
-  height: 22px;
+.glass-icon-btn__back,
+.glass-icon-btn__front {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  transition:
+    opacity 0.3s cubic-bezier(0.83, 0, 0.17, 1),
+    transform 0.3s cubic-bezier(0.83, 0, 0.17, 1);
 }
 
-.canvasflow-collapse:hover {
-  color: var(--sidebar-text-strong);
-  background: var(--sidebar-hover);
+.glass-icon-btn__back {
+  display: block;
+  background: linear-gradient(hsl(223, 90%, 58%), hsl(208, 90%, 56%));
+  box-shadow: 0.35em -0.35em 0.65em rgba(17, 24, 39, 0.16);
+  transform: rotate(15deg);
+  transform-origin: 100% 100%;
+  will-change: transform;
+}
+
+.glass-icon-btn__front {
+  display: flex;
+  background-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.34) inset;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transform-origin: 80% 50%;
+  will-change: transform;
+}
+
+.glass-icon-btn__icon {
+  display: flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  margin: auto;
+}
+
+.glass-icon-btn__icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.canvasflow-collapse:focus-visible .glass-icon-btn__back,
+.canvasflow-collapse:hover .glass-icon-btn__back {
+  transform: rotate(25deg) translate3d(-0.18em, -0.18em, 0.35em);
+}
+
+.canvasflow-collapse:focus-visible .glass-icon-btn__front,
+.canvasflow-collapse:hover .glass-icon-btn__front {
+  transform: translate3d(0, 0, 0.8em);
+}
+
+.app-shell[data-theme='light'] .canvasflow-collapse {
+  color: #ffffff;
 }
 
 .canvasflow-collapse:focus-visible,

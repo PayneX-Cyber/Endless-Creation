@@ -47,8 +47,13 @@ export function App() {
             <span>Endless</span>
             <span>Creation</span>
           </span>
-          <button className="canvasflow-collapse" aria-label="折叠侧边栏" type="button">
-            <CollapseIcon />
+          <button className="canvasflow-collapse glass-icon-btn" aria-label="折叠侧边栏" type="button">
+            <span className="glass-icon-btn__back" aria-hidden="true" />
+            <span className="glass-icon-btn__front">
+              <span className="glass-icon-btn__icon" aria-hidden="true">
+                <CollapseIcon />
+              </span>
+            </span>
           </button>
         </header>
 
