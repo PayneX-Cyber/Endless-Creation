@@ -59,11 +59,33 @@ export const rendererBridge = {
 
     const clipboard = globalThis.navigator?.clipboard;
 
-    if (!clipboard?.writeText) {
+    if (clipboard?.writeText) {
+      await clipboard.writeText(text);
+      return;
+    }
+
+    const document = globalThis.document;
+
+    if (!document?.body) {
       throw new Error('Clipboard bridge is unavailable.');
     }
 
-    await clipboard.writeText(text);
+    const textArea = document.createElement('textarea');
+    textArea.value = text;
+    textArea.setAttribute('readonly', 'true');
+    textArea.style.position = 'fixed';
+    textArea.style.inset = '0 auto auto -9999px';
+    document.body.append(textArea);
+    textArea.select();
+
+    try {
+      const copied = document.execCommand('copy');
+      if (!copied) {
+        throw new Error('Copy command was rejected.');
+      }
+    } finally {
+      textArea.remove();
+    }
   },
 };
 

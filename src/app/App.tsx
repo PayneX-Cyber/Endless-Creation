@@ -10,6 +10,28 @@ export function App() {
   const [theme, setTheme] = usePersistentTheme();
   const [activeMode, setActiveMode] = useState<CreationMode>('text');
 
+  useEffect(() => {
+    const shortcutModes: Record<string, CreationMode> = {
+      '1': 'text',
+      '2': 'image',
+      '3': 'video',
+      '4': 'library',
+    };
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+
+      const nextMode = shortcutModes[event.key];
+      if (!nextMode) return;
+
+      event.preventDefault();
+      setActiveMode(nextMode);
+    }
+
+    globalThis.window.addEventListener('keydown', handleKeyDown);
+    return () => globalThis.window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   return (
     <div className="app-shell" data-theme={theme}>
       <div className="app-window" role="application" aria-label="Endless Creation 创作工作台">
@@ -22,7 +44,11 @@ export function App() {
             <span>AI 创作平台</span>
             <small>Workspace Shell v0.2</small>
           </div>
-          <div className="window-controls" aria-label="窗口控制">`n            <button aria-label="最小化窗口" className="window-controls__dot" onClick={() => void rendererBridge.minimizeWindow()} type="button" />`n            <button aria-label="最大化或还原窗口" className="window-controls__dot" onClick={() => void rendererBridge.maximizeWindow()} type="button" />`n            <button aria-label="关闭窗口" className="window-controls__dot window-controls__dot--close" onClick={() => void rendererBridge.closeWindow()} type="button" />`n          </div>
+          <div className="window-controls" aria-label="窗口控制">
+            <button aria-label="最小化窗口" className="window-controls__dot" onClick={() => void rendererBridge.minimizeWindow()} type="button" />
+            <button aria-label="最大化或还原窗口" className="window-controls__dot" onClick={() => void rendererBridge.maximizeWindow()} type="button" />
+            <button aria-label="关闭窗口" className="window-controls__dot window-controls__dot--close" onClick={() => void rendererBridge.closeWindow()} type="button" />
+          </div>
         </header>
 
         <div className="workspace-frame">

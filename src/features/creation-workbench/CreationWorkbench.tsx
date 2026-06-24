@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActionCard } from '../../components/ActionCard';
 import { Button } from '../../components/Button';
 import { Panel } from '../../components/Panel';
@@ -12,8 +12,12 @@ interface CreationWorkbenchProps {
   mode: CreationMode;
 }
 
-type SubmitState = 'idle' | 'loading' | 'success' | 'error';
+type SubmitState = 'idle' | 'loading' | 'success' | 'error' | 'cancelled';
 type CopyState = 'idle' | 'copied' | 'failed';
+
+type HistoryItem = GenerationTask & {
+  completedAt: string;
+};
 
 const MODE_COPY: Record<CreationMode, { eyebrow: string; title: string; description: string; placeholder: string; action: string }> = {
   text: {
@@ -51,19 +55,66 @@ export function CreationWorkbench({ mode }: CreationWorkbenchProps) {
   const [validationMessage, setValidationMessage] = useState('');
   const [submitState, setSubmitState] = useState<SubmitState>('idle');
   const [task, setTask] = useState<GenerationTask | null>(null);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [copyState, setCopyState] = useState<CopyState>('idle');
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const copyTimerRef = useRef<number | null>(null);
+  const promptRef = useRef(prompt);
+  const modeRef = useRef(mode);
+
+  useEffect(() => {
+    promptRef.current = prompt;
+  }, [prompt]);
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+      clearCopyTimer();
+    };
+  }, []);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Enter' || !event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+      event.preventDefault();
+      void submitGeneration(promptRef.current, modeRef.current);
+    }
+
+    globalThis.window.addEventListener('keydown', handleKeyDown);
+    return () => globalThis.window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const modeCopy = MODE_COPY[mode];
   const canCopy = Boolean(task?.result?.content);
+  const visibleHistory = history.filter((item) => item.mode === mode);
   const buttonText = useMemo(() => {
     if (submitState === 'loading') return '生成中…';
     if (submitState === 'error') return '重新生成';
     if (submitState === 'success') return '再次生成';
+    if (submitState === 'cancelled') return '继续生成';
     return modeCopy.action;
   }, [modeCopy.action, submitState]);
 
-  async function handleSubmit() {
-    const trimmedPrompt = prompt.trim();
+  function clearCopyTimer() {
+    if (copyTimerRef.current !== null) {
+      globalThis.clearTimeout(copyTimerRef.current);
+      copyTimerRef.current = null;
+    }
+  }
+
+  function rememberTask(nextTask: GenerationTask) {
+    setHistory((current) => [
+      { ...nextTask, completedAt: new Date().toISOString() },
+      ...current.filter((item) => item.id !== nextTask.id),
+    ].slice(0, 8));
+  }
+
+  async function submitGeneration(sourcePrompt = prompt, sourceMode = mode) {
+    const trimmedPrompt = sourcePrompt.trim();
     setCopyState('idle');
 
     if (!trimmedPrompt) {
@@ -71,36 +122,79 @@ export function CreationWorkbench({ mode }: CreationWorkbenchProps) {
       return;
     }
 
+    abortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+
     setValidationMessage('');
     setSubmitState('loading');
 
     try {
-      const nextTask = await createGenerationTask({ mode, prompt: trimmedPrompt });
+      const nextTask = await createGenerationTask(
+        { mode: sourceMode, prompt: trimmedPrompt },
+        { signal: abortController.signal },
+      );
+
+      if (abortController.signal.aborted) return;
+
       setTask(nextTask);
+      rememberTask(nextTask);
       setSubmitState(nextTask.status === 'failed' ? 'error' : 'success');
-    } catch {
-      setTask({
+    } catch (error) {
+      if (isAbortError(error)) {
+        setSubmitState('cancelled');
+        return;
+      }
+
+      const failedTask: GenerationTask = {
         id: `local-error-${Date.now()}`,
-        mode,
+        mode: sourceMode,
         prompt: trimmedPrompt,
         status: 'failed',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         errorMessage: '本地 mock client 出现异常，请重试。',
-      });
+      };
+      setTask(failedTask);
+      rememberTask(failedTask);
       setSubmitState('error');
+    } finally {
+      if (abortControllerRef.current === abortController) {
+        abortControllerRef.current = null;
+      }
     }
+  }
+
+  function handleCancelGeneration() {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setSubmitState('cancelled');
   }
 
   async function handleCopyResult() {
     if (!task?.result?.content) return;
+
+    clearCopyTimer();
 
     try {
       await rendererBridge.copyText(task.result.content);
       setCopyState('copied');
     } catch {
       setCopyState('failed');
+    } finally {
+      copyTimerRef.current = globalThis.setTimeout(() => {
+        setCopyState('idle');
+        copyTimerRef.current = null;
+      }, 2200);
     }
+  }
+
+  function restoreHistoryItem(item: HistoryItem) {
+    setPrompt(item.prompt);
+    setTask(item);
+    setSubmitState(item.status === 'failed' ? 'error' : 'success');
+    setValidationMessage('');
+    setCopyState('idle');
   }
 
   return (
@@ -127,10 +221,17 @@ export function CreationWorkbench({ mode }: CreationWorkbenchProps) {
           />
           {validationMessage && <p className="field-error" id="prompt-error" role="alert">{validationMessage}</p>}
           <div className="prompt-box__actions">
-            <span id="mock-service-note">{aiServiceStatus.provider} · {aiServiceStatus.connected ? '已连接' : '离线模拟'}</span>
-            <Button disabled={submitState === 'loading'} onClick={handleSubmit} variant="primary" type="button">
-              {buttonText}
-            </Button>
+            <span id="mock-service-note">{aiServiceStatus.provider} · {aiServiceStatus.connected ? '已连接' : '离线模拟'} · Ctrl+Enter 生成</span>
+            <div className="prompt-box__buttons">
+              {submitState === 'loading' && (
+                <Button onClick={handleCancelGeneration} variant="soft" type="button">
+                  取消
+                </Button>
+              )}
+              <Button disabled={submitState === 'loading'} onClick={() => void submitGeneration()} variant="primary" type="button">
+                {buttonText}
+              </Button>
+            </div>
           </div>
         </div>
       </section>
@@ -171,7 +272,7 @@ export function CreationWorkbench({ mode }: CreationWorkbenchProps) {
                 <div className="result-error" role="alert">
                   <strong>生成失败</strong>
                   <p>{task.errorMessage}</p>
-                  <Button disabled={submitState === 'loading'} onClick={handleSubmit} type="button" variant="soft">重试</Button>
+                  <Button disabled={submitState === 'loading'} onClick={() => void submitGeneration()} type="button" variant="soft">重试</Button>
                 </div>
               ) : (
                 <div className="result-body">
@@ -183,7 +284,7 @@ export function CreationWorkbench({ mode }: CreationWorkbenchProps) {
                   <pre>{task.result?.content}</pre>
                   <div className="result-body__actions">
                     <Button disabled={!canCopy} onClick={handleCopyResult} type="button" variant="soft">复制结果</Button>
-                    {copyState === 'copied' && <span className="copy-feedback" role="status">已复制</span>}
+                    {copyState === 'copied' && <span className="copy-feedback" role="status">已复制到剪贴板</span>}
                     {copyState === 'failed' && <span className="copy-feedback copy-feedback--error" role="status">复制失败，请手动选择文本</span>}
                   </div>
                 </div>
@@ -198,6 +299,26 @@ export function CreationWorkbench({ mode }: CreationWorkbenchProps) {
               </div>
               <p>选择左侧功能，输入提示并点击生成。这里会展示本次 mock AI 任务的状态、摘要和可复制结果。</p>
             </div>
+          )}
+        </Panel>
+
+        <Panel eyebrow="History" title="生成历史">
+          {visibleHistory.length > 0 ? (
+            <ol className="history-list" aria-label="当前模式生成历史">
+              {visibleHistory.map((item) => (
+                <li key={item.id}>
+                  <button className="history-item" onClick={() => restoreHistoryItem(item)} type="button">
+                    <span>
+                      <strong>{item.result?.title ?? item.errorMessage ?? '未完成生成'}</strong>
+                      <small>{formatHistoryTime(item.completedAt)} · {item.prompt}</small>
+                    </span>
+                    <span className={`task-status task-status--${item.status}`}>{taskStatusText[item.status]}</span>
+                  </button>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="history-empty">当前模式还没有生成记录。生成完成或失败后会保存在本地页面状态中。</p>
           )}
         </Panel>
       </div>
@@ -218,3 +339,14 @@ const taskStatusText = {
   failed: '失败',
 };
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === 'AbortError';
+}
+
+function formatHistoryTime(isoTime: string): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(new Date(isoTime));
+}
