@@ -34,11 +34,15 @@ const assetItems: Array<{ Icon: SidebarIcon; label: string; count: number }> = [
 
 export function App() {
   const [theme, setTheme] = usePersistentTheme();
+  const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const ThemeIcon = theme === 'dark' ? SunIcon : MoonIcon;
 
   return (
-    <div className="app-shell" data-theme={theme}>
-      <aside className="canvasflow-sidebar" aria-label="CanvasFlow 侧边栏">
+    <div className={`app-shell ${isSidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''}`} data-theme={theme}>
+      <aside
+        className={`canvasflow-sidebar ${isSidebarCollapsed ? 'canvasflow-sidebar--collapsed' : ''}`}
+        aria-label="CanvasFlow 侧边栏"
+      >
         <header className="canvasflow-brand">
           <span className="canvasflow-brand__mark" aria-hidden="true">
             <AddSquareIcon />
@@ -47,7 +51,13 @@ export function App() {
             <span>Endless</span>
             <span>Creation</span>
           </span>
-          <button className="canvasflow-collapse glass-icon-btn" aria-label="折叠侧边栏" type="button">
+          <button
+            aria-expanded={!isSidebarCollapsed}
+            className="canvasflow-collapse glass-icon-btn"
+            aria-label={isSidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
+            onClick={() => setSidebarCollapsed((current) => !current)}
+            type="button"
+          >
             <span className="glass-icon-btn__back" aria-hidden="true" />
             <span className="glass-icon-btn__front">
               <span className="glass-icon-btn__icon" aria-hidden="true">
@@ -61,19 +71,20 @@ export function App() {
           {sidebarNavItems.map(({ Icon, ...item }) => (
             <button
               aria-current={item.active ? 'page' : undefined}
+              aria-label={isSidebarCollapsed ? item.label : undefined}
               className={`canvasflow-nav__item ${item.active ? 'canvasflow-nav__item--active' : ''}`}
               key={item.id}
               type="button"
             >
               <span className="canvasflow-nav__icon" aria-hidden="true"><Icon /></span>
-              <span>{item.label}</span>
+              <span className="canvasflow-nav__label">{item.label}</span>
             </button>
           ))}
 
           <section className="canvasflow-nav__group" aria-label="资产管理">
-            <button className="canvasflow-nav__item" type="button">
+            <button aria-label={isSidebarCollapsed ? '资产管理' : undefined} className="canvasflow-nav__item" type="button">
               <span className="canvasflow-nav__icon" aria-hidden="true"><FolderIcon /></span>
-              <span>资产管理</span>
+              <span className="canvasflow-nav__label">资产管理</span>
               <span className="canvasflow-nav__chevron" aria-hidden="true"><ChevronDownIcon /></span>
             </button>
 
@@ -81,7 +92,7 @@ export function App() {
               {assetItems.map(({ Icon, ...item }) => (
                 <button className="canvasflow-subnav__item" key={item.label} type="button">
                   <span className="canvasflow-nav__icon" aria-hidden="true"><Icon /></span>
-                  <span>{item.label}</span>
+                  <span className="canvasflow-nav__label">{item.label}</span>
                   <span className="canvasflow-badge" aria-label={`${item.label} ${item.count} 个`}>{item.count}</span>
                 </button>
               ))}
@@ -91,7 +102,7 @@ export function App() {
 
         <footer className="canvasflow-footer">
           <div className="canvasflow-footer__row">
-            <span>主题</span>
+            <span className="canvasflow-footer__label">主题</span>
             <button
               aria-pressed={theme === 'light'}
               className="canvasflow-theme-button"
@@ -99,7 +110,7 @@ export function App() {
               type="button"
             >
               <ThemeIcon />
-              <span>{theme === 'dark' ? '浅色' : '深色'}</span>
+              <span className="canvasflow-theme-button__label">{theme === 'dark' ? '浅色' : '深色'}</span>
             </button>
           </div>
           <div className="canvasflow-footer__row canvasflow-footer__row--muted">
