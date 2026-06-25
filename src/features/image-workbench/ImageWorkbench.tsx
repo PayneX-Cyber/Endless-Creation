@@ -2,24 +2,18 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import './ImageWorkbench.css';
 
-const parameterRows = [
-  ['模型', 'gpt-image-2'],
-  ['尺寸', '1536 x 1024'],
-  ['质量', '高'],
-  ['数量', '4'],
-  ['风格强度', '72%'],
-  ['参考权重', '60%'],
-] as const;
-
 const costPills = ['预计扣费 ¥0.04', '标准单张 · ¥0.04', '生成图片 · ¥0.04'] as const;
+const qualityOptions = ['自动', '高', '中', '低'] as const;
 const quickActionsTop = ['提示词库', '方案库', '参数设置', '改稿实验', '存为模板'] as const;
 const quickActionsBottom = ['存方案包', '复制', '清空', 'Prompt Lab'] as const;
 
 type VariantId = 'variant-1' | 'variant-3';
+type QualityOption = (typeof qualityOptions)[number];
 
 export function ImageWorkbench() {
   const [selectedVariant, setSelectedVariant] = useState<VariantId>('variant-1');
   const [promptText, setPromptText] = useState('');
+  const [quality, setQuality] = useState<QualityOption>('高');
 
   function handleQuickAction(action: string) {
     if (action === '清空') {
@@ -47,32 +41,7 @@ export function ImageWorkbench() {
           </div>
         </header>
 
-        <div className="image-workbench__columns">
-          <aside className="image-workbench__card image-workbench__card--params">
-            <h2>参数检查器</h2>
-            <div className="image-workbench__params">
-              {parameterRows.map(([label, value]) => (
-                <div className="image-workbench__param-row" key={label}>
-                  <span>{label}</span>
-                  <strong>{value}</strong>
-                </div>
-              ))}
-            </div>
-
-            <div className="image-workbench__divider" />
-
-            <div className="image-workbench__section-label">输出选项</div>
-            <label className="image-workbench__checkline">
-              <span aria-hidden="true" className="image-workbench__checkbox"><CheckIcon /></span>
-              <span>保存到本地项目</span>
-            </label>
-
-            <div className="image-workbench__queue">
-              <strong>队列</strong>
-              <span>暂无等待任务</span>
-            </div>
-          </aside>
-
+        <div className="image-workbench__columns image-workbench__columns--merged">
           <section className="image-workbench__card image-workbench__card--composer image-workbench__card--image-studio">
             <div className="image-studio__header">
               <div className="image-studio__title-copy">
@@ -84,11 +53,56 @@ export function ImageWorkbench() {
               </div>
             </div>
 
-            <label className="image-studio__model-select">
-              <span>图片模型</span>
-              <strong>GPT Image 2 · 3 通道</strong>
-              <ChevronDownIcon />
-            </label>
+            <div className="image-studio__params" aria-label="生图参数">
+              <div className="image-studio__field image-studio__field--select">
+                <span>图片模型</span>
+                <strong>GPT Image 2 · 3 通道</strong>
+                <ChevronDownIcon />
+              </div>
+              <div className="image-studio__field">
+                <span>尺寸</span>
+                <strong>1536 x 1024</strong>
+              </div>
+              <div className="image-studio__field image-studio__field--quality">
+                <span>质量</span>
+                <div className="image-studio__quality-group" role="group" aria-label="质量">
+                  {qualityOptions.map((option) => (
+                    <button
+                      aria-pressed={quality === option}
+                      className={quality === option ? 'image-studio__quality image-studio__quality--active' : 'image-studio__quality'}
+                      key={option}
+                      onClick={() => setQuality(option)}
+                      type="button"
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="image-studio__field">
+                <span>数量</span>
+                <strong>4</strong>
+              </div>
+              <div className="image-studio__field">
+                <span>风格强度</span>
+                <strong>72%</strong>
+              </div>
+              <div className="image-studio__field">
+                <span>参考权重</span>
+                <strong>60%</strong>
+              </div>
+            </div>
+
+            <div className="image-studio__status-strip">
+              <label className="image-studio__save-option">
+                <span aria-hidden="true" className="image-workbench__checkbox"><CheckIcon /></span>
+                <span>保存到本地项目</span>
+              </label>
+              <div className="image-studio__queue-inline">
+                <span>队列</span>
+                <strong>暂无等待任务</strong>
+              </div>
+            </div>
 
             <label className="image-studio__prompt-area">
               <span>提示词</span>
@@ -159,7 +173,7 @@ export function ImageWorkbench() {
           </section>
         </div>
 
-        <footer className="image-workbench__statusbar">已更新列顺序：参数检查器 / 图片工作台 / 结果画布</footer>
+        <footer className="image-workbench__statusbar">已更新布局：图片工作台 / 结果画布</footer>
       </section>
     </main>
   );
@@ -218,7 +232,6 @@ function SvgIcon({ children }: { children: ReactNode }) {
   );
 }
 
-function PlusIcon() { return <SvgIcon><path d="M12 5v14M5 12h14" /></SvgIcon>; }
 function CheckIcon() { return <SvgIcon><path d="M5 12l4 4L19 6" /></SvgIcon>; }
 function ChevronDownIcon() { return <SvgIcon><path d="m6 9 6 6 6-6" /></SvgIcon>; }
 function UploadIcon() { return <SvgIcon><path d="M12 16V4M7 9l5-5 5 5M5 20h14" /></SvgIcon>; }
