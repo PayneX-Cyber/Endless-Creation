@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import './ImageWorkbench.css';
 
 type Quality = 'auto' | 'high' | 'medium' | 'low';
+type AspectRatio = '1:1' | '3:2' | '2:3' | '4:3' | '3:4' | '16:9' | '9:16' | '1:1(2k)' | '16:9(2k)' | '9:16(2k)' | '16:9(4k)' | '9:16(4k)' | 'auto';
 
 const qualityOptions: Array<{ id: Quality; label: string }> = [
   { id: 'auto', label: '自动' },
@@ -11,13 +12,36 @@ const qualityOptions: Array<{ id: Quality; label: string }> = [
   { id: 'low', label: '低' },
 ];
 
+const aspectRatioOptions: AspectRatio[] = [
+  '1:1',
+  '3:2',
+  '2:3',
+  '4:3',
+  '3:4',
+  '16:9',
+  '9:16',
+  '1:1(2k)',
+  '16:9(2k)',
+  '9:16(2k)',
+  '16:9(4k)',
+  '9:16(4k)',
+  'auto',
+];
+
+const generationCounts = Array.from({ length: 10 }, (_, index) => index + 1);
+
 export function ImageWorkbench() {
   const [prompt, setPrompt] = useState('');
   const [quality, setQuality] = useState<Quality>('auto');
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('1:1');
+  const [generationCount, setGenerationCount] = useState(1);
+  const canGenerate = prompt.trim().length > 0;
 
   const resetDraft = () => {
     setPrompt('');
     setQuality('auto');
+    setAspectRatio('1:1');
+    setGenerationCount(1);
   };
 
   return (
@@ -102,13 +126,46 @@ export function ImageWorkbench() {
           </div>
         </div>
 
-        <div className="image-workbench__meta-grid" aria-hidden="true">
-          <div><span>尺寸</span><strong>1024 ? 1024</strong></div>
-          <div><span>数量</span><strong>1</strong></div>
+        <div className="image-workbench__field image-workbench__field--compact">
+          <h2>宽高比</h2>
+          <div className="image-workbench__ratio-grid" role="group" aria-label="宽高比">
+            {aspectRatioOptions.map((item) => (
+              <button
+                aria-pressed={aspectRatio === item}
+                className={`image-workbench__ratio-card ${aspectRatio === item ? 'image-workbench__ratio-card--active' : ''}`}
+                key={item}
+                onClick={() => setAspectRatio(item)}
+                type="button"
+              >
+                {item === 'auto' ? null : <RatioIcon ratio={item} />}
+                <span>{item}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        <button className="image-workbench__generate" type="button">
-          <SparkIcon />生成图片
+        <div className="image-workbench__field image-workbench__field--compact">
+          <h2>生成张数</h2>
+          <div className="image-workbench__count-grid" role="group" aria-label="生成张数">
+            {generationCounts.map((item) => (
+              <button
+                aria-pressed={generationCount === item}
+                className={`image-workbench__count-button ${generationCount === item ? 'image-workbench__count-button--active' : ''}`}
+                key={item}
+                onClick={() => setGenerationCount(item)}
+                type="button"
+              >
+                {item} 张
+              </button>
+            ))}
+            <button className="image-workbench__count-button image-workbench__count-button--custom" type="button">
+              {generationCount}
+            </button>
+          </div>
+        </div>
+
+        <button className="image-workbench__generate" disabled={!canGenerate} type="button">
+          <SparkIcon />开始生成
         </button>
       </section>
 
@@ -130,6 +187,17 @@ function SvgIcon({ children }: { children: ReactNode }) {
       {children}
     </svg>
   );
+}
+
+function RatioIcon({ ratio }: { ratio: AspectRatio }) {
+  const baseRatio = ratio.replace(/\(.+\)/, '');
+  const isPortrait = baseRatio === '2:3' || baseRatio === '3:4' || baseRatio === '9:16';
+  const isLandscape = baseRatio === '3:2' || baseRatio === '4:3' || baseRatio === '16:9';
+  const className = `image-workbench__ratio-icon ${
+    isPortrait ? 'image-workbench__ratio-icon--portrait' : isLandscape ? 'image-workbench__ratio-icon--landscape' : 'image-workbench__ratio-icon--square'
+  }`;
+
+  return <span className={className} aria-hidden="true" />;
 }
 
 function PlusIcon() { return <SvgIcon><path d="M12 5v14M5 12h14" /></SvgIcon>; }
