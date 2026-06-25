@@ -295,6 +295,15 @@
   background: var(--sidebar-hover);
 }
 
+.canvasflow-subnav__item--active {
+  color: var(--sidebar-text-strong);
+  background: var(--sidebar-active);
+}
+
+.canvasflow-subnav__item--active .canvasflow-nav__icon {
+  color: var(--sidebar-text-strong);
+}
+
 .canvasflow-badge {
   display: inline-grid;
   min-width: 26px;

@@ -19,17 +19,18 @@ import {
 import './App.css';
 
 type SidebarIcon = ComponentType<SVGProps<SVGSVGElement>>;
+type ActiveNavId = 'projects' | 'prompts' | 'assets' | 'asset-role' | 'asset-scene' | 'asset-script' | 'asset-novel';
 
-const sidebarNavItems: Array<{ id: string; Icon: SidebarIcon; label: string; active: boolean }> = [
-  { id: 'projects', Icon: ProjectIcon, label: '项目管理', active: true },
-  { id: 'prompts', Icon: PromptIcon, label: '提示词库', active: false },
+const sidebarNavItems: Array<{ id: ActiveNavId; Icon: SidebarIcon; label: string }> = [
+  { id: 'projects', Icon: ProjectIcon, label: '项目管理' },
+  { id: 'prompts', Icon: PromptIcon, label: '提示词库' },
 ];
 
-const assetItems: Array<{ Icon: SidebarIcon; label: string; count: number }> = [
-  { Icon: UserIcon, label: '角色', count: 12 },
-  { Icon: SceneIcon, label: '场景', count: 8 },
-  { Icon: ScriptIcon, label: '剧本', count: 5 },
-  { Icon: BookIcon, label: '小说', count: 3 },
+const assetItems: Array<{ id: ActiveNavId; Icon: SidebarIcon; label: string; count: number }> = [
+  { id: 'asset-role', Icon: UserIcon, label: '角色', count: 12 },
+  { id: 'asset-scene', Icon: SceneIcon, label: '场景', count: 8 },
+  { id: 'asset-script', Icon: ScriptIcon, label: '剧本', count: 5 },
+  { id: 'asset-novel', Icon: BookIcon, label: '小说', count: 3 },
 ];
 
 const mockUser = { name: '未登录用户', status: '点击登录' };
@@ -38,6 +39,7 @@ export function App() {
   const [theme, setTheme] = usePersistentTheme();
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isSidebarPreviewed, setSidebarPreviewed] = useState(false);
+  const [activeNavId, setActiveNavId] = useState<ActiveNavId>('projects');
   const ThemeIcon = theme === 'dark' ? SunIcon : MoonIcon;
   const isSidebarVisuallyCollapsed = isSidebarCollapsed && !isSidebarPreviewed;
 
@@ -84,10 +86,11 @@ export function App() {
         <nav className="canvasflow-nav" aria-label="Endless Creation 导航">
           {sidebarNavItems.map(({ Icon, ...item }) => (
             <button
-              aria-current={item.active ? 'page' : undefined}
+              aria-current={activeNavId === item.id ? 'page' : undefined}
               aria-label={isSidebarVisuallyCollapsed ? item.label : undefined}
-              className={`canvasflow-nav__item ${item.active ? 'canvasflow-nav__item--active' : ''}`}
+              className={`canvasflow-nav__item ${activeNavId === item.id ? 'canvasflow-nav__item--active' : ''}`}
               key={item.id}
+              onClick={() => setActiveNavId(item.id)}
               type="button"
             >
               <span className="canvasflow-nav__icon" aria-hidden="true"><Icon /></span>
@@ -96,7 +99,13 @@ export function App() {
           ))}
 
           <section className="canvasflow-nav__group" aria-label="资产管理">
-            <button aria-label={isSidebarVisuallyCollapsed ? '资产管理' : undefined} className="canvasflow-nav__item" type="button">
+            <button
+              aria-current={activeNavId === 'assets' ? 'page' : undefined}
+              aria-label={isSidebarVisuallyCollapsed ? '资产管理' : undefined}
+              className={`canvasflow-nav__item ${activeNavId === 'assets' ? 'canvasflow-nav__item--active' : ''}`}
+              onClick={() => setActiveNavId('assets')}
+              type="button"
+            >
               <span className="canvasflow-nav__icon" aria-hidden="true"><FolderIcon /></span>
               <span className="canvasflow-nav__label">资产管理</span>
               <span className="canvasflow-nav__chevron" aria-hidden="true"><ChevronDownIcon /></span>
@@ -104,7 +113,14 @@ export function App() {
 
             <div className="canvasflow-subnav">
               {assetItems.map(({ Icon, ...item }) => (
-                <button className="canvasflow-subnav__item" key={item.label} type="button">
+                <button
+                  aria-current={activeNavId === item.id ? 'page' : undefined}
+                  aria-label={isSidebarVisuallyCollapsed ? item.label : undefined}
+                  className={`canvasflow-subnav__item ${activeNavId === item.id ? 'canvasflow-subnav__item--active' : ''}`}
+                  key={item.id}
+                  onClick={() => setActiveNavId(item.id)}
+                  type="button"
+                >
                   <span className="canvasflow-nav__icon" aria-hidden="true"><Icon /></span>
                   <span className="canvasflow-nav__label">{item.label}</span>
                   <span className="canvasflow-badge" aria-label={`${item.label} ${item.count} 个`}>{item.count}</span>
