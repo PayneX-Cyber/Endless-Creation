@@ -11,14 +11,26 @@ const parameterRows = [
   ['参考权重', '60%'],
 ] as const;
 
-const styleChips = ['电影感', '海报', '3D 渲染', '柔光'] as const;
+const costPills = ['预计扣费 ¥0.04', '标准单张 · ¥0.04', '生成图片 · ¥0.04'] as const;
+const quickActionsTop = ['提示词库', '方案库', '参数设置', '改稿实验', '存为模板'] as const;
+const quickActionsBottom = ['存方案包', '复制', '清空', 'Prompt Lab'] as const;
 
-type StyleChip = (typeof styleChips)[number];
 type VariantId = 'variant-1' | 'variant-3';
 
 export function ImageWorkbench() {
-  const [selectedChip, setSelectedChip] = useState<StyleChip>('电影感');
   const [selectedVariant, setSelectedVariant] = useState<VariantId>('variant-1');
+  const [promptText, setPromptText] = useState('');
+
+  function handleQuickAction(action: string) {
+    if (action === '清空') {
+      setPromptText('');
+      return;
+    }
+
+    if (action === '复制' && promptText) {
+      void navigator.clipboard?.writeText(promptText).catch(() => undefined);
+    }
+  }
 
   return (
     <main className="image-workbench" aria-label="生图工作台">
@@ -61,42 +73,66 @@ export function ImageWorkbench() {
             </div>
           </aside>
 
-          <section className="image-workbench__card image-workbench__card--composer">
-            <h2>提示词编辑器</h2>
-            <label className="image-workbench__prompt-box image-workbench__prompt-box--large">
-              <span className="image-workbench__prompt-label">主提示词输入区</span>
-              <textarea aria-label="主提示词输入区" placeholder="主体 / 风格 / 光线 / 构图" />
-            </label>
-            <label className="image-workbench__prompt-box">
-              <span className="image-workbench__prompt-label">反向提示词</span>
-              <input aria-label="反向提示词" type="text" />
-            </label>
-
-            <div className="image-workbench__section-label">参考图</div>
-            <div className="image-workbench__ref-grid">
-              {Array.from({ length: 3 }).map((_, index) => (
-                <button className="image-workbench__ref-tile" key={index} type="button" aria-label="导入参考图">
-                  <PlusIcon />
-                </button>
-              ))}
+          <section className="image-workbench__card image-workbench__card--composer image-workbench__card--image-studio">
+            <div className="image-studio__header">
+              <div className="image-studio__title-copy">
+                <h2>图片工作台</h2>
+                <p>写清楚画面需求，然后提交生成。</p>
+              </div>
+              <div className="image-studio__cost-pills" aria-label="费用信息">
+                {costPills.map((pill) => <span key={pill}>{pill}</span>)}
+              </div>
             </div>
 
-            <div className="image-workbench__section-label">风格标签</div>
-            <div className="image-workbench__chips" role="group" aria-label="风格标签">
-              {styleChips.map((chip) => (
-                <button
-                  aria-pressed={selectedChip === chip}
-                  className={`image-workbench__chip ${selectedChip === chip ? 'image-workbench__chip--active' : ''}`}
-                  key={chip}
-                  onClick={() => setSelectedChip(chip)}
-                  type="button"
-                >
-                  {chip}
-                </button>
-              ))}
+            <label className="image-studio__model-select">
+              <span>图片模型</span>
+              <strong>GPT Image 2 · 3 通道</strong>
+              <ChevronDownIcon />
+            </label>
+
+            <label className="image-studio__prompt-area">
+              <span>提示词</span>
+              <textarea
+                aria-label="提示词"
+                maxLength={4000}
+                onChange={(event) => setPromptText(event.target.value)}
+                placeholder="提示词"
+                value={promptText}
+              />
+            </label>
+            <div className="image-studio__count" aria-live="polite">{promptText.length}/4000</div>
+
+            <div className="image-studio__upload-zone">
+              <button className="image-studio__upload-button" type="button">
+                <UploadIcon />
+                <span>上传参考图</span>
+              </button>
+              <div>
+                <strong>可选上传参考图，支持图生图/重绘</strong>
+                <p>最多 4 张，每张 8MB；当前模型会走参考图生成通道。</p>
+              </div>
             </div>
 
-            <button className="image-workbench__generate" type="button">生成 4 张图片</button>
+            <div className="image-studio__actions" aria-label="快捷操作">
+              <div className="image-studio__action-row">
+                {quickActionsTop.map((action, index) => (
+                  <button className={`image-studio__action ${index === 1 ? 'image-studio__action--warm' : ''}`} key={action} onClick={() => handleQuickAction(action)} type="button">
+                    <ActionIcon variant={index} />
+                    <span>{action}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="image-studio__action-row image-studio__action-row--secondary">
+                {quickActionsBottom.map((action, index) => (
+                  <button className="image-studio__action image-studio__action--ghost" key={action} onClick={() => handleQuickAction(action)} type="button">
+                    <ActionIcon variant={index + 5} />
+                    <span>{action}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button className="image-workbench__generate image-studio__submit" type="button">生成 4 张图片</button>
           </section>
 
           <section className="image-workbench__card image-workbench__card--results">
@@ -123,7 +159,7 @@ export function ImageWorkbench() {
           </section>
         </div>
 
-        <footer className="image-workbench__statusbar">已更新列顺序：参数检查器 / 提示词编辑器 / 结果画布</footer>
+        <footer className="image-workbench__statusbar">已更新列顺序：参数检查器 / 图片工作台 / 结果画布</footer>
       </section>
     </main>
   );
@@ -158,6 +194,22 @@ function ResultCard({ active, accent, label, onClick }: { active: boolean; accen
   );
 }
 
+function ActionIcon({ variant }: { variant: number }) {
+  const paths = [
+    <path key="book" d="M5 5.5h9a3 3 0 0 1 3 3v10H8a3 3 0 0 0-3 3v-16Z" />,
+    <path key="box" d="M4 8h16M7 8V5h10v3M7 12h10M8 16h8" />,
+    <path key="gear" d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7ZM12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3" />,
+    <path key="flask" d="M9 3h6M10 3v5l-5 9a3 3 0 0 0 2.6 4.5h8.8A3 3 0 0 0 19 17l-5-9V3" />,
+    <path key="bookmark" d="M6 4h12v17l-6-3-6 3V4Z" />,
+    <path key="save" d="M5 4h12l2 2v14H5V4ZM8 4v6h8M8 17h8" />,
+    <path key="copy" d="M8 8h11v11H8zM5 5h11" />,
+    <path key="clear" d="M5 7h14M10 11v6M14 11v6M8 7l1-3h6l1 3M7 7l1 14h8l1-14" />,
+    <path key="lab" d="M7 17 17 7M9 7h8v8" />,
+  ];
+
+  return <SvgIcon>{paths[variant] ?? paths[0]}</SvgIcon>;
+}
+
 function SvgIcon({ children }: { children: ReactNode }) {
   return (
     <svg aria-hidden="true" fill="none" focusable="false" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">
@@ -168,3 +220,5 @@ function SvgIcon({ children }: { children: ReactNode }) {
 
 function PlusIcon() { return <SvgIcon><path d="M12 5v14M5 12h14" /></SvgIcon>; }
 function CheckIcon() { return <SvgIcon><path d="M5 12l4 4L19 6" /></SvgIcon>; }
+function ChevronDownIcon() { return <SvgIcon><path d="m6 9 6 6 6-6" /></SvgIcon>; }
+function UploadIcon() { return <SvgIcon><path d="M12 16V4M7 9l5-5 5 5M5 20h14" /></SvgIcon>; }
