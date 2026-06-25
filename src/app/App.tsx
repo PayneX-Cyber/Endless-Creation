@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ComponentType, SVGProps } from 'react';
 import type { ThemeMode } from '../types/workspace';
 import { rendererBridge } from '../services/rendererBridge';
+import { ImageWorkbench } from '../features/image-workbench';
 import {
   AddSquareIcon,
   BillingIcon,
@@ -231,7 +232,11 @@ export function App() {
         </footer>
       </aside>
 
-      <main className="blank-workspace" aria-label="空白工作区" />
+      {activeNavId === 'image-workbench' ? (
+        <ImageWorkbench />
+      ) : (
+        <main className="blank-workspace" aria-label="空白工作区" />
+      )}
     </div>
   );
 }
