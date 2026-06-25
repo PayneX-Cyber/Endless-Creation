@@ -72,6 +72,10 @@ export function App() {
   const ThemeIcon = theme === 'dark' ? SunIcon : MoonIcon;
   const AssetChevronIcon = isAssetMenuExpanded ? ChevronDownIcon : ChevronRightIcon;
   const isSidebarVisuallyCollapsed = isSidebarCollapsed && !isSidebarPreviewed;
+  const activeTitle =
+    sidebarNavItems.find((item) => item.id === activeNavId)?.label ??
+    assetItems.find((item) => item.id === activeNavId)?.label ??
+    '工作区';
 
   useEffect(() => {
     if (!isUserMenuOpen) return;
@@ -231,7 +235,14 @@ export function App() {
         </footer>
       </aside>
 
-      <main className="blank-workspace" aria-label="空白工作区" />
+      <section className="workspace-shell" aria-label="工作区">
+        <header className="workspace-titlebar">
+          <h1>{activeTitle}</h1>
+        </header>
+        <div className="workspace-content">
+          <main className="blank-workspace" aria-label="空白工作区" />
+        </div>
+      </section>
     </div>
   );
 }
