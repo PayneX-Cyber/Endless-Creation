@@ -181,7 +181,7 @@ export function CanvasWorkbench({ canvasId, onBack, keyboardDisabled = false }: 
       position: { x: 180 + offset, y: 180 + offset },
       width: type === 'image' ? 280 : type === 'video' ? 270 : 260,
       height: type === 'image' ? 190 : type === 'video' ? 170 : 150,
-      metadata: type === 'config' ? { model: 'Mock ??', size: '1536 x 1024', quality: '?' } : undefined,
+      metadata: type === 'config' ? { model: 'Mock 模型', size: '1536 x 1024', quality: '高' } : undefined,
     };
     commit((current) => ({ ...current, nodes: [...current.nodes, node] }));
     setSelectedNodeId(node.id);
@@ -223,7 +223,7 @@ export function CanvasWorkbench({ canvasId, onBack, keyboardDisabled = false }: 
   }
 
   function saveMock() {
-    updateDocument({ updatedAt: '??' });
+    updateDocument({ updatedAt: '刚刚' });
     setSaveState('saved');
   }
 
@@ -264,7 +264,7 @@ export function CanvasWorkbench({ canvasId, onBack, keyboardDisabled = false }: 
   function pasteCopied() {
     const nodes = clipboardRef.current;
     if (!nodes?.length) return;
-    const pasted = nodes.map((node) => ({ ...node, id: createId(node.type), title: `${node.title} ??`, position: { x: node.position.x + 36, y: node.position.y + 36 } }));
+    const pasted = nodes.map((node) => ({ ...node, id: createId(node.type), title: `${node.title} 副本`, position: { x: node.position.x + 36, y: node.position.y + 36 } }));
     commit((current) => ({ ...current, nodes: [...current.nodes, ...pasted] }));
     setSelectedNodeId(pasted[0]?.id ?? null);
     setSelectedConnectionId(null);
@@ -313,21 +313,21 @@ export function CanvasWorkbench({ canvasId, onBack, keyboardDisabled = false }: 
   return (
     <main
       className="canvas-workbench"
-      aria-label="?????"
+      aria-label="画布工作区"
       ref={rootRef}
       onPointerDownCapture={() => { canvasActiveRef.current = true; }}
     >
       <header className="canvas-workbench__topbar">
         <div className="canvas-workbench__title-area">
-          <button className="canvas-workbench__back" onClick={onBack} type="button">??????</button>
+          <button className="canvas-workbench__back" onClick={onBack} type="button">返回项目管理</button>
           <div>
             <h1>{document.title}</h1>
-            <p>{document.description || '????'}</p>
+            <p>{document.description || '暂无描述'}</p>
           </div>
         </div>
         <div className="canvas-workbench__meta">
-          <span className={saveState === 'saved' ? 'canvas-workbench__save-state' : 'canvas-workbench__save-state canvas-workbench__save-state--dirty'}>{saveState === 'saved' ? '???' : '??????'}</span>
-          <button className="canvas-workbench__save" onClick={saveMock} type="button">??</button>
+          <span className={saveState === 'saved' ? 'canvas-workbench__save-state' : 'canvas-workbench__save-state canvas-workbench__save-state--dirty'}>{saveState === 'saved' ? '已保存' : '有未保存更改'}</span>
+          <button className="canvas-workbench__save" onClick={saveMock} type="button">保存</button>
         </div>
       </header>
 
@@ -340,24 +340,24 @@ export function CanvasWorkbench({ canvasId, onBack, keyboardDisabled = false }: 
         </InfiniteCanvas>
         <CanvasToolbar hasSelection={Boolean(selectedNodeId || selectedConnectionId)} canUndo={history.past.length > 0} canRedo={history.future.length > 0} backgroundMode={document.backgroundMode} onAddNode={addNode} onDeleteSelected={deleteSelected} onClear={clearCanvas} onUndo={undo} onRedo={redo} onBackgroundModeChange={setBackgroundMode} onResetView={resetView} />
         <CanvasZoomControls scale={document.viewport.k} onScaleChange={(k) => updateViewport({ ...document.viewport, k })} onReset={resetView} />
-        {selectedNode ? <div className="canvas-workbench__selection" data-canvas-control>{`????${selectedNode.title}`}</div> : selectedConnectionId ? <div className="canvas-workbench__selection" data-canvas-control>??????</div> : null}
+        {selectedNode ? <div className="canvas-workbench__selection" data-canvas-control>{`选中：${selectedNode.title}`}</div> : selectedConnectionId ? <div className="canvas-workbench__selection" data-canvas-control>已选中连线</div> : null}
       </section>
     </main>
   );
 }
 
 function nodeTitle(type: CanvasNodeType) {
-  if (type === 'image') return '????';
-  if (type === 'config') return '????';
-  if (type === 'video') return '????';
-  if (type === 'audio') return '????';
-  return '????';
+  if (type === 'image') return '图片节点';
+  if (type === 'config') return '配置节点';
+  if (type === 'video') return '视频节点';
+  if (type === 'audio') return '音频节点';
+  return '文本节点';
 }
 
 function nodeContent(type: CanvasNodeType) {
-  if (type === 'image') return '???????????????????';
-  if (type === 'config') return '????????????????';
-  if (type === 'video') return '???????????????????';
-  if (type === 'audio') return '?????????????????';
-  return '???????????????';
+  if (type === 'image') return '用于占位本地图片或后续生成的视觉结果。';
+  if (type === 'config') return '记录模型、尺寸、质量等生成参数。';
+  if (type === 'video') return '用于规划视频镜头、素材节奏和旁白结构。';
+  if (type === 'audio') return '用于规划音频、配乐或旁白生成需求。';
+  return '写下一段可继续拆分的创作内容。';
 }

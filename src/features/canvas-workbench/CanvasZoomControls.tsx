@@ -20,26 +20,26 @@ export function CanvasZoomControls({ scale, onScaleChange, onReset }: CanvasZoom
   return (
     <div className="canvas-zoom-wrap" data-canvas-control>
       {feedback ? <div className="canvas-zoom__feedback" role="status">{feedback}</div> : null}
-      <div className="canvas-zoom" aria-label="???????">
-        <ZoomButton label="??" onClick={() => setFeedback('????????')}>
+      <div className="canvas-zoom" aria-label="画布视图控制栏">
+        <ZoomButton label="定位" onClick={() => setFeedback('定位功能后续接入')}>
           <CompassIcon />
         </ZoomButton>
-        <ZoomButton label="????" onClick={onReset}>
+        <ZoomButton label="适配视图" onClick={onReset}>
           <FocusIcon />
         </ZoomButton>
         <input
-          aria-label="????"
+          aria-label="缩放画布"
           className="canvas-zoom__range"
           max={Math.round(MAX_CANVAS_SCALE * 100)}
           min={Math.round(MIN_CANVAS_SCALE * 100)}
           onChange={(event) => onScaleChange(clampScale(Number(event.target.value) / 100))}
           step="1"
-          title="????"
+          title="缩放画布"
           type="range"
           value={percent}
         />
         <span className="canvas-zoom__percent">{percent}%</span>
-        <ZoomButton label="??" onClick={() => setFeedback('?????????')}>
+        <ZoomButton label="帮助" onClick={() => setFeedback('快捷键说明后续接入')}>
           <HelpIcon />
         </ZoomButton>
       </div>

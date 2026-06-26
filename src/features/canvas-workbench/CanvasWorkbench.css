@@ -709,3 +709,15 @@
     width: 92px;
   }
 }
+
+.canvas-toolbar__button--danger:hover:not(:disabled),
+.canvas-node__delete:hover {
+  color: var(--canvas-danger);
+  border-color: rgba(251, 113, 133, 0.36);
+  background: rgba(251, 113, 133, 0.12);
+}
+
+.canvas-node--related:not(.canvas-node--selected) {
+  border-color: rgba(91, 140, 255, 0.32);
+  box-shadow: 0 0 0 1px rgba(91, 140, 255, 0.10), 0 14px 34px rgba(0, 0, 0, 0.12);
+}

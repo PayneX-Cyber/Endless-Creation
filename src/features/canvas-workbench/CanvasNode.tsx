@@ -41,7 +41,7 @@ export function CanvasNode({ node, selected, related, isSpacePressed, onPointerD
             }}
             type="button"
           >
-            ??
+            删除
           </button>
         ) : null}
       </div>
@@ -59,8 +59,8 @@ function ConnectionHandleButton({ type, nodeId, onConnectStart, onConnectEnd }: 
       className={`canvas-node__handle canvas-node__handle--${type}`}
       data-canvas-control
       data-connection-handle={type}
-      aria-label={type === 'source' ? '????????' : '??????'}
-      title={type === 'source' ? '????????' : '??????'}
+      aria-label={type === 'source' ? '从此节点创建连线' : '连接到此节点'}
+      title={type === 'source' ? '从此节点创建连线' : '连接到此节点'}
       onPointerDown={(event) => onConnectStart(event, nodeId, type)}
       onPointerUp={(event) => onConnectEnd(event, nodeId, type)}
     />
@@ -74,9 +74,9 @@ function NodePreview({ node }: { node: CanvasNodeData }) {
   if (node.type === 'config') {
     return (
       <div className="canvas-node__config" aria-hidden="true">
-        <span>{node.metadata?.model || 'Mock ??'}</span>
+        <span>{node.metadata?.model || 'Mock 模型'}</span>
         <span>{node.metadata?.size || '1536 x 1024'}</span>
-        <span>{node.metadata?.quality || '??'}</span>
+        <span>{node.metadata?.quality || '自动'}</span>
       </div>
     );
   }
@@ -84,9 +84,9 @@ function NodePreview({ node }: { node: CanvasNodeData }) {
 }
 
 function nodeTypeLabel(type: CanvasNodeData['type']) {
-  if (type === 'image') return '??';
-  if (type === 'config') return '??';
-  if (type === 'video') return '??';
-  if (type === 'audio') return '??';
-  return '??';
+  if (type === 'image') return '文本';
+  if (type === 'config') return '文本';
+  if (type === 'video') return '文本';
+  if (type === 'audio') return '文本';
+  return '文本';
 }
