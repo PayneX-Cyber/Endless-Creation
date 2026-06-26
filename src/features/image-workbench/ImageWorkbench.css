@@ -960,11 +960,19 @@
   min-width: 0;
   min-height: 58px;
   padding: 18px 16px 12px;
-  border: 1.5px solid rgba(86, 132, 255, 0.72);
+  border: 1.5px solid var(--image-line-soft);
   border-radius: 15px;
   color: var(--image-text);
   background: var(--image-card-bg);
-  box-shadow: 0 0 0 1px rgba(86, 132, 255, 0.05);
+  box-shadow: 0 0 0 1px rgba(86, 132, 255, 0.03);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+
+.image-studio__field:hover,
+.image-studio__field:focus-within {
+  border-color: rgba(75, 131, 255, 0.96);
+  box-shadow: 0 0 0 2px rgba(75, 131, 255, 0.1);
 }
 
 .image-studio__field > span {
