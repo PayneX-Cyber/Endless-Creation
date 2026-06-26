@@ -16,6 +16,7 @@ import {
   LogoutIcon,
   MoonIcon,
   PenBookIcon,
+  HomeIcon,
   ProjectIcon,
   PromptIcon,
   SceneIcon,
@@ -29,6 +30,7 @@ import './App.css';
 
 type SidebarIcon = ComponentType<SVGProps<SVGSVGElement>>;
 type ActiveNavId =
+  | 'home'
   | 'projects'
   | 'novel'
   | 'script-workbench'
@@ -66,7 +68,7 @@ export function App() {
   const [theme, setTheme] = usePersistentTheme();
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isSidebarPreviewed, setSidebarPreviewed] = useState(false);
-  const [activeNavId, setActiveNavId] = useState<ActiveNavId>('projects');
+  const [activeNavId, setActiveNavId] = useState<ActiveNavId>('home');
   const [isAssetMenuExpanded, setAssetMenuExpanded] = useState(true);
   const [isUserMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);

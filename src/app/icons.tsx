@@ -37,6 +37,17 @@ export function CollapseIcon(props: IconProps) {
   );
 }
 
+
+export function HomeIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <path d="M4.5 11.5 12 4l7.5 7.5" />
+      <path d="M6.5 10.5V20h11v-9.5" />
+      <path d="M10 20v-5h4v5" />
+    </SvgIcon>
+  );
+}
+
 export function ProjectIcon(props: IconProps) {
   return (
     <SvgIcon {...props}>
