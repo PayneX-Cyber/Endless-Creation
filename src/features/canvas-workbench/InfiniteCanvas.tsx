@@ -1,18 +1,20 @@
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent as ReactWheelEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode, type WheelEvent as ReactWheelEvent } from 'react';
 import { clampScale, zoomAtPoint } from './canvasMath';
-import type { ViewportTransform } from './types';
+import type { CanvasBackgroundMode, ViewportTransform } from './types';
 
 interface InfiniteCanvasProps {
   viewport: ViewportTransform;
+  backgroundMode: CanvasBackgroundMode;
   onViewportChange: (viewport: ViewportTransform) => void;
   onCanvasClick: () => void;
   children: ReactNode;
 }
 
-export function InfiniteCanvas({ viewport, onViewportChange, onCanvasClick, children }: InfiniteCanvasProps) {
+export function InfiniteCanvas({ viewport, backgroundMode, onViewportChange, onCanvasClick, children }: InfiniteCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const panRef = useRef({ active: false, pointerId: 0, startX: 0, startY: 0, initialX: 0, initialY: 0, moved: false });
   const viewportRef = useRef(viewport);
+  const [isSpacePressed, setSpacePressed] = useState(false);
 
   useEffect(() => {
     viewportRef.current = viewport;
@@ -24,6 +26,23 @@ export function InfiniteCanvas({ viewport, onViewportChange, onCanvasClick, chil
     const preventDocumentScroll = (event: WheelEvent) => event.preventDefault();
     container.addEventListener('wheel', preventDocumentScroll, { passive: false });
     return () => container.removeEventListener('wheel', preventDocumentScroll);
+  }, []);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.code !== 'Space') return;
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
+      setSpacePressed(true);
+    }
+    function handleKeyUp(event: KeyboardEvent) {
+      if (event.code === 'Space') setSpacePressed(false);
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
   }, []);
 
   function handleWheel(event: ReactWheelEvent<HTMLDivElement>) {
@@ -38,7 +57,8 @@ export function InfiniteCanvas({ viewport, onViewportChange, onCanvasClick, chil
 
   function handlePointerDown(event: ReactPointerEvent<HTMLDivElement>) {
     const target = event.target instanceof Element ? event.target : null;
-    if (event.button !== 0 || target?.closest('[data-canvas-node],[data-canvas-control]')) return;
+    if (event.button !== 0 || target?.closest('[data-canvas-control]')) return;
+    if (target?.closest('[data-canvas-node]') && !isSpacePressed) return;
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     panRef.current = {
@@ -70,7 +90,7 @@ export function InfiniteCanvas({ viewport, onViewportChange, onCanvasClick, chil
 
   return (
     <div
-      className="infinite-canvas"
+      className={`infinite-canvas infinite-canvas--${backgroundMode} ${isSpacePressed ? 'infinite-canvas--space' : ''}`}
       ref={containerRef}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -78,22 +98,20 @@ export function InfiniteCanvas({ viewport, onViewportChange, onCanvasClick, chil
       onPointerCancel={handlePointerUp}
       onWheel={handleWheel}
     >
-      <CanvasGrid viewport={viewport} />
-      <div
-        className="infinite-canvas__world"
-        style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${clampScale(viewport.k)})` }}
-      >
+      <CanvasGrid viewport={viewport} backgroundMode={backgroundMode} />
+      <div className="infinite-canvas__world" style={{ transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${clampScale(viewport.k)})` }}>
         {children}
       </div>
     </div>
   );
 }
 
-function CanvasGrid({ viewport }: { viewport: ViewportTransform }) {
+function CanvasGrid({ viewport, backgroundMode }: { viewport: ViewportTransform; backgroundMode: CanvasBackgroundMode }) {
   const gridSize = Math.max(12, 48 * viewport.k);
+  if (backgroundMode === 'blank') return null;
   return (
     <div
-      className="infinite-canvas__grid"
+      className={`infinite-canvas__grid infinite-canvas__grid--${backgroundMode}`}
       style={{
         backgroundSize: `${gridSize}px ${gridSize}px`,
         backgroundPosition: `${viewport.x % gridSize}px ${viewport.y % gridSize}px`,
