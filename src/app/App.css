@@ -190,7 +190,8 @@
 .canvasflow-collapse:focus-visible,
 .canvasflow-nav__item:focus-visible,
 .canvasflow-subnav__item:focus-visible,
-.canvasflow-theme-button:focus-visible {
+.canvasflow-theme-button:focus-visible,
+.canvasflow-pin-button:focus-visible {
   outline: 2px solid var(--brand-blue);
   outline-offset: 2px;
 }
@@ -359,6 +360,42 @@
 .canvasflow-theme-button svg {
   width: 15px;
   height: 15px;
+}
+
+.canvasflow-pin-button {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--sidebar-divider);
+  border-radius: 11px;
+  color: var(--sidebar-text-strong);
+  background: var(--sidebar-bg-elevated);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.12);
+  font: inherit;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+}
+
+.canvasflow-pin-button svg {
+  width: 16px;
+  height: 16px;
+  transform: rotate(180deg);
+}
+
+.app-shell[data-theme='light'] .canvasflow-pin-button {
+  color: #334155;
+  background: #ffffff;
+  border-color: #E5EAF1;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.08);
+}
+
+.canvasflow-pin-button:hover {
+  background: var(--sidebar-hover);
+  border-color: var(--sidebar-border);
+  transform: translateY(-1px);
 }
 
 .canvasflow-theme-button__label {
@@ -597,9 +634,6 @@
   grid-template-columns: 76px minmax(0, 1fr);
 }
 
-.app-shell--sidebar-collapsed.app-shell--sidebar-previewed {
-  grid-template-columns: 248px minmax(0, 1fr);
-}
 
 .canvasflow-sidebar {
   transition: width 180ms ease;
@@ -610,10 +644,6 @@
   width: 76px;
 }
 
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed {
-  grid-template-rows: 86px minmax(0, 1fr) auto;
-  width: 248px;
-}
 
 .canvasflow-sidebar--collapsed .canvasflow-brand {
   flex-direction: column;
@@ -623,21 +653,11 @@
   padding: 0;
 }
 
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-brand {
-  flex-direction: row;
-  justify-content: flex-start;
-  gap: 12px;
-  height: 86px;
-  padding: 0 16px;
-}
 
 .canvasflow-sidebar--collapsed .canvasflow-brand__name {
   display: none;
 }
 
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-brand__name {
-  display: grid;
-}
 
 .canvasflow-sidebar--collapsed .canvasflow-collapse {
   display: none;
@@ -645,29 +665,17 @@
   height: 32px;
 }
 
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-collapse {
-  display: block;
-  width: 36px;
-  height: 36px;
-}
 
 .canvasflow-sidebar--collapsed .glass-icon-btn__icon {
   transform: rotate(180deg);
 }
 
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .glass-icon-btn__icon {
-  transform: rotate(180deg);
-}
 
 .canvasflow-sidebar--collapsed .canvasflow-nav {
   justify-items: center;
   padding: 18px 10px 0;
 }
 
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-nav {
-  justify-items: stretch;
-  padding: 18px 14px 0;
-}
 
 .canvasflow-sidebar--collapsed .canvasflow-nav__item {
   justify-content: center;
@@ -676,12 +684,6 @@
   padding: 0;
 }
 
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-nav__item {
-  justify-content: flex-start;
-  width: 100%;
-  height: 52px;
-  padding: 0 9px;
-}
 
 .canvasflow-sidebar--collapsed .canvasflow-nav__label,
 .canvasflow-sidebar--collapsed .canvasflow-nav__chevron,
@@ -689,42 +691,22 @@
   display: none;
 }
 
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-nav__label,
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-nav__chevron,
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-badge {
-  display: revert;
-}
 
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-nav__chevron {
-  display: grid;
-}
 
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-badge {
-  display: inline-grid;
-}
 
 .canvasflow-sidebar--collapsed .canvasflow-subnav {
   display: none;
 }
 
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-subnav {
-  display: grid;
-}
 
 .canvasflow-sidebar--collapsed .canvasflow-footer {
   align-content: center;
   justify-items: center;
   align-self: end;
-  height: 108px;
-  padding: 10px 0;
+  height: 152px;
+  padding: 12px 0;
 }
 
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-footer {
-  align-content: center;
-  justify-items: stretch;
-  height: 86px;
-  padding: 14px;
-}
 
 .canvasflow-sidebar--collapsed .canvasflow-user-row {
   display: grid;
@@ -732,10 +714,6 @@
   gap: 8px;
 }
 
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-user-row {
-  display: flex;
-  justify-items: stretch;
-}
 
 .canvasflow-sidebar--collapsed .canvasflow-user-copy,
 .canvasflow-sidebar--collapsed .canvasflow-user-chevron,
@@ -743,47 +721,31 @@
   display: none;
 }
 
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-user-copy {
-  display: grid;
-}
 
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-user-chevron {
-  display: grid;
-}
 
-.canvasflow-sidebar--collapsed .canvasflow-theme-button {
-  width: 34px;
-  height: 34px;
+.canvasflow-sidebar--collapsed .canvasflow-theme-button,
+.canvasflow-sidebar--collapsed .canvasflow-pin-button {
+  display: inline-flex;
+  width: 40px;
+  height: 40px;
   padding: 0;
-  border-radius: 11px;
+  border-radius: 13px;
 }
 
 .canvasflow-sidebar--collapsed .canvasflow-user-button {
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 40px;
+  height: 40px;
   padding: 0;
+  border-radius: 13px;
 }
 
 .canvasflow-sidebar--collapsed .canvasflow-user-avatar {
-  width: 31px;
-  height: 31px;
-}
-
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-theme-button {
   width: 34px;
   height: 34px;
-  padding: 0;
-  border-radius: 11px;
 }
 
-.canvasflow-sidebar--collapsed.canvasflow-sidebar--previewed .canvasflow-user-button {
-  justify-content: flex-start;
-  flex: 1 1 auto;
-  width: auto;
-  height: auto;
-  padding: 8px;
-}
+
 
 
 .app-shell > .image-workbench,
@@ -792,4 +754,10 @@
   min-width: 0;
   min-height: 0;
   height: 100%;
+}
+
+.canvasflow-sidebar--collapsed .canvasflow-theme-button svg,
+.canvasflow-sidebar--collapsed .canvasflow-pin-button svg {
+  width: 17px;
+  height: 17px;
 }

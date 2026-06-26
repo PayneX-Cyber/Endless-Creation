@@ -70,7 +70,6 @@ const mockUser = { name: 'John Doe', email: 'john@example.com', initials: 'JD' }
 export function App() {
   const [theme, setTheme] = usePersistentTheme();
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [isSidebarPreviewed, setSidebarPreviewed] = useState(false);
   const [activeNavId, setActiveNavId] = useState<ActiveNavId>('home');
   const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
   const [isAssetMenuExpanded, setAssetMenuExpanded] = useState(true);
@@ -78,7 +77,7 @@ export function App() {
   const userMenuRef = useRef<HTMLDivElement>(null);
   const ThemeIcon = theme === 'dark' ? SunIcon : MoonIcon;
   const AssetChevronIcon = isAssetMenuExpanded ? ChevronDownIcon : ChevronRightIcon;
-  const isSidebarVisuallyCollapsed = isSidebarCollapsed && !isSidebarPreviewed;
+  const isSidebarVisuallyCollapsed = isSidebarCollapsed;
 
   useEffect(() => {
     if (!isUserMenuOpen) return;
@@ -99,16 +98,12 @@ export function App() {
 
   return (
     <div
-      className={`app-shell ${isSidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''} ${isSidebarPreviewed ? 'app-shell--sidebar-previewed' : ''}`}
+      className={`app-shell ${isSidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''}`}
       data-theme={theme}
     >
       <aside
-        className={`canvasflow-sidebar ${isSidebarCollapsed ? 'canvasflow-sidebar--collapsed' : ''} ${isSidebarPreviewed ? 'canvasflow-sidebar--previewed' : ''}`}
+        className={`canvasflow-sidebar ${isSidebarCollapsed ? 'canvasflow-sidebar--collapsed' : ''}`}
         aria-label="Endless Creation 侧边栏"
-        onMouseEnter={() => {
-          if (isSidebarCollapsed) setSidebarPreviewed(true);
-        }}
-        onMouseLeave={() => setSidebarPreviewed(false)}
       >
         <header className="canvasflow-brand">
           <span className="canvasflow-brand__mark" aria-hidden="true">
@@ -124,7 +119,6 @@ export function App() {
             aria-label={isSidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
             onClick={() => {
               setSidebarCollapsed((current) => !current);
-              setSidebarPreviewed(false);
             }}
             type="button"
           >
@@ -235,6 +229,15 @@ export function App() {
               type="button"
             >
               <ThemeIcon />
+            </button>
+            <button
+              aria-label="固定展开侧边栏"
+              title="固定展开侧边栏"
+              className="canvasflow-pin-button"
+              onClick={() => setSidebarCollapsed(false)}
+              type="button"
+            >
+              <CollapseIcon />
             </button>
           </div>
         </footer>
