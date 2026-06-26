@@ -706,25 +706,33 @@
 }
 
 .image-studio__prompt-area {
+  position: relative;
   display: grid;
   gap: 10px;
   min-height: 166px;
-  padding: 18px;
-  border: 1px solid var(--image-line-soft);
+  padding: 22px 18px 16px;
+  border: 1.5px solid var(--image-line-soft);
   border-radius: 15px;
-  background: var(--image-input);
+  background: var(--image-card-bg);
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
 
 .image-studio__prompt-area:focus-within {
-  border-color: rgba(91, 134, 255, 0.86);
-  box-shadow: 0 0 0 3px rgba(91, 134, 255, 0.12);
+  border-color: rgba(75, 131, 255, 0.96);
+  box-shadow: 0 0 0 2px rgba(75, 131, 255, 0.1);
 }
 
 .image-studio__prompt-area span {
-  color: var(--image-muted);
-  font-size: 16px;
-  font-weight: 650;
+  position: absolute;
+  top: -9px;
+  left: 18px;
+  z-index: 1;
+  padding: 0 5px;
+  color: #3f7cff;
+  background: var(--image-card-bg);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
 }
 
 .image-studio__prompt-area textarea {
