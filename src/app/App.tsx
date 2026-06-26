@@ -41,13 +41,12 @@ type ActiveNavId =
   | 'video-workbench'
   | 'prompts'
   | 'assets'
-  | 'settings'
   | 'asset-role'
   | 'asset-scene'
   | 'asset-script'
   | 'asset-novel';
 
-type PrimaryNavId = Exclude<ActiveNavId, 'settings' | 'asset-role' | 'asset-scene' | 'asset-script' | 'asset-novel'>;
+type PrimaryNavId = Exclude<ActiveNavId, 'asset-role' | 'asset-scene' | 'asset-script' | 'asset-novel'>;
 
 const sidebarNavItems: Array<{ id: PrimaryNavId; Icon: SidebarIcon; label: string }> = [
   { id: 'home', Icon: HomeIcon, label: '首页' },
@@ -76,6 +75,7 @@ export function App() {
   const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
   const [isAssetMenuExpanded, setAssetMenuExpanded] = useState(true);
   const [isUserMenuOpen, setUserMenuOpen] = useState(false);
+  const [isSettingsOpen, setSettingsOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const ThemeIcon = theme === 'dark' ? SunIcon : MoonIcon;
   const AssetChevronIcon = isAssetMenuExpanded ? ChevronDownIcon : ChevronRightIcon;
@@ -199,8 +199,7 @@ export function App() {
                 type="button"
                 role="menuitem"
                 onClick={() => {
-                  setActiveNavId('settings');
-                  setActiveCanvasId(null);
+                  setSettingsOpen(true);
                   setUserMenuOpen(false);
                 }}
               >
@@ -252,14 +251,20 @@ export function App() {
 
       {activeNavId === 'image-workbench' ? (
         <ImageWorkbench />
-      ) : activeNavId === 'settings' ? (
-        <SettingsPage theme={theme} onThemeChange={setTheme} />
       ) : activeNavId === 'projects' && activeCanvasId ? (
         <CanvasWorkbench canvasId={activeCanvasId} onBack={() => setActiveCanvasId(null)} />
       ) : activeNavId === 'projects' ? (
         <ProjectManagement onOpenCanvas={setActiveCanvasId} />
       ) : (
         <main className="blank-workspace" aria-label="空白工作区" />
+      )}
+
+      {isSettingsOpen && (
+        <SettingsPage
+          theme={theme}
+          onThemeChange={setTheme}
+          onClose={() => setSettingsOpen(false)}
+        />
       )}
     </div>
   );
