@@ -1,9 +1,65 @@
-﻿.settings-page {
+.settings-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 28px;
+  background: rgba(3, 7, 18, 0.58);
+  backdrop-filter: blur(10px);
+}
+
+.settings-modal__dialog {
+  position: relative;
+  width: min(920px, calc(100vw - 56px));
+  max-height: 80vh;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 26px;
+  background: var(--bg);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.42);
+}
+
+.settings-modal__close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border: 1px solid var(--border-strong);
+  border-radius: 13px;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+  font: inherit;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.settings-modal__close:hover {
+  border-color: rgba(91, 140, 255, 0.42);
+  background: var(--surface-2);
+  transform: translateY(-1px);
+}
+
+.settings-modal__close:focus-visible,
+.settings-page button:focus-visible,
+.settings-page select:focus-visible {
+  outline: 2px solid #5b8cff;
+  outline-offset: 2px;
+}
+
+.settings-page {
   min-width: 0;
   min-height: 0;
-  height: 100%;
+  max-height: 80vh;
   overflow: auto;
-  padding: 44px clamp(24px, 5vw, 72px) 64px;
+  padding: 36px clamp(22px, 4vw, 48px) 42px;
   color: var(--ink);
   background:
     radial-gradient(circle at top right, rgba(91, 140, 255, 0.16), transparent 34rem),
@@ -335,6 +391,15 @@
   background: rgba(255, 255, 255, 0.92);
 }
 
+.app-shell[data-theme='light'] .settings-modal {
+  background: rgba(15, 23, 42, 0.28);
+}
+
+.app-shell[data-theme='light'] .settings-modal__dialog {
+  background: #eef2f7;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.22);
+}
+
 @media (max-width: 980px) {
   .settings-page__hero {
     display: grid;
@@ -347,5 +412,23 @@
   .settings-page__grid,
   .settings-provider-list {
     grid-template-columns: 1fr;
+  }
+}
+
+
+@media (max-width: 640px) {
+  .settings-modal {
+    padding: 14px;
+  }
+
+  .settings-modal__dialog {
+    width: calc(100vw - 28px);
+    max-height: 88vh;
+    border-radius: 20px;
+  }
+
+  .settings-page {
+    max-height: 88vh;
+    padding: 28px 16px 30px;
   }
 }
