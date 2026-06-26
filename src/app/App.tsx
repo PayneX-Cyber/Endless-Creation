@@ -12,11 +12,11 @@ import {
   CollapseIcon,
   FolderIcon,
   HelpIcon,
+  HomeIcon,
   ImageWorkbenchIcon,
   LogoutIcon,
   MoonIcon,
   PenBookIcon,
-  HomeIcon,
   ProjectIcon,
   PromptIcon,
   SceneIcon,
@@ -46,6 +46,7 @@ type ActiveNavId =
 type PrimaryNavId = Exclude<ActiveNavId, 'asset-role' | 'asset-scene' | 'asset-script' | 'asset-novel'>;
 
 const sidebarNavItems: Array<{ id: PrimaryNavId; Icon: SidebarIcon; label: string }> = [
+  { id: 'home', Icon: HomeIcon, label: '首页' },
   { id: 'projects', Icon: ProjectIcon, label: '项目管理' },
   { id: 'novel', Icon: PenBookIcon, label: '小说创作' },
   { id: 'script-workbench', Icon: ScriptIcon, label: '剧本工作台' },

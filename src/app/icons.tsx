@@ -37,7 +37,6 @@ export function CollapseIcon(props: IconProps) {
   );
 }
 
-
 export function HomeIcon(props: IconProps) {
   return (
     <SvgIcon {...props}>

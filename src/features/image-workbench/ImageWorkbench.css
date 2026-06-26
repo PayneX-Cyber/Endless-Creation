@@ -945,7 +945,7 @@
 
 .image-studio__params {
   display: grid;
-  grid-template-columns: minmax(220px, 1.35fr) repeat(2, minmax(148px, 1fr));
+  grid-template-columns: repeat(12, minmax(0, 1fr));
   gap: 16px;
   padding: 8px 0 0;
   border: 0;
@@ -955,6 +955,7 @@
 .image-studio__field {
   position: relative;
   display: grid;
+  grid-column: span 3;
   align-content: center;
   gap: 8px;
   min-width: 0;
@@ -967,7 +968,6 @@
   box-shadow: 0 0 0 1px rgba(86, 132, 255, 0.03);
   transition: border-color 150ms ease, box-shadow 150ms ease;
 }
-
 
 .image-studio__field:hover,
 .image-studio__field:focus-within {
@@ -999,6 +999,7 @@
 }
 
 .image-studio__field--select {
+  grid-column: span 7;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
 }
@@ -1013,8 +1014,12 @@
   color: var(--image-muted);
 }
 
+.image-studio__params > .image-studio__field:nth-child(2) {
+  grid-column: span 5;
+}
+
 .image-studio__field--quality {
-  grid-column: span 2;
+  grid-column: span 9;
 }
 
 .image-studio__quality-group {
@@ -1045,8 +1050,8 @@
 
 .image-studio__status-strip {
   display: grid;
-  grid-template-columns: minmax(190px, auto) minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: 16px;
 }
 
 .image-studio__save-option,
@@ -1054,12 +1059,12 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 46px;
-  padding: 0 14px;
-  border: 1px solid var(--image-line);
-  border-radius: 13px;
+  min-height: 58px;
+  padding: 0 16px;
+  border: 1.5px solid var(--image-line-soft);
+  border-radius: 15px;
   color: #d2dae8;
-  background: rgba(13, 18, 27, 0.44);
+  background: var(--image-card-bg);
   font-size: 14px;
   font-weight: 750;
 }
@@ -1105,11 +1110,13 @@
 
 @media (max-width: 860px) {
   .image-studio__params {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .image-studio__field,
   .image-studio__field--select,
-  .image-studio__field--quality {
+  .image-studio__field--quality,
+  .image-studio__params > .image-studio__field:nth-child(2) {
     grid-column: span 2;
   }
 
@@ -1155,9 +1162,10 @@
 
 .image-studio__stepper {
   display: grid;
-  grid-template-columns: 30px minmax(48px, 1fr) 30px;
+  grid-template-columns: 32px minmax(42px, 1fr) 32px;
   align-items: center;
   gap: 6px;
+  min-width: 0;
 }
 
 .image-studio__stepper button {
