@@ -3,6 +3,7 @@ import type { ComponentType, SVGProps } from 'react';
 import type { ThemeMode } from '../types/workspace';
 import { rendererBridge } from '../services/rendererBridge';
 import { ImageWorkbench } from '../features/image-workbench';
+import { ProjectManagement } from '../features/project-management';
 import {
   AddSquareIcon,
   BillingIcon,
@@ -237,8 +238,10 @@ export function App() {
 
       {activeNavId === 'image-workbench' ? (
         <ImageWorkbench />
+      ) : activeNavId === 'projects' ? (
+        <ProjectManagement />
       ) : (
-        <main className="blank-workspace" aria-label="空白工作区" />
+        <main className="blank-workspace" aria-label="?????" />
       )}
     </div>
   );
