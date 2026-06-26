@@ -11,20 +11,23 @@
 
 .settings-modal__dialog {
   position: relative;
-  width: min(920px, calc(100vw - 56px));
-  max-height: 80vh;
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr);
+  width: min(960px, calc(100vw - 56px));
+  height: min(760px, 82vh);
   overflow: hidden;
   border: 1px solid var(--border-strong);
   border-radius: 26px;
+  color: var(--ink);
   background: var(--bg);
   box-shadow: 0 30px 90px rgba(0, 0, 0, 0.42);
 }
 
 .settings-modal__close {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 2;
+  top: 18px;
+  right: 18px;
+  z-index: 4;
   display: grid;
   width: 38px;
   height: 38px;
@@ -32,7 +35,7 @@
   border: 1px solid var(--border-strong);
   border-radius: 13px;
   color: var(--ink);
-  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
   font: inherit;
   font-size: 24px;
@@ -48,120 +51,229 @@
 }
 
 .settings-modal__close:focus-visible,
-.settings-page button:focus-visible,
-.settings-page select:focus-visible {
+.settings-modal button:focus-visible,
+.settings-modal select:focus-visible {
   outline: 2px solid #5b8cff;
   outline-offset: 2px;
 }
 
-.settings-page {
+.settings-modal__nav {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 22px;
+  min-width: 0;
+  padding: 28px 16px;
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
+.settings-modal__brand {
+  display: grid;
+  gap: 7px;
+  padding: 0 8px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-modal__brand p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.settings-modal__brand span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.settings-nav-list {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+.settings-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 13px;
+  color: var(--muted);
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 850;
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.settings-nav-item::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  width: 3px;
+  height: 18px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.settings-nav-item:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+.settings-nav-item--active {
+  color: var(--ink);
+  border-color: rgba(91, 140, 255, 0.26);
+  background: rgba(91, 140, 255, 0.14);
+}
+
+.settings-nav-item--active::before {
+  background: #5b8cff;
+}
+
+.settings-nav-item__dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.55;
+}
+
+.settings-nav-item--active .settings-nav-item__dot {
+  color: #5b8cff;
+  opacity: 1;
+}
+
+.settings-modal__content {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
-  max-height: 80vh;
-  overflow: auto;
-  padding: 36px clamp(22px, 4vw, 48px) 42px;
-  color: var(--ink);
   background:
-    radial-gradient(circle at top right, rgba(91, 140, 255, 0.16), transparent 34rem),
-    linear-gradient(180deg, rgba(255,255,255,0.02), transparent 18rem),
+    radial-gradient(circle at top right, rgba(91, 140, 255, 0.12), transparent 28rem),
     var(--bg);
 }
 
-.settings-page__hero {
+.settings-content-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 24px;
-  padding-bottom: 28px;
+  gap: 18px;
+  padding: 34px 70px 24px 34px;
   border-bottom: 1px solid var(--border);
 }
 
 .settings-page__eyebrow {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   color: #5b8cff;
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 900;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-.settings-page h1 {
+.settings-content-header h1 {
   margin: 0;
-  font-size: clamp(34px, 4vw, 48px);
+  color: var(--ink);
+  font-size: 34px;
   line-height: 1;
   letter-spacing: -0.04em;
 }
 
 .settings-page__subtitle {
-  max-width: 620px;
-  margin: 14px 0 0;
+  max-width: 460px;
+  margin: 10px 0 0;
   color: var(--muted);
-  font-size: 16px;
-  line-height: 1.7;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .settings-page__actions {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding-top: 8px;
+  gap: 10px;
+  padding-top: 4px;
 }
 
 .settings-page__feedback {
-  padding: 9px 12px;
+  padding: 8px 10px;
   border: 1px solid rgba(91, 140, 255, 0.22);
   border-radius: 999px;
   color: #8fb0ff;
   background: rgba(91, 140, 255, 0.12);
-  font-size: 13px;
-  font-weight: 800;
+  font-size: 12px;
+  font-weight: 850;
   white-space: nowrap;
 }
 
 .settings-page__primary,
 .settings-path button {
-  height: 40px;
+  height: 38px;
   border: 1px solid rgba(91, 140, 255, 0.42);
   border-radius: 12px;
   color: #fff;
   background: #4b83ff;
-  box-shadow: 0 12px 28px rgba(75, 131, 255, 0.24);
+  box-shadow: 0 12px 28px rgba(75, 131, 255, 0.22);
   font: inherit;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 850;
   cursor: pointer;
   transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
 }
 
 .settings-page__primary {
-  padding: 0 18px;
+  padding: 0 16px;
 }
 
 .settings-page__primary:hover,
 .settings-path button:hover {
   transform: translateY(-1px);
   background: #3f76ee;
-  box-shadow: 0 16px 34px rgba(75, 131, 255, 0.28);
+  box-shadow: 0 16px 34px rgba(75, 131, 255, 0.26);
 }
 
-.settings-page__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  margin-top: 24px;
+.settings-content-scroll {
+  min-height: 0;
+  overflow: auto;
+  padding: 24px 34px 34px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.32) transparent;
+}
+
+.settings-content-scroll::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.settings-content-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.settings-content-scroll::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.24);
+}
+
+.settings-content-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.42);
 }
 
 .settings-card {
   min-width: 0;
   padding: 22px;
   border: 1px solid var(--border);
-  border-radius: 22px;
+  border-radius: 20px;
   background: color-mix(in srgb, var(--surface) 88%, transparent);
-  box-shadow: var(--shadow);
-}
-
-.settings-card--wide {
-  grid-column: 1 / -1;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.18);
 }
 
 .settings-card__header {
@@ -174,6 +286,7 @@
 
 .settings-card h2 {
   margin: 0;
+  color: var(--ink);
   font-size: 18px;
   letter-spacing: -0.02em;
 }
@@ -267,12 +380,17 @@
   background: var(--surface-2);
 }
 
+.settings-toggle-row + .settings-toggle-row {
+  margin-top: 12px;
+}
+
 .settings-toggle-row div {
   display: grid;
   gap: 5px;
 }
 
 .settings-toggle-row strong {
+  color: var(--ink);
   font-size: 14px;
 }
 
@@ -337,6 +455,7 @@
 .settings-path strong {
   min-width: 0;
   overflow: hidden;
+  color: var(--ink);
   font-size: 14px;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -363,13 +482,16 @@
   background: var(--surface-2);
 }
 
-.settings-provider span {
+.settings-provider span,
+.settings-about-list span {
   color: var(--muted);
   font-size: 13px;
   font-weight: 800;
 }
 
-.settings-provider strong {
+.settings-provider strong,
+.settings-about-list strong {
+  color: var(--ink);
   font-size: 15px;
 }
 
@@ -380,15 +502,18 @@
   line-height: 1.5;
 }
 
-.app-shell[data-theme='light'] .settings-page {
-  background:
-    radial-gradient(circle at top right, rgba(75, 131, 255, 0.18), transparent 34rem),
-    linear-gradient(180deg, rgba(255,255,255,0.62), transparent 20rem),
-    var(--bg);
+.settings-about-list {
+  display: grid;
+  gap: 12px;
 }
 
-.app-shell[data-theme='light'] .settings-card {
-  background: rgba(255, 255, 255, 0.92);
+.settings-about-list div {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface-2);
 }
 
 .app-shell[data-theme='light'] .settings-modal {
@@ -400,35 +525,81 @@
   box-shadow: 0 28px 80px rgba(15, 23, 42, 0.22);
 }
 
-@media (max-width: 980px) {
-  .settings-page__hero {
-    display: grid;
-  }
-
-  .settings-page__actions {
-    justify-content: space-between;
-  }
-
-  .settings-page__grid,
-  .settings-provider-list {
-    grid-template-columns: 1fr;
-  }
+.app-shell[data-theme='light'] .settings-modal__nav {
+  background: rgba(255, 255, 255, 0.72);
 }
 
+.app-shell[data-theme='light'] .settings-modal__content {
+  background:
+    radial-gradient(circle at top right, rgba(75, 131, 255, 0.16), transparent 28rem),
+    #eef2f7;
+}
 
-@media (max-width: 640px) {
+.app-shell[data-theme='light'] .settings-card {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.09);
+}
+
+.app-shell[data-theme='light'] .settings-content-scroll {
+  scrollbar-color: rgba(100, 116, 139, 0.28) transparent;
+}
+
+@media (max-width: 820px) {
   .settings-modal {
     padding: 14px;
   }
 
   .settings-modal__dialog {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto minmax(0, 1fr);
     width: calc(100vw - 28px);
-    max-height: 88vh;
+    height: min(760px, 88vh);
     border-radius: 20px;
   }
 
-  .settings-page {
-    max-height: 88vh;
-    padding: 28px 16px 30px;
+  .settings-modal__nav {
+    gap: 14px;
+    padding: 18px 16px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .settings-modal__brand {
+    padding: 0 46px 12px 2px;
+  }
+
+  .settings-nav-list {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: none;
+  }
+
+  .settings-nav-list::-webkit-scrollbar {
+    display: none;
+  }
+
+  .settings-nav-item {
+    width: auto;
+    flex: 0 0 auto;
+    min-height: 38px;
+  }
+
+  .settings-nav-item::before {
+    display: none;
+  }
+
+  .settings-content-header {
+    display: grid;
+    padding: 22px 18px 18px;
+  }
+
+  .settings-content-scroll {
+    padding: 18px;
+  }
+
+  .settings-provider-list {
+    grid-template-columns: 1fr;
   }
 }
