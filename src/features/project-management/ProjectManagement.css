@@ -1,0 +1,265 @@
+.project-management {
+  box-sizing: border-box;
+  min-width: 0;
+  height: 100%;
+  overflow: auto;
+  padding: clamp(40px, 6vw, 72px);
+  color: #090909;
+  background: #ffffff;
+}
+
+.project-management *,
+.project-management *::before,
+.project-management *::after {
+  box-sizing: border-box;
+}
+
+.project-management__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.project-management__title-group p {
+  margin: 0 0 14px;
+  color: #67645e;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.project-management__title-group h1 {
+  margin: 0;
+  color: #050505;
+  font-size: clamp(34px, 4vw, 42px);
+  font-weight: 850;
+  letter-spacing: -0.05em;
+  line-height: 1;
+}
+
+.project-management__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.project-management__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 108px;
+  height: 42px;
+  padding: 0 17px;
+  border: 1px solid #dddddd;
+  border-radius: 8px;
+  color: #0f0f0f;
+  background: #ffffff;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 650;
+  cursor: pointer;
+  transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+}
+
+.project-management__button:hover {
+  border-color: #a7a7a7;
+  background: #fafafa;
+  transform: translateY(-1px);
+}
+
+.project-management__button--primary {
+  min-width: 140px;
+  border-color: #050505;
+  color: #ffffff;
+  background: #050505;
+}
+
+.project-management__button--primary:hover {
+  border-color: #050505;
+  background: #1a1a1a;
+}
+
+.project-management__button svg {
+  width: 19px;
+  height: 19px;
+}
+
+.project-management__divider {
+  height: 1px;
+  margin: 52px 0 40px;
+  background: #e4e1dc;
+}
+
+.project-management__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 444px));
+  gap: 24px;
+  align-items: start;
+}
+
+.canvas-card {
+  display: flex;
+  min-height: 220px;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 25px;
+  border-radius: 22px;
+  color: #080808;
+  background: #eeeae3;
+}
+
+.canvas-card__topline {
+  display: flex;
+  align-items: flex-start;
+  gap: 15px;
+}
+
+.canvas-card__checkbox {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  margin-top: 2px;
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.canvas-card__checkbox input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.canvas-card__checkbox span {
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid #777a7a;
+  border-radius: 3px;
+  background: transparent;
+}
+
+.canvas-card__checkbox input:checked + span {
+  border-color: #050505;
+  background: linear-gradient(#050505, #050505) center / 10px 10px no-repeat;
+}
+
+.canvas-card h2 {
+  margin: 0;
+  color: #080808;
+  font-size: 25px;
+  font-weight: 850;
+  letter-spacing: -0.035em;
+}
+
+.canvas-card p {
+  margin: 18px 0 0;
+  color: #3f4549;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.canvas-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: #5f6263;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.canvas-card__icons {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.canvas-card__icons button {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  color: #121212;
+  background: transparent;
+  cursor: pointer;
+  transition: color 140ms ease, transform 140ms ease;
+}
+
+.canvas-card__icons button:hover {
+  color: #4b83ff;
+  transform: translateY(-1px);
+}
+
+.canvas-card__icons svg {
+  width: 20px;
+  height: 20px;
+}
+
+.app-shell[data-theme='dark'] .project-management {
+  color: #edf2fa;
+  background: #0f131a;
+}
+
+.app-shell[data-theme='dark'] .project-management__title-group p,
+.app-shell[data-theme='dark'] .canvas-card__footer,
+.app-shell[data-theme='dark'] .canvas-card p {
+  color: #9aa8bb;
+}
+
+.app-shell[data-theme='dark'] .project-management__title-group h1,
+.app-shell[data-theme='dark'] .canvas-card h2 {
+  color: #f5f7fb;
+}
+
+.app-shell[data-theme='dark'] .project-management__button {
+  color: #eef3fb;
+  border-color: rgba(238, 243, 251, 0.16);
+  background: #171d27;
+}
+
+.app-shell[data-theme='dark'] .project-management__button--primary {
+  color: #ffffff;
+  border-color: #5b8cff;
+  background: #5b8cff;
+}
+
+.app-shell[data-theme='dark'] .project-management__divider {
+  background: rgba(238, 243, 251, 0.1);
+}
+
+.app-shell[data-theme='dark'] .canvas-card {
+  color: #edf2fa;
+  background: #1b2029;
+}
+
+.app-shell[data-theme='dark'] .canvas-card__checkbox span {
+  border-color: #7c8796;
+}
+
+.app-shell[data-theme='dark'] .canvas-card__icons button {
+  color: #dfe6f1;
+}
+
+@media (max-width: 820px) {
+  .project-management {
+    padding: 32px 22px;
+  }
+
+  .project-management__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .project-management__actions {
+    justify-content: flex-start;
+  }
+
+  .project-management__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
