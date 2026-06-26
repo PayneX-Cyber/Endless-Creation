@@ -17,6 +17,10 @@ export interface CreateGenerationTaskInput {
   prompt: string;
 }
 
+export interface CreateGenerationTaskOptions {
+  signal?: AbortSignal;
+}
+
 const MODE_LABEL: Record<GenerationMode, string> = {
   text: '文本生成',
   image: '图片生成',
@@ -24,7 +28,12 @@ const MODE_LABEL: Record<GenerationMode, string> = {
   library: '项目库整理',
 };
 
-export async function createGenerationTask(input: CreateGenerationTaskInput): Promise<GenerationTask> {
+export async function createGenerationTask(
+  input: CreateGenerationTaskInput,
+  options: CreateGenerationTaskOptions = {},
+): Promise<GenerationTask> {
+  throwIfAborted(options.signal);
+
   const now = new Date().toISOString();
   const baseTask: GenerationTask = {
     id: createTaskId(),
@@ -35,7 +44,8 @@ export async function createGenerationTask(input: CreateGenerationTaskInput): Pr
     updatedAt: now,
   };
 
-  await wait(650 + Math.random() * 850);
+  await wait(650 + Math.random() * 850, options.signal);
+  throwIfAborted(options.signal);
 
   const status = pickMockStatus();
   const updatedAt = new Date().toISOString();
@@ -82,8 +92,22 @@ function createMockResult(mode: GenerationMode, prompt: string, status: Generati
   };
 }
 
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => globalThis.setTimeout(resolve, ms));
+function wait(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = globalThis.setTimeout(() => {
+      signal?.removeEventListener('abort', handleAbort);
+      resolve();
+    }, ms);
+
+    function handleAbort() {
+      globalThis.clearTimeout(timeoutId);
+      reject(createAbortError());
+    }
+
+    if (signal) {
+      signal.addEventListener('abort', handleAbort, { once: true });
+    }
+  });
 }
 
 function createTaskId(): string {
@@ -92,5 +116,15 @@ function createTaskId(): string {
   }
 
   return `mock-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw createAbortError();
+  }
+}
+
+function createAbortError(): DOMException {
+  return new DOMException('Generation was cancelled.', 'AbortError');
 }
 

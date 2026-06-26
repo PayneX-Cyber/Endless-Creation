@@ -1,10 +1,10 @@
 ﻿import type { NavItem, RecentProject } from '../../types/workspace';
 
 export const NAV_ITEMS: NavItem[] = [
-  { id: 'text', label: '文本生成', description: '脚本、文案、长文结构', shortcut: '⌘1' },
-  { id: 'image', label: '图片生成', description: '概念图、海报、分镜', shortcut: '⌘2' },
-  { id: 'video', label: '视频生成', description: '镜头脚本与成片规划', shortcut: '⌘3' },
-  { id: 'library', label: '项目库', description: '素材、草稿、历史版本', shortcut: '⌘4' },
+  { id: 'text', label: '文本生成', description: '脚本、文案、长文结构', shortcut: 'Ctrl 1' },
+  { id: 'image', label: '图片生成', description: '概念图、海报、分镜', shortcut: 'Ctrl 2' },
+  { id: 'video', label: '视频生成', description: '镜头脚本与成片规划', shortcut: 'Ctrl 3' },
+  { id: 'library', label: '项目库', description: '素材、草稿、历史版本', shortcut: 'Ctrl 4' },
 ];
 
 export const RECENT_PROJECTS: RecentProject[] = [

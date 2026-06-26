@@ -1,74 +1,242 @@
-﻿import { useEffect, useState } from 'react';
-import type { CreationMode, ThemeMode } from '../types/workspace';
+import { useEffect, useRef, useState } from 'react';
+import type { ComponentType, SVGProps } from 'react';
+import type { ThemeMode } from '../types/workspace';
 import { rendererBridge } from '../services/rendererBridge';
-import { Button } from '../components/Button';
-import { CreationWorkbench } from '../features/creation-workbench';
-import { NAV_ITEMS } from '../features/creation-workbench/data';
+import { ImageWorkbench } from '../features/image-workbench';
+import {
+  AddSquareIcon,
+  BillingIcon,
+  BookIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  CollapseIcon,
+  FolderIcon,
+  HelpIcon,
+  ImageWorkbenchIcon,
+  LogoutIcon,
+  MoonIcon,
+  PenBookIcon,
+  ProjectIcon,
+  PromptIcon,
+  SceneIcon,
+  ScriptIcon,
+  SettingsIcon,
+  SunIcon,
+  UserIcon,
+  VideoIcon,
+} from './icons';
 import './App.css';
+
+type SidebarIcon = ComponentType<SVGProps<SVGSVGElement>>;
+type ActiveNavId =
+  | 'projects'
+  | 'novel'
+  | 'script-workbench'
+  | 'image-workbench'
+  | 'video-workbench'
+  | 'prompts'
+  | 'assets'
+  | 'asset-role'
+  | 'asset-scene'
+  | 'asset-script'
+  | 'asset-novel';
+
+type PrimaryNavId = Exclude<ActiveNavId, 'asset-role' | 'asset-scene' | 'asset-script' | 'asset-novel'>;
+
+const sidebarNavItems: Array<{ id: PrimaryNavId; Icon: SidebarIcon; label: string }> = [
+  { id: 'projects', Icon: ProjectIcon, label: '项目管理' },
+  { id: 'novel', Icon: PenBookIcon, label: '小说创作' },
+  { id: 'script-workbench', Icon: ScriptIcon, label: '剧本工作台' },
+  { id: 'image-workbench', Icon: ImageWorkbenchIcon, label: '生图工作台' },
+  { id: 'video-workbench', Icon: VideoIcon, label: '视频工作台' },
+  { id: 'prompts', Icon: PromptIcon, label: '提示词库' },
+  { id: 'assets', Icon: FolderIcon, label: '资产管理' },
+];
+
+const assetItems: Array<{ id: ActiveNavId; Icon: SidebarIcon; label: string; count: number }> = [
+  { id: 'asset-role', Icon: UserIcon, label: '角色', count: 12 },
+  { id: 'asset-scene', Icon: SceneIcon, label: '场景', count: 8 },
+  { id: 'asset-script', Icon: ScriptIcon, label: '剧本', count: 5 },
+  { id: 'asset-novel', Icon: BookIcon, label: '小说', count: 3 },
+];
+
+const mockUser = { name: 'John Doe', email: 'john@example.com', initials: 'JD' };
 
 export function App() {
   const [theme, setTheme] = usePersistentTheme();
-  const [activeMode, setActiveMode] = useState<CreationMode>('text');
+  const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isSidebarPreviewed, setSidebarPreviewed] = useState(false);
+  const [activeNavId, setActiveNavId] = useState<ActiveNavId>('projects');
+  const [isAssetMenuExpanded, setAssetMenuExpanded] = useState(true);
+  const [isUserMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const ThemeIcon = theme === 'dark' ? SunIcon : MoonIcon;
+  const AssetChevronIcon = isAssetMenuExpanded ? ChevronDownIcon : ChevronRightIcon;
+  const isSidebarVisuallyCollapsed = isSidebarCollapsed && !isSidebarPreviewed;
+
+  useEffect(() => {
+    if (!isUserMenuOpen) return;
+
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (!userMenuRef.current?.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+  }, [isUserMenuOpen]);
+
+  useEffect(() => {
+    if (isSidebarCollapsed) setUserMenuOpen(false);
+  }, [isSidebarCollapsed]);
 
   return (
-    <div className="app-shell" data-theme={theme}>
-      <div className="app-window" role="application" aria-label="Endless Creation 创作工作台">
-        <header className="titlebar">
-          <div className="brand" aria-label="应用标识">
-            <span className="brand__mark">EC</span>
-            <span className="brand__name">Endless Creation</span>
-          </div>
-          <div className="titlebar__center">
-            <span>AI 创作平台</span>
-            <small>Workspace Shell v0.2</small>
-          </div>
-          <div className="window-controls" aria-label="窗口控制">`n            <button aria-label="最小化窗口" className="window-controls__dot" onClick={() => void rendererBridge.minimizeWindow()} type="button" />`n            <button aria-label="最大化或还原窗口" className="window-controls__dot" onClick={() => void rendererBridge.maximizeWindow()} type="button" />`n            <button aria-label="关闭窗口" className="window-controls__dot window-controls__dot--close" onClick={() => void rendererBridge.closeWindow()} type="button" />`n          </div>
+    <div
+      className={`app-shell ${isSidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''} ${isSidebarPreviewed ? 'app-shell--sidebar-previewed' : ''}`}
+      data-theme={theme}
+    >
+      <aside
+        className={`canvasflow-sidebar ${isSidebarCollapsed ? 'canvasflow-sidebar--collapsed' : ''} ${isSidebarPreviewed ? 'canvasflow-sidebar--previewed' : ''}`}
+        aria-label="Endless Creation 侧边栏"
+        onMouseEnter={() => {
+          if (isSidebarCollapsed) setSidebarPreviewed(true);
+        }}
+        onMouseLeave={() => setSidebarPreviewed(false)}
+      >
+        <header className="canvasflow-brand">
+          <span className="canvasflow-brand__mark" aria-hidden="true">
+            <AddSquareIcon />
+          </span>
+          <span className="canvasflow-brand__name" aria-label="Endless Creation">
+            <span>Endless</span>
+            <span>Creation</span>
+          </span>
+          <button
+            aria-expanded={!isSidebarCollapsed}
+            className="canvasflow-collapse glass-icon-btn"
+            aria-label={isSidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
+            onClick={() => {
+              setSidebarCollapsed((current) => !current);
+              setSidebarPreviewed(false);
+            }}
+            type="button"
+          >
+            <span className="glass-icon-btn__back" aria-hidden="true" />
+            <span className="glass-icon-btn__front">
+              <span className="glass-icon-btn__icon" aria-hidden="true">
+                <CollapseIcon />
+              </span>
+            </span>
+          </button>
         </header>
 
-        <div className="workspace-frame">
-          <aside className="sidebar" aria-label="功能导航">
-            <nav className="nav-list">
-              {NAV_ITEMS.map((item) => {
-                const isActive = item.id === activeMode;
+        <nav className="canvasflow-nav" aria-label="Endless Creation 导航">
+          {sidebarNavItems.map(({ Icon, ...item }) => {
+            const isAssetParent = item.id === 'assets';
+            const isActive = activeNavId === item.id;
 
-                return (
-                  <button
-                    aria-current={isActive ? 'page' : undefined}
-                    className={`nav-item ${isActive ? 'nav-item--active' : ''}`}
-                    key={item.id}
-                    onClick={() => setActiveMode(item.id)}
-                    type="button"
-                  >
-                    <span>
-                      <strong>{item.label}</strong>
-                      <small>{item.description}</small>
-                    </span>
-                    <kbd>{item.shortcut}</kbd>
-                  </button>
-                );
-              })}
-            </nav>
+            return (
+              <div className="canvasflow-nav__entry" key={item.id}>
+                <button
+                  aria-current={isActive ? 'page' : undefined}
+                  aria-expanded={isAssetParent ? isAssetMenuExpanded : undefined}
+                  aria-label={isSidebarVisuallyCollapsed ? item.label : undefined}
+                  className={`canvasflow-nav__item ${isActive ? 'canvasflow-nav__item--active' : ''}`}
+                  onClick={() => {
+                    setActiveNavId(item.id);
+                    if (isAssetParent) {
+                      setAssetMenuExpanded((current) => !current);
+                    }
+                  }}
+                  type="button"
+                >
+                  <span className="canvasflow-nav__icon" aria-hidden="true"><Icon /></span>
+                  <span className="canvasflow-nav__label">{item.label}</span>
+                  {isAssetParent && (
+                    <span className="canvasflow-nav__chevron" aria-hidden="true"><AssetChevronIcon /></span>
+                  )}
+                </button>
 
-            <footer className="sidebar-footer">
-              <Button variant="ghost" type="button">设置</Button>
-              <Button
-                variant="soft"
-                type="button"
-                aria-pressed={theme === 'light'}
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              >
-                {theme === 'dark' ? '切换浅色' : '切换深色'}
-              </Button>
-              <div className="user-status" aria-label="用户与状态">
-                <span className="user-status__avatar">U</span>
-                <span><strong>Creator</strong><small>本地草稿 · Mock AI</small></span>
+                {isAssetParent && isAssetMenuExpanded && (
+                  <div className="canvasflow-subnav">
+                    {assetItems.map(({ Icon: AssetIcon, ...assetItem }) => (
+                      <button
+                        aria-current={activeNavId === assetItem.id ? 'page' : undefined}
+                        aria-label={isSidebarVisuallyCollapsed ? assetItem.label : undefined}
+                        className={`canvasflow-subnav__item ${activeNavId === assetItem.id ? 'canvasflow-subnav__item--active' : ''}`}
+                        key={assetItem.id}
+                        onClick={() => {
+                          setActiveNavId(assetItem.id);
+                          setAssetMenuExpanded(true);
+                        }}
+                        type="button"
+                      >
+                        <span className="canvasflow-nav__icon" aria-hidden="true"><AssetIcon /></span>
+                        <span className="canvasflow-nav__label">{assetItem.label}</span>
+                        <span className="canvasflow-badge" aria-label={`${assetItem.label} ${assetItem.count} 个`}>{assetItem.count}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </footer>
-          </aside>
+            );
+          })}
+        </nav>
 
-          <CreationWorkbench mode={activeMode} />
-        </div>
-      </div>
+        <footer className="canvasflow-footer" ref={userMenuRef}>
+          {isUserMenuOpen && !isSidebarCollapsed && (
+            <div className="canvasflow-user-menu" role="menu" aria-label="User menu">
+              <div className="canvasflow-user-menu__identity">
+                <strong>{mockUser.name}</strong>
+                <span>{mockUser.email}</span>
+              </div>
+              <div className="canvasflow-user-menu__divider" />
+              <button className="canvasflow-user-menu__item" type="button" role="menuitem"><UserIcon />个人资料</button>
+              <button className="canvasflow-user-menu__item" type="button" role="menuitem"><SettingsIcon />设置</button>
+              <button className="canvasflow-user-menu__item" type="button" role="menuitem"><BillingIcon />账单</button>
+              <div className="canvasflow-user-menu__divider" />
+              <button className="canvasflow-user-menu__item" type="button" role="menuitem"><HelpIcon />帮助与支持</button>
+              <div className="canvasflow-user-menu__divider" />
+              <button className="canvasflow-user-menu__item canvasflow-user-menu__item--danger" type="button" role="menuitem"><LogoutIcon />退出登录</button>
+            </div>
+          )}
+
+          <div className="canvasflow-user-row">
+            <button
+              aria-expanded={isSidebarCollapsed ? undefined : isUserMenuOpen}
+              aria-label={mockUser.name}
+              className="canvasflow-user-button"
+              onClick={() => {
+                if (isSidebarCollapsed) return;
+                setUserMenuOpen((current) => !current);
+              }}
+              type="button"
+            >
+              <span className="canvasflow-user-avatar" aria-hidden="true">{mockUser.initials}</span>
+              <span className="canvasflow-user-copy">
+                <span className="canvasflow-user-name">{mockUser.name}</span>
+              </span>
+              <span className="canvasflow-user-chevron" aria-hidden="true"><ChevronDownIcon /></span>
+            </button>
+            <button
+              aria-label={theme === 'dark' ? '切换到浅色主题' : '切换到深色主题'}
+              aria-pressed={theme === 'light'}
+              className="canvasflow-theme-button"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              type="button"
+            >
+              <ThemeIcon />
+            </button>
+          </div>
+        </footer>
+      </aside>
+
+      {activeNavId === 'image-workbench' ? (
+        <ImageWorkbench />
+      ) : (
+        <main className="blank-workspace" aria-label="空白工作区" />
+      )}
     </div>
   );
 }
@@ -85,5 +253,3 @@ function usePersistentTheme(): [ThemeMode, (theme: ThemeMode) => void] {
 
   return [theme, setThemeState];
 }
-
-
