@@ -201,8 +201,41 @@
   align-content: start;
   gap: 2px;
   min-height: 0;
-  overflow: hidden;
-  padding: 18px 14px 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 14px 22px;
+  scrollbar-color: rgba(148, 163, 184, 0.28) transparent;
+  scrollbar-width: thin;
+}
+
+.canvasflow-nav::-webkit-scrollbar {
+  width: 5px;
+}
+
+.canvasflow-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.canvasflow-nav::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+}
+
+.canvasflow-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.34);
+}
+
+.app-shell[data-theme='light'] .canvasflow-nav {
+  scrollbar-color: rgba(100, 116, 139, 0.22) transparent;
+}
+
+.app-shell[data-theme='light'] .canvasflow-nav::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.16);
+}
+
+.app-shell[data-theme='light'] .canvasflow-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.28);
 }
 
 .canvasflow-nav__item,
@@ -631,7 +664,7 @@
 
 @media (max-width: 520px) {
   .canvasflow-brand { padding: 0 16px; }
-  .canvasflow-nav { padding: 18px 16px 0; }
+  .canvasflow-nav { padding: 18px 16px 22px; }
   .canvasflow-footer { padding: 16px; }
 }
 
@@ -679,7 +712,7 @@
 
 .canvasflow-sidebar--collapsed .canvasflow-nav {
   justify-items: center;
-  padding: 18px 10px 0;
+  padding: 18px 10px 18px;
 }
 
 
