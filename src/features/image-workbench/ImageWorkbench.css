@@ -1,4 +1,4 @@
-.image-workbench {
+﻿.image-workbench {
   --image-bg: #0b111b;
   --image-panel: #111822;
   --image-panel-strong: #161d29;
@@ -938,30 +938,39 @@
 .image-studio__params {
   display: grid;
   grid-template-columns: minmax(220px, 1.35fr) repeat(2, minmax(148px, 1fr));
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--image-line);
-  border-radius: 16px;
-  background: rgba(13, 18, 27, 0.34);
+  gap: 16px;
+  padding: 8px 0 0;
+  border: 0;
+  background: transparent;
 }
 
 .image-studio__field {
+  position: relative;
   display: grid;
+  align-content: center;
   gap: 8px;
   min-width: 0;
-  min-height: 66px;
-  padding: 12px 13px;
-  border: 1px solid var(--image-line-soft);
-  border-radius: 13px;
+  min-height: 58px;
+  padding: 18px 16px 12px;
+  border: 1.5px solid rgba(86, 132, 255, 0.72);
+  border-radius: 15px;
   color: var(--image-text);
-  background: var(--image-input);
+  background: var(--image-card-bg);
+  box-shadow: 0 0 0 1px rgba(86, 132, 255, 0.05);
 }
 
 .image-studio__field > span {
-  color: var(--image-muted);
+  position: absolute;
+  top: -9px;
+  left: 14px;
+  z-index: 1;
+  padding: 0 5px;
+  color: #3f7cff;
+  background: var(--image-card-bg);
   font-size: 12px;
-  font-weight: 750;
-  letter-spacing: 0.02em;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.01em;
 }
 
 .image-studio__field strong {
@@ -974,13 +983,12 @@
 }
 
 .image-studio__field--select {
-  position: relative;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
+  align-items: center;
 }
 
 .image-studio__field--select > span {
-  grid-column: 1 / -1;
+  grid-column: auto;
 }
 
 .image-studio__field--select svg {
@@ -1496,3 +1504,4 @@
     grid-template-columns: 1fr;
   }
 }
+
