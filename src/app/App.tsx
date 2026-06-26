@@ -241,7 +241,7 @@ export function App() {
       ) : activeNavId === 'projects' ? (
         <ProjectManagement />
       ) : (
-        <main className="blank-workspace" aria-label="?????" />
+        <main className="blank-workspace" aria-label="空白工作区" />
       )}
     </div>
   );
