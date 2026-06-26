@@ -7,10 +7,11 @@ interface InfiniteCanvasProps {
   backgroundMode: CanvasBackgroundMode;
   onViewportChange: (viewport: ViewportTransform) => void;
   onCanvasClick: () => void;
+  onSpacePressedChange?: (pressed: boolean) => void;
   children: ReactNode;
 }
 
-export function InfiniteCanvas({ viewport, backgroundMode, onViewportChange, onCanvasClick, children }: InfiniteCanvasProps) {
+export function InfiniteCanvas({ viewport, backgroundMode, onViewportChange, onCanvasClick, onSpacePressedChange, children }: InfiniteCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const panRef = useRef({ active: false, pointerId: 0, startX: 0, startY: 0, initialX: 0, initialY: 0, moved: false });
   const viewportRef = useRef(viewport);
@@ -29,21 +30,35 @@ export function InfiniteCanvas({ viewport, backgroundMode, onViewportChange, onC
   }, []);
 
   useEffect(() => {
+    function setPressed(pressed: boolean) {
+      setSpacePressed(pressed);
+      onSpacePressedChange?.(pressed);
+    }
+
+    function isEditableTarget(target: EventTarget | null) {
+      if (!(target instanceof HTMLElement)) return false;
+      return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement || target.isContentEditable;
+    }
+
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.code !== 'Space') return;
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return;
-      setSpacePressed(true);
+      if (event.code !== 'Space' || isEditableTarget(event.target)) return;
+      setPressed(true);
     }
     function handleKeyUp(event: KeyboardEvent) {
-      if (event.code === 'Space') setSpacePressed(false);
+      if (event.code === 'Space') setPressed(false);
+    }
+    function handleBlur() {
+      setPressed(false);
     }
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
     };
-  }, []);
+  }, [onSpacePressedChange]);
 
   function handleWheel(event: ReactWheelEvent<HTMLDivElement>) {
     const target = event.target instanceof Element ? event.target : null;

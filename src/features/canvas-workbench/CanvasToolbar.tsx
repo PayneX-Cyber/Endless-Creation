@@ -15,6 +15,12 @@ interface CanvasToolbarProps {
   onResetView: () => void;
 }
 
+const backgroundLabels: Record<CanvasBackgroundMode, string> = {
+  lines: '??',
+  dots: '??',
+  blank: '??',
+};
+
 export function CanvasToolbar({ hasSelection, canUndo, canRedo, backgroundMode, onAddNode, onDeleteSelected, onClear, onUndo, onRedo, onBackgroundModeChange, onResetView }: CanvasToolbarProps) {
   const [feedback, setFeedback] = useState('');
 
@@ -25,35 +31,35 @@ export function CanvasToolbar({ hasSelection, canUndo, canRedo, backgroundMode, 
   }, [feedback]);
 
   function pending(label: string) {
-    setFeedback(`${label} 后续接入`);
+    setFeedback(`${label}????`);
   }
 
   function cycleBackground() {
     const next = backgroundMode === 'lines' ? 'dots' : backgroundMode === 'dots' ? 'blank' : 'lines';
     onBackgroundModeChange(next);
-    setFeedback(`背景：${next === 'lines' ? '线' : next === 'dots' ? '点' : '空白'}`);
+    setFeedback(`???${backgroundLabels[next]}`);
   }
 
   return (
     <div className="canvas-toolbar-wrap" data-canvas-control>
       {feedback ? <div className="canvas-toolbar__feedback" role="status">{feedback}</div> : null}
-      <div className="canvas-toolbar" role="toolbar" aria-label="画布工具栏">
-        <ToolButton label="移动/选择" active onClick={() => setFeedback('选择工具已启用')}><HandIcon /></ToolButton>
-        <ToolButton label="撤销" disabled={!canUndo} onClick={onUndo}><UndoIcon /></ToolButton>
-        <ToolButton label="重做" disabled={!canRedo} onClick={onRedo}><RedoIcon /></ToolButton>
+      <div className="canvas-toolbar" role="toolbar" aria-label="?????">
+        <ToolButton label="?? / ??" active onClick={() => setFeedback('???????')}><HandIcon /></ToolButton>
+        <ToolButton label="??" disabled={!canUndo} onClick={onUndo}><UndoIcon /></ToolButton>
+        <ToolButton label="??" disabled={!canRedo} onClick={onRedo}><RedoIcon /></ToolButton>
         <ToolbarDivider />
-        <ToolButton label="新增文本节点" onClick={() => onAddNode('text')}><TextIcon /></ToolButton>
-        <ToolButton label="新增图片节点" onClick={() => onAddNode('image')}><ImageIcon /></ToolButton>
-        <ToolButton label="新增视频节点" onClick={() => onAddNode('video')}><VideoIcon /></ToolButton>
-        <ToolButton label="新增音频节点" onClick={() => onAddNode('audio')}><MusicIcon /></ToolButton>
-        <ToolButton label="新增配置节点" onClick={() => onAddNode('config')}><SlidersIcon /></ToolButton>
-        <ToolButton label="上传/导入" onClick={() => pending('上传/导入')}><UploadIcon /></ToolButton>
+        <ToolButton label="??????" onClick={() => onAddNode('text')}><TextIcon /></ToolButton>
+        <ToolButton label="??????" onClick={() => onAddNode('image')}><ImageIcon /></ToolButton>
+        <ToolButton label="??????" onClick={() => onAddNode('video')}><VideoIcon /></ToolButton>
+        <ToolButton label="??????" onClick={() => onAddNode('audio')}><MusicIcon /></ToolButton>
+        <ToolButton label="??????" onClick={() => onAddNode('config')}><SlidersIcon /></ToolButton>
+        <ToolButton label="?? / ??" onClick={() => pending('????')}><UploadIcon /></ToolButton>
         <ToolbarDivider />
-        <ToolButton label="资产库" onClick={() => pending('资产库')}><FolderIcon /></ToolButton>
-        <ToolButton label="切换背景模式" active={backgroundMode !== 'lines'} onClick={cycleBackground}><GridIcon /></ToolButton>
-        <ToolButton label="删除选中" disabled={!hasSelection} danger onClick={onDeleteSelected}><EraserIcon /></ToolButton>
-        <ToolButton label="清空画布" danger onClick={onClear}><TrashIcon /></ToolButton>
-        <ToolButton label="重置视图" onClick={onResetView}><FocusIcon /></ToolButton>
+        <ToolButton label="???" onClick={() => pending('???')}><FolderIcon /></ToolButton>
+        <ToolButton label="??????" active={backgroundMode !== 'lines'} onClick={cycleBackground}><GridIcon /></ToolButton>
+        <ToolButton label="????" disabled={!hasSelection} danger onClick={onDeleteSelected}><EraserIcon /></ToolButton>
+        <ToolButton label="????" danger onClick={onClear}><TrashIcon /></ToolButton>
+        <ToolButton label="????" onClick={onResetView}><FocusIcon /></ToolButton>
       </div>
     </div>
   );

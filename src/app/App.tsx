@@ -49,21 +49,21 @@ type ActiveNavId =
 type PrimaryNavId = Exclude<ActiveNavId, 'asset-role' | 'asset-scene' | 'asset-script' | 'asset-novel'>;
 
 const sidebarNavItems: Array<{ id: PrimaryNavId; Icon: SidebarIcon; label: string }> = [
-  { id: 'home', Icon: HomeIcon, label: '首页' },
-  { id: 'projects', Icon: ProjectIcon, label: '项目管理' },
-  { id: 'novel', Icon: PenBookIcon, label: '小说创作' },
-  { id: 'script-workbench', Icon: ScriptIcon, label: '剧本工作台' },
-  { id: 'image-workbench', Icon: ImageWorkbenchIcon, label: '生图工作台' },
-  { id: 'video-workbench', Icon: VideoIcon, label: '视频工作台' },
-  { id: 'prompts', Icon: PromptIcon, label: '提示词库' },
-  { id: 'assets', Icon: FolderIcon, label: '资产管理' },
+  { id: 'home', Icon: HomeIcon, label: '??' },
+  { id: 'projects', Icon: ProjectIcon, label: '????' },
+  { id: 'novel', Icon: PenBookIcon, label: '????' },
+  { id: 'script-workbench', Icon: ScriptIcon, label: '?????' },
+  { id: 'image-workbench', Icon: ImageWorkbenchIcon, label: '?????' },
+  { id: 'video-workbench', Icon: VideoIcon, label: '?????' },
+  { id: 'prompts', Icon: PromptIcon, label: '????' },
+  { id: 'assets', Icon: FolderIcon, label: '????' },
 ];
 
 const assetItems: Array<{ id: ActiveNavId; Icon: SidebarIcon; label: string; count: number }> = [
-  { id: 'asset-role', Icon: UserIcon, label: '角色', count: 12 },
-  { id: 'asset-scene', Icon: SceneIcon, label: '场景', count: 8 },
-  { id: 'asset-script', Icon: ScriptIcon, label: '剧本', count: 5 },
-  { id: 'asset-novel', Icon: BookIcon, label: '小说', count: 3 },
+  { id: 'asset-role', Icon: UserIcon, label: '??', count: 12 },
+  { id: 'asset-scene', Icon: SceneIcon, label: '??', count: 8 },
+  { id: 'asset-script', Icon: ScriptIcon, label: '??', count: 5 },
+  { id: 'asset-novel', Icon: BookIcon, label: '??', count: 3 },
 ];
 
 const mockUser = { name: 'John Doe', email: 'john@example.com', initials: 'JD' };
@@ -94,7 +94,6 @@ export function App() {
     return () => document.removeEventListener('mousedown', closeOnOutsideClick);
   }, [isUserMenuOpen]);
 
-
   return (
     <div
       className={`app-shell ${isSidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''}`}
@@ -102,7 +101,7 @@ export function App() {
     >
       <aside
         className={`canvasflow-sidebar ${isSidebarCollapsed ? 'canvasflow-sidebar--collapsed' : ''}`}
-        aria-label="Endless Creation 侧边栏"
+        aria-label="Endless Creation ???"
       >
         <header className="canvasflow-brand">
           <span className="canvasflow-brand__mark" aria-hidden="true">
@@ -115,7 +114,7 @@ export function App() {
           <button
             aria-expanded={!isSidebarCollapsed}
             className="canvasflow-collapse glass-icon-btn"
-            aria-label={isSidebarCollapsed ? '展开侧边栏' : '折叠侧边栏'}
+            aria-label={isSidebarCollapsed ? '?????' : '?????'}
             onClick={() => {
               setSidebarCollapsed((current) => !current);
             }}
@@ -130,7 +129,7 @@ export function App() {
           </button>
         </header>
 
-        <nav className="canvasflow-nav" aria-label="Endless Creation 导航">
+        <nav className="canvasflow-nav" aria-label="Endless Creation ??">
           {sidebarNavItems.map(({ Icon, ...item }) => {
             const isAssetParent = item.id === 'assets';
             const isActive = activeNavId === item.id;
@@ -175,7 +174,7 @@ export function App() {
                       >
                         <span className="canvasflow-nav__icon" aria-hidden="true"><AssetIcon /></span>
                         <span className="canvasflow-nav__label">{assetItem.label}</span>
-                        <span className="canvasflow-badge" aria-label={`${assetItem.label} ${assetItem.count} 个`}>{assetItem.count}</span>
+                        <span className="canvasflow-badge" aria-label={`${assetItem.label} ${assetItem.count} ?`}>{assetItem.count}</span>
                       </button>
                     ))}
                   </div>
@@ -187,13 +186,13 @@ export function App() {
 
         <footer className="canvasflow-footer" ref={userMenuRef}>
           {isUserMenuOpen && (
-            <div className="canvasflow-user-menu" role="menu" aria-label="User menu">
+            <div className="canvasflow-user-menu" role="menu" aria-label="????">
               <div className="canvasflow-user-menu__identity">
                 <strong>{mockUser.name}</strong>
                 <span>{mockUser.email}</span>
               </div>
               <div className="canvasflow-user-menu__divider" />
-              <button className="canvasflow-user-menu__item" type="button" role="menuitem"><UserIcon />个人资料</button>
+              <button className="canvasflow-user-menu__item" type="button" role="menuitem"><UserIcon />????</button>
               <button
                 className="canvasflow-user-menu__item"
                 type="button"
@@ -203,13 +202,13 @@ export function App() {
                   setUserMenuOpen(false);
                 }}
               >
-                <SettingsIcon />设置
+                <SettingsIcon />??
               </button>
-              <button className="canvasflow-user-menu__item" type="button" role="menuitem"><BillingIcon />账单</button>
+              <button className="canvasflow-user-menu__item" type="button" role="menuitem"><BillingIcon />??</button>
               <div className="canvasflow-user-menu__divider" />
-              <button className="canvasflow-user-menu__item" type="button" role="menuitem"><HelpIcon />帮助与支持</button>
+              <button className="canvasflow-user-menu__item" type="button" role="menuitem"><HelpIcon />?????</button>
               <div className="canvasflow-user-menu__divider" />
-              <button className="canvasflow-user-menu__item canvasflow-user-menu__item--danger" type="button" role="menuitem"><LogoutIcon />退出登录</button>
+              <button className="canvasflow-user-menu__item canvasflow-user-menu__item--danger" type="button" role="menuitem"><LogoutIcon />????</button>
             </div>
           )}
 
@@ -228,7 +227,7 @@ export function App() {
               <span className="canvasflow-user-chevron" aria-hidden="true"><ChevronDownIcon /></span>
             </button>
             <button
-              aria-label={theme === 'dark' ? '切换到浅色主题' : '切换到深色主题'}
+              aria-label={theme === 'dark' ? '???????' : '???????'}
               aria-pressed={theme === 'light'}
               className="canvasflow-theme-button"
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -237,8 +236,8 @@ export function App() {
               <ThemeIcon />
             </button>
             <button
-              aria-label="固定展开侧边栏"
-              title="固定展开侧边栏"
+              aria-label="???????"
+              title="???????"
               className="canvasflow-pin-button"
               onClick={() => setSidebarCollapsed(false)}
               type="button"
@@ -252,11 +251,11 @@ export function App() {
       {activeNavId === 'image-workbench' ? (
         <ImageWorkbench />
       ) : activeNavId === 'projects' && activeCanvasId ? (
-        <CanvasWorkbench canvasId={activeCanvasId} onBack={() => setActiveCanvasId(null)} />
+        <CanvasWorkbench canvasId={activeCanvasId} onBack={() => setActiveCanvasId(null)} keyboardDisabled={isSettingsOpen} />
       ) : activeNavId === 'projects' ? (
         <ProjectManagement onOpenCanvas={setActiveCanvasId} />
       ) : (
-        <main className="blank-workspace" aria-label="空白工作区" />
+        <main className="blank-workspace" aria-label="?????" />
       )}
 
       {isSettingsOpen && (

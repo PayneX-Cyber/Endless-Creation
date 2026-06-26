@@ -5,13 +5,14 @@ interface CanvasNodeProps {
   node: CanvasNodeData;
   selected: boolean;
   related: boolean;
+  isSpacePressed: boolean;
   onPointerDown: (event: ReactPointerEvent<HTMLElement>, nodeId: string) => void;
   onDelete: (nodeId: string) => void;
   onConnectStart: (event: ReactPointerEvent<HTMLButtonElement>, nodeId: string, handleType: ConnectionHandleType) => void;
   onConnectEnd: (event: ReactPointerEvent<HTMLButtonElement>, nodeId: string, handleType: ConnectionHandleType) => void;
 }
 
-export function CanvasNode({ node, selected, related, onPointerDown, onDelete, onConnectStart, onConnectEnd }: CanvasNodeProps) {
+export function CanvasNode({ node, selected, related, isSpacePressed, onPointerDown, onDelete, onConnectStart, onConnectEnd }: CanvasNodeProps) {
   return (
     <article
       className={`canvas-node canvas-node--${node.type} ${selected ? 'canvas-node--selected' : ''} ${related ? 'canvas-node--related' : ''}`}
@@ -19,11 +20,15 @@ export function CanvasNode({ node, selected, related, onPointerDown, onDelete, o
       data-node-id={node.id}
       style={{ width: node.width, height: node.height, transform: `translate(${node.position.x}px, ${node.position.y}px)` }}
       tabIndex={0}
-      onPointerDown={(event) => onPointerDown(event, node.id)}
+      onPointerDown={(event) => {
+        if (isSpacePressed) return;
+        onPointerDown(event, node.id);
+      }}
     >
       <ConnectionHandleButton type="target" nodeId={node.id} onConnectStart={onConnectStart} onConnectEnd={onConnectEnd} />
       <ConnectionHandleButton type="source" nodeId={node.id} onConnectStart={onConnectStart} onConnectEnd={onConnectEnd} />
 
+      <div className="canvas-node__accent" aria-hidden="true" />
       <div className="canvas-node__topline">
         <span className="canvas-node__badge">{nodeTypeLabel(node.type)}</span>
         {selected ? (
@@ -36,7 +41,7 @@ export function CanvasNode({ node, selected, related, onPointerDown, onDelete, o
             }}
             type="button"
           >
-            删除
+            ??
           </button>
         ) : null}
       </div>
@@ -54,7 +59,8 @@ function ConnectionHandleButton({ type, nodeId, onConnectStart, onConnectEnd }: 
       className={`canvas-node__handle canvas-node__handle--${type}`}
       data-canvas-control
       data-connection-handle={type}
-      aria-label={type === 'source' ? '从此节点创建连线' : '连接到此节点'}
+      aria-label={type === 'source' ? '????????' : '??????'}
+      title={type === 'source' ? '????????' : '??????'}
       onPointerDown={(event) => onConnectStart(event, nodeId, type)}
       onPointerUp={(event) => onConnectEnd(event, nodeId, type)}
     />
@@ -68,9 +74,9 @@ function NodePreview({ node }: { node: CanvasNodeData }) {
   if (node.type === 'config') {
     return (
       <div className="canvas-node__config" aria-hidden="true">
-        <span>{node.metadata?.model || 'Mock 模型'}</span>
+        <span>{node.metadata?.model || 'Mock ??'}</span>
         <span>{node.metadata?.size || '1536 x 1024'}</span>
-        <span>{node.metadata?.quality || '自动'}</span>
+        <span>{node.metadata?.quality || '??'}</span>
       </div>
     );
   }
@@ -78,9 +84,9 @@ function NodePreview({ node }: { node: CanvasNodeData }) {
 }
 
 function nodeTypeLabel(type: CanvasNodeData['type']) {
-  if (type === 'image') return '图片';
-  if (type === 'config') return '配置';
-  if (type === 'video') return '视频';
-  if (type === 'audio') return '音频';
-  return '文本';
+  if (type === 'image') return '??';
+  if (type === 'config') return '??';
+  if (type === 'video') return '??';
+  if (type === 'audio') return '??';
+  return '??';
 }
