@@ -221,10 +221,10 @@
   content: '';
 }
 
-.project-card--novel { --project-accent: #8b5cf6; --project-soft: rgba(139, 92, 246, 0.13); }
-.project-card--script { --project-accent: #f59e0b; --project-soft: rgba(245, 158, 11, 0.14); }
-.project-card--image { --project-accent: #27cad4; --project-soft: rgba(39, 202, 212, 0.13); }
-.project-card--video { --project-accent: #fb7185; --project-soft: rgba(251, 113, 133, 0.13); }
+.project-card--canvas { --project-accent: #4b83ff; --project-soft: rgba(75, 131, 255, 0.13); }
+.project-card--local { --project-accent: #27cad4; --project-soft: rgba(39, 202, 212, 0.13); }
+.project-card--relation { --project-accent: #8b5cf6; --project-soft: rgba(139, 92, 246, 0.13); }
+.project-card--archive { --project-accent: #64748b; --project-soft: rgba(100, 116, 139, 0.13); }
 
 .project-card__topline {
   display: flex;
