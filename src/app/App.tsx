@@ -5,6 +5,7 @@ import { rendererBridge } from '../services/rendererBridge';
 import { ImageWorkbench } from '../features/image-workbench';
 import { ProjectManagement } from '../features/project-management';
 import { CanvasWorkbench } from '../features/canvas-workbench';
+import { SettingsPage } from '../features/settings';
 import {
   AddSquareIcon,
   BillingIcon,
@@ -40,12 +41,13 @@ type ActiveNavId =
   | 'video-workbench'
   | 'prompts'
   | 'assets'
+  | 'settings'
   | 'asset-role'
   | 'asset-scene'
   | 'asset-script'
   | 'asset-novel';
 
-type PrimaryNavId = Exclude<ActiveNavId, 'asset-role' | 'asset-scene' | 'asset-script' | 'asset-novel'>;
+type PrimaryNavId = Exclude<ActiveNavId, 'settings' | 'asset-role' | 'asset-scene' | 'asset-script' | 'asset-novel'>;
 
 const sidebarNavItems: Array<{ id: PrimaryNavId; Icon: SidebarIcon; label: string }> = [
   { id: 'home', Icon: HomeIcon, label: '首页' },
@@ -192,7 +194,18 @@ export function App() {
               </div>
               <div className="canvasflow-user-menu__divider" />
               <button className="canvasflow-user-menu__item" type="button" role="menuitem"><UserIcon />个人资料</button>
-              <button className="canvasflow-user-menu__item" type="button" role="menuitem"><SettingsIcon />设置</button>
+              <button
+                className="canvasflow-user-menu__item"
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setActiveNavId('settings');
+                  setActiveCanvasId(null);
+                  setUserMenuOpen(false);
+                }}
+              >
+                <SettingsIcon />设置
+              </button>
               <button className="canvasflow-user-menu__item" type="button" role="menuitem"><BillingIcon />账单</button>
               <div className="canvasflow-user-menu__divider" />
               <button className="canvasflow-user-menu__item" type="button" role="menuitem"><HelpIcon />帮助与支持</button>
@@ -239,6 +252,8 @@ export function App() {
 
       {activeNavId === 'image-workbench' ? (
         <ImageWorkbench />
+      ) : activeNavId === 'settings' ? (
+        <SettingsPage theme={theme} onThemeChange={setTheme} />
       ) : activeNavId === 'projects' && activeCanvasId ? (
         <CanvasWorkbench canvasId={activeCanvasId} onBack={() => setActiveCanvasId(null)} />
       ) : activeNavId === 'projects' ? (
