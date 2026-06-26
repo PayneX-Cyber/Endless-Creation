@@ -92,9 +92,6 @@ export function App() {
     return () => document.removeEventListener('mousedown', closeOnOutsideClick);
   }, [isUserMenuOpen]);
 
-  useEffect(() => {
-    if (isSidebarCollapsed) setUserMenuOpen(false);
-  }, [isSidebarCollapsed]);
 
   return (
     <div
@@ -187,7 +184,7 @@ export function App() {
         </nav>
 
         <footer className="canvasflow-footer" ref={userMenuRef}>
-          {isUserMenuOpen && !isSidebarCollapsed && (
+          {isUserMenuOpen && (
             <div className="canvasflow-user-menu" role="menu" aria-label="User menu">
               <div className="canvasflow-user-menu__identity">
                 <strong>{mockUser.name}</strong>
@@ -206,13 +203,10 @@ export function App() {
 
           <div className="canvasflow-user-row">
             <button
-              aria-expanded={isSidebarCollapsed ? undefined : isUserMenuOpen}
+              aria-expanded={isUserMenuOpen}
               aria-label={mockUser.name}
               className="canvasflow-user-button"
-              onClick={() => {
-                if (isSidebarCollapsed) return;
-                setUserMenuOpen((current) => !current);
-              }}
+              onClick={() => setUserMenuOpen((current) => !current)}
               type="button"
             >
               <span className="canvasflow-user-avatar" aria-hidden="true">{mockUser.initials}</span>

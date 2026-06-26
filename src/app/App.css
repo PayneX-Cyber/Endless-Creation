@@ -588,9 +588,15 @@
   color: #334155;
 }
 
-.canvasflow-user-menu__item:hover {
+.canvasflow-user-menu__item:hover,
+.canvasflow-user-menu__item:focus-visible {
   color: var(--sidebar-text-strong);
   background: var(--sidebar-hover);
+}
+
+.canvasflow-user-menu__item:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: -2px;
 }
 
 .canvasflow-user-menu__item svg {
@@ -705,6 +711,29 @@
   align-self: end;
   height: 152px;
   padding: 12px 0;
+}
+
+.canvasflow-sidebar--collapsed {
+  overflow: visible;
+  z-index: 30;
+}
+
+.canvasflow-sidebar--collapsed .canvasflow-footer {
+  overflow: visible;
+}
+
+.canvasflow-sidebar--collapsed .canvasflow-user-menu {
+  left: calc(100% + 12px);
+  right: auto;
+  bottom: 92px;
+  width: 232px;
+  z-index: 50;
+}
+
+.canvasflow-sidebar--collapsed .canvasflow-user-menu__identity,
+.canvasflow-sidebar--collapsed .canvasflow-user-menu__item {
+  padding-left: 14px;
+  padding-right: 14px;
 }
 
 
