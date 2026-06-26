@@ -72,14 +72,14 @@
 
 .project-management__button--primary {
   min-width: 140px;
-  border-color: #172033;
+  border-color: #4b83ff;
   color: #ffffff;
-  background: #050505;
+  background: linear-gradient(180deg, #5b8cff 0%, #4b76f0 100%);
 }
 
 .project-management__button--primary:hover {
-  border-color: #172033;
-  background: #1a1a1a;
+  border-color: #3f7cff;
+  background: #3f6fe8;
 }
 
 .project-management__button svg {
@@ -144,8 +144,8 @@
 }
 
 .canvas-card__checkbox input:checked + span {
-  border-color: #172033;
-  background: linear-gradient(#050505, #050505) center / 10px 10px no-repeat;
+  border-color: #4b83ff;
+  background: linear-gradient(#4b83ff, #4b83ff) center / 10px 10px no-repeat;
 }
 
 .canvas-card h2 {

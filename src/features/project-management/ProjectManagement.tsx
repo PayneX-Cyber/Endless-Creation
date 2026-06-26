@@ -33,7 +33,7 @@ export function ProjectManagement() {
               </label>
               <div>
                 <h2>{canvas.title}</h2>
-                <p>{canvas.nodes} 个节点 ? {canvas.edges} 条连线</p>
+                <p>{canvas.nodes} 个节点 · {canvas.edges} 条连线</p>
               </div>
             </div>
             <footer className="canvas-card__footer">
