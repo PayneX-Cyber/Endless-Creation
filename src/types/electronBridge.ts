@@ -1,4 +1,6 @@
-﻿export interface EndlessCreationBridge {
+import type { ApiConnectionTestResult, ApiProviderConfig } from './apiProvider';
+
+export interface EndlessCreationBridge {
   app: {
     getVersion(): Promise<string>;
     getPlatform(): Promise<string>;
@@ -11,4 +13,8 @@
   clipboard: {
     writeText(text: string): Promise<void>;
   };
+  api: {
+    testConnection(config: ApiProviderConfig): Promise<ApiConnectionTestResult>;
+  };
 }
+

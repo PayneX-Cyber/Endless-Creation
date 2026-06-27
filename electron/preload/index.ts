@@ -14,6 +14,9 @@ const bridge: EndlessCreationBridge = {
   clipboard: {
     writeText: (text: string) => ipcRenderer.invoke('clipboard:write-text', text),
   },
+  api: {
+    testConnection: (config) => ipcRenderer.invoke('api:test-connection', config),
+  },
 };
 
 contextBridge.exposeInMainWorld('endlessCreationBridge', bridge);

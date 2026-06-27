@@ -1,4 +1,5 @@
-﻿import type { ThemeMode } from '../types/workspace';
+import type { ApiConnectionTestResult, ApiProviderConfig } from '../types/apiProvider';
+import type { ThemeMode } from '../types/workspace';
 
 const THEME_STORAGE_KEY = 'ec-theme';
 
@@ -87,8 +88,22 @@ export const rendererBridge = {
       textArea.remove();
     }
   },
+
+  async testApiConnection(config: ApiProviderConfig): Promise<ApiConnectionTestResult> {
+    const electronBridge = getElectronBridge();
+
+    if (!electronBridge) {
+      return {
+        ok: false,
+        message: '当前浏览器预览模式无法测试外部 API，请在 Electron 中打开设置后重试。',
+      };
+    }
+
+    return electronBridge.api.testConnection(config);
+  },
 };
 
 function getElectronBridge() {
   return globalThis.window?.endlessCreationBridge;
 }
+

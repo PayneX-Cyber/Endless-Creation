@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { rendererBridge } from '../../services/rendererBridge';
+import type { ApiConnectionTestResult, ApiProviderConfig } from '../../types/apiProvider';
 import type { ThemeMode } from '../../types/workspace';
 import './SettingsPage.css';
 
@@ -11,11 +13,24 @@ interface SettingsPageProps {
 type StartupPage = 'home' | 'projects' | 'last';
 type SettingsSectionId = 'appearance' | 'workspace' | 'local' | 'ai' | 'about';
 
+export const API_PROVIDER_STORAGE_KEY = 'endless-creation.api-provider-config';
+
+const defaultProviderConfig: ApiProviderConfig = {
+  id: 'openai-compatible-default',
+  label: 'OpenAI',
+  type: 'openai-compatible',
+  baseUrl: 'https://api.openai.com/v1',
+  apiKey: '',
+  defaultModel: 'gpt-4o-mini',
+  enabled: true,
+  lastTestStatus: 'untested',
+};
+
 const settingsSections: Array<{ id: SettingsSectionId; label: string; description: string }> = [
   { id: 'appearance', label: '外观', description: '主题与界面显示偏好。' },
   { id: 'workspace', label: '工作区', description: '启动页与画布体验。' },
   { id: 'local', label: '本地创作', description: '草稿与本地项目偏好。' },
-  { id: 'ai', label: 'AI 与生成', description: 'Mock 生成能力与 provider 状态。' },
+  { id: 'ai', label: 'AI 与生成', description: '配置 OpenAI-compatible 接口并验证 API 可用性。' },
   { id: 'about', label: '关于', description: '版本、阶段与说明。' },
 ];
 
@@ -25,8 +40,12 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
   const [compactCanvas, setCompactCanvas] = useState(false);
   const [startupPage, setStartupPage] = useState<StartupPage>('home');
   const [feedback, setFeedback] = useState('');
+  const [providerConfig, setProviderConfig] = useState<ApiProviderConfig>(() => readProviderConfig());
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [testResult, setTestResult] = useState<ApiConnectionTestResult | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const activeSectionMeta = settingsSections.find((section) => section.id === activeSection) ?? settingsSections[0];
+  const isTesting = providerConfig.lastTestStatus === 'testing';
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -47,8 +66,47 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
     return () => document.removeEventListener('keydown', closeOnEscape);
   }, [onClose]);
 
-  function mockSave() {
-    setFeedback('设置已保存到本次会话');
+  function updateProviderConfig(patch: Partial<ApiProviderConfig>) {
+    setProviderConfig((current) => ({ ...current, ...patch }));
+  }
+
+  function saveProviderConfig(nextConfig = providerConfig) {
+    try {
+      localStorage.setItem(API_PROVIDER_STORAGE_KEY, JSON.stringify(nextConfig));
+      setFeedback('配置已保存到本地开发存储。');
+    } catch {
+      setFeedback('保存失败，请检查浏览器本地存储权限。');
+    }
+  }
+
+  function saveSettings() {
+    if (activeSection === 'ai') {
+      saveProviderConfig();
+      return;
+    }
+
+    setFeedback('设置已保存到本次会话。');
+  }
+
+  async function testConnection() {
+    const testingConfig: ApiProviderConfig = {
+      ...providerConfig,
+      lastTestStatus: 'testing',
+    };
+
+    setProviderConfig(testingConfig);
+    setTestResult({ ok: false, message: '正在测试连接…' });
+
+    const result = await rendererBridge.testApiConnection(testingConfig);
+    const testedConfig: ApiProviderConfig = {
+      ...testingConfig,
+      lastTestedAt: new Date().toLocaleString(),
+      lastTestStatus: result.ok ? 'success' : 'failed',
+    };
+
+    setProviderConfig(testedConfig);
+    setTestResult(result);
+    saveProviderConfig(testedConfig);
   }
 
   return (
@@ -95,7 +153,7 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
             </div>
             <div className="settings-page__actions">
               {feedback ? <span className="settings-page__feedback" role="status">{feedback}</span> : null}
-              <button className="settings-page__primary" type="button" onClick={mockSave}>保存设置</button>
+              <button className="settings-page__primary" type="button" onClick={saveSettings}>保存设置</button>
             </div>
           </header>
 
@@ -145,12 +203,51 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
             )}
 
             {activeSection === 'ai' && (
-              <article className="settings-card">
-                <div className="settings-card__header"><div><h2>AI 与生成</h2><p>第一版只展示配置入口，不读取 API Key，也不接真实 provider。</p></div><span className="settings-card__badge settings-card__badge--muted">Mock</span></div>
-                <div className="settings-provider-list">
-                  <div className="settings-provider"><span>生图工作台</span><strong>Mock Image Generator</strong><em>已使用本地模拟流程</em></div>
-                  <div className="settings-provider"><span>画布工作区</span><strong>本地画布 Mock</strong><em>平移、缩放、节点与连线均为本地状态</em></div>
+              <article className="settings-card settings-card--api">
+                <div className="settings-card__header">
+                  <div>
+                    <h2>API Provider 配置</h2>
+                    <p>配置 OpenAI-compatible 接口，用于后续生图、视频、Agent 与提示词验证。</p>
+                  </div>
+                  <StatusBadge status={providerConfig.lastTestStatus ?? 'untested'} />
                 </div>
+
+                <div className="settings-api-grid">
+                  <label className="settings-field">
+                    <span>Provider 名称</span>
+                    <input value={providerConfig.label} onChange={(event) => updateProviderConfig({ label: event.target.value })} placeholder="OpenAI" />
+                  </label>
+                  <label className="settings-field">
+                    <span>默认模型</span>
+                    <input value={providerConfig.defaultModel} onChange={(event) => updateProviderConfig({ defaultModel: event.target.value })} placeholder="gpt-4o-mini" />
+                  </label>
+                  <label className="settings-field settings-field--wide">
+                    <span>Base URL</span>
+                    <input value={providerConfig.baseUrl} onChange={(event) => updateProviderConfig({ baseUrl: event.target.value })} placeholder="https://api.openai.com/v1" />
+                  </label>
+                  <label className="settings-field settings-field--wide">
+                    <span>API Key</span>
+                    <span className="settings-secret-field">
+                      <input value={providerConfig.apiKey} onChange={(event) => updateProviderConfig({ apiKey: event.target.value })} placeholder="sk-..." type={showApiKey ? 'text' : 'password'} />
+                      <button type="button" onClick={() => setShowApiKey((current) => !current)}>{showApiKey ? '隐藏' : '显示'}</button>
+                    </span>
+                  </label>
+                </div>
+
+                <ToggleRow title="启用此 Provider" description="关闭后后续生成流程不会默认使用该配置。" checked={providerConfig.enabled} onChange={(enabled) => updateProviderConfig({ enabled })} />
+
+                <div className="settings-api-actions">
+                  <button className="settings-page__primary" type="button" onClick={() => saveProviderConfig()}>保存配置</button>
+                  <button className="settings-page__secondary" type="button" disabled={isTesting} onClick={() => void testConnection()}>{isTesting ? '测试中…' : '测试连接'}</button>
+                </div>
+
+                <div className={`settings-api-status settings-api-status--${providerConfig.lastTestStatus ?? 'untested'}`} role="status">
+                  <strong>{statusTitle(providerConfig.lastTestStatus ?? 'untested')}</strong>
+                  <span>{testResult?.message ?? statusDescription(providerConfig)}</span>
+                  {testResult?.models?.length ? <em>模型示例：{testResult.models.join('、')}</em> : null}
+                </div>
+
+                <p className="settings-api-note">当前配置保存在本地开发存储，后续会迁移到安全存储。不做账号、云同步或密钥加密。</p>
               </article>
             )}
 
@@ -160,7 +257,7 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
                 <div className="settings-about-list">
                   <div><span>版本</span><strong>0.1.0 Mock Preview</strong></div>
                   <div><span>运行模式</span><strong>Electron + Vite + React</strong></div>
-                  <div><span>数据说明</span><strong>当前不接真实 AI、不写入 API Key、不调用本地文件系统。</strong></div>
+                  <div><span>数据说明</span><strong>当前不接账号、不做云同步、不写入真实 API Key 到代码。</strong></div>
                 </div>
               </article>
             )}
@@ -184,3 +281,38 @@ function ToggleRow({ title, description, checked, onChange }: { title: string; d
     </div>
   );
 }
+
+function StatusBadge({ status }: { status: NonNullable<ApiProviderConfig['lastTestStatus']> }) {
+  return <span className={`settings-card__badge settings-card__badge--${status}`}>{statusTitle(status)}</span>;
+}
+
+function statusTitle(status: NonNullable<ApiProviderConfig['lastTestStatus']>) {
+  if (status === 'testing') return '测试中';
+  if (status === 'success') return '测试成功';
+  if (status === 'failed') return '测试失败';
+  return '未配置';
+}
+
+function statusDescription(config: ApiProviderConfig) {
+  if (config.lastTestStatus === 'success' && config.lastTestedAt) return `上次测试：${config.lastTestedAt}`;
+  if (config.lastTestStatus === 'failed' && config.lastTestedAt) return `上次失败：${config.lastTestedAt}`;
+  return '填写 Base URL 与 API Key 后，可以测试 /models 接口是否可用。';
+}
+
+function readProviderConfig(): ApiProviderConfig {
+  try {
+    const stored = localStorage.getItem(API_PROVIDER_STORAGE_KEY);
+    if (!stored) return defaultProviderConfig;
+
+    const parsed = JSON.parse(stored) as Partial<ApiProviderConfig>;
+    return {
+      ...defaultProviderConfig,
+      ...parsed,
+      type: 'openai-compatible',
+      apiKey: typeof parsed.apiKey === 'string' ? parsed.apiKey : '',
+    };
+  } catch {
+    return defaultProviderConfig;
+  }
+}
+
