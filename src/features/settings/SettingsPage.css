@@ -938,3 +938,22 @@
     grid-template-columns: 1fr;
   }
 }
+
+.settings-section {
+  display: grid;
+  gap: 18px;
+}
+
+.settings-section--api {
+  align-content: start;
+}
+
+.settings-section .settings-card {
+  display: grid;
+  gap: 16px;
+}
+
+.settings-section--api .settings-config-tabs {
+  justify-self: start;
+  margin: 0 0 2px;
+}

@@ -10,7 +10,8 @@ interface SettingsPageProps {
   onClose: () => void;
 }
 
-type ConfigTabId = 'channels' | 'models' | 'preferences' | 'webdav';
+type SettingsSectionId = 'appearance' | 'workspace' | 'local' | 'api' | 'about';
+type ApiConfigTabId = 'channels' | 'models' | 'preferences' | 'webdav';
 type StartupPage = 'home' | 'projects' | 'last';
 
 interface ModelPreferences {
@@ -30,9 +31,16 @@ interface GenerationPreferences {
   videoQuality: '720' | '1080';
   audioFormat: 'mp3' | 'wav';
   audioSpeed: '0.8' | '1' | '1.2';
+}
+
+interface WorkspacePreferences {
   startupPage: StartupPage;
   compactCanvas: boolean;
+}
+
+interface LocalCreationPreferences {
   autoSave: boolean;
+  defaultProjectDirectory: string;
 }
 
 interface WebdavConfig {
@@ -50,8 +58,18 @@ export const API_PROVIDER_STORAGE_KEY = 'endless-creation.api-provider-config';
 export const MODEL_PREFERENCES_STORAGE_KEY = 'endless-creation.model-preferences';
 export const GENERATION_PREFERENCES_STORAGE_KEY = 'endless-creation.generation-preferences';
 export const WEBDAV_CONFIG_STORAGE_KEY = 'endless-creation.webdav-config';
+const WORKSPACE_PREFERENCES_STORAGE_KEY = 'endless-creation.workspace-preferences';
+const LOCAL_CREATION_PREFERENCES_STORAGE_KEY = 'endless-creation.local-creation-preferences';
 
-const configTabs: Array<{ id: ConfigTabId; label: string }> = [
+const settingsSections: Array<{ id: SettingsSectionId; label: string; description: string }> = [
+  { id: 'appearance', label: '外观', description: '主题与界面显示偏好。' },
+  { id: 'workspace', label: '工作区', description: '启动页与画布体验。' },
+  { id: 'local', label: '本地创作', description: '草稿与本地项目偏好。' },
+  { id: 'api', label: 'API配置', description: '渠道聚合、模型选择和同步偏好。' },
+  { id: 'about', label: '关于', description: '版本、阶段与说明。' },
+];
+
+const apiConfigTabs: Array<{ id: ApiConfigTabId; label: string }> = [
   { id: 'channels', label: '渠道' },
   { id: 'models', label: '模型' },
   { id: 'preferences', label: '生成偏好' },
@@ -86,9 +104,16 @@ const defaultGenerationPreferences: GenerationPreferences = {
   videoQuality: '720',
   audioFormat: 'mp3',
   audioSpeed: '1',
+};
+
+const defaultWorkspacePreferences: WorkspacePreferences = {
   startupPage: 'home',
   compactCanvas: false,
+};
+
+const defaultLocalCreationPreferences: LocalCreationPreferences = {
   autoSave: true,
+  defaultProjectDirectory: '本地项目目录（后续接入选择器）',
 };
 
 const defaultWebdavConfig: WebdavConfig = {
@@ -102,17 +127,21 @@ const defaultWebdavConfig: WebdavConfig = {
 };
 
 export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProps) {
-  const [activeTab, setActiveTab] = useState<ConfigTabId>('channels');
+  const [activeSection, setActiveSection] = useState<SettingsSectionId>('appearance');
+  const [activeApiTab, setActiveApiTab] = useState<ApiConfigTabId>('channels');
   const [feedback, setFeedback] = useState('');
   const [providerConfig, setProviderConfig] = useState<ApiProviderConfig>(() => readStorage(API_PROVIDER_STORAGE_KEY, defaultProviderConfig));
   const [modelPreferences, setModelPreferences] = useState<ModelPreferences>(() => readStorage(MODEL_PREFERENCES_STORAGE_KEY, defaultModelPreferences));
   const [generationPreferences, setGenerationPreferences] = useState<GenerationPreferences>(() => readStorage(GENERATION_PREFERENCES_STORAGE_KEY, defaultGenerationPreferences));
+  const [workspacePreferences, setWorkspacePreferences] = useState<WorkspacePreferences>(() => readStorage(WORKSPACE_PREFERENCES_STORAGE_KEY, defaultWorkspacePreferences));
+  const [localCreationPreferences, setLocalCreationPreferences] = useState<LocalCreationPreferences>(() => readStorage(LOCAL_CREATION_PREFERENCES_STORAGE_KEY, defaultLocalCreationPreferences));
   const [webdavConfig, setWebdavConfig] = useState<WebdavConfig>(() => readStorage(WEBDAV_CONFIG_STORAGE_KEY, defaultWebdavConfig));
   const [showApiKey, setShowApiKey] = useState(false);
   const [showWebdavPassword, setShowWebdavPassword] = useState(false);
   const [testResult, setTestResult] = useState<ApiConnectionTestResult | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const isTesting = providerConfig.lastTestStatus === 'testing';
+  const activeSectionMeta = settingsSections.find((section) => section.id === activeSection) ?? settingsSections[0];
   const modelOptions = useMemo(() => uniqueModels([providerConfig.defaultModel, ...modelPreferences.availableModels]), [modelPreferences.availableModels, providerConfig.defaultModel]);
 
   useEffect(() => {
@@ -133,31 +162,6 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
     document.addEventListener('keydown', closeOnEscape);
     return () => document.removeEventListener('keydown', closeOnEscape);
   }, [onClose]);
-
-  function changeTab(tabId: ConfigTabId) {
-    setActiveTab(tabId);
-  }
-
-  function handleTabKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, tabId: ConfigTabId) {
-    const currentIndex = configTabs.findIndex((tab) => tab.id === tabId);
-    if (currentIndex < 0) return;
-
-    const nextIndex = event.key === 'ArrowRight'
-      ? (currentIndex + 1) % configTabs.length
-      : event.key === 'ArrowLeft'
-        ? (currentIndex - 1 + configTabs.length) % configTabs.length
-        : event.key === 'Home'
-          ? 0
-          : event.key === 'End'
-            ? configTabs.length - 1
-            : -1;
-
-    if (nextIndex < 0) return;
-    event.preventDefault();
-    const nextTab = configTabs[nextIndex].id;
-    setActiveTab(nextTab);
-    window.requestAnimationFrame(() => document.getElementById(`settings-tab-${nextTab}`)?.focus());
-  }
 
   function updateProviderConfig(patch: Partial<ApiProviderConfig>) {
     setProviderConfig((current) => ({ ...current, ...patch }));
@@ -190,17 +194,9 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
     writeStorage(MODEL_PREFERENCES_STORAGE_KEY, nextModels);
   }
 
-  function updateModelPreferences(patch: Partial<ModelPreferences>) {
-    setModelPreferences((current) => ({ ...current, ...patch }));
-  }
-
   function saveModelPreferences() {
     writeStorage(MODEL_PREFERENCES_STORAGE_KEY, modelPreferences);
     setFeedback('模型偏好已保存。');
-  }
-
-  function updateGenerationPreferences(patch: Partial<GenerationPreferences>) {
-    setGenerationPreferences((current) => ({ ...current, ...patch }));
   }
 
   function saveGenerationPreferences() {
@@ -208,8 +204,14 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
     setFeedback('生成偏好已保存。');
   }
 
-  function updateWebdavConfig(patch: Partial<WebdavConfig>) {
-    setWebdavConfig((current) => ({ ...current, ...patch }));
+  function saveWorkspacePreferences() {
+    writeStorage(WORKSPACE_PREFERENCES_STORAGE_KEY, workspacePreferences);
+    setFeedback('工作区偏好已保存。');
+  }
+
+  function saveLocalCreationPreferences() {
+    writeStorage(LOCAL_CREATION_PREFERENCES_STORAGE_KEY, localCreationPreferences);
+    setFeedback('本地创作偏好已保存。');
   }
 
   function saveWebdavConfig(nextConfig = webdavConfig, quiet = false) {
@@ -228,10 +230,31 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
     setFeedback(webdavConfig.url.trim() ? 'WebDAV 配置已保存，真实连接后续接入。' : '请先填写 WebDAV 地址。');
   }
 
+  function handleApiTabKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, tabId: ApiConfigTabId) {
+    const currentIndex = apiConfigTabs.findIndex((tab) => tab.id === tabId);
+    if (currentIndex < 0) return;
+
+    const nextIndex = event.key === 'ArrowRight'
+      ? (currentIndex + 1) % apiConfigTabs.length
+      : event.key === 'ArrowLeft'
+        ? (currentIndex - 1 + apiConfigTabs.length) % apiConfigTabs.length
+        : event.key === 'Home'
+          ? 0
+          : event.key === 'End'
+            ? apiConfigTabs.length - 1
+            : -1;
+
+    if (nextIndex < 0) return;
+    event.preventDefault();
+    const nextTab = apiConfigTabs[nextIndex].id;
+    setActiveApiTab(nextTab);
+    window.requestAnimationFrame(() => document.getElementById(`settings-api-tab-${nextTab}`)?.focus());
+  }
+
   return (
     <div className="settings-modal" role="presentation" onMouseDown={onClose}>
       <section
-        className="settings-modal__dialog settings-config-dialog"
+        className="settings-modal__dialog"
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
@@ -241,232 +264,335 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
           <span aria-hidden="true">×</span>
         </button>
 
-        <header className="settings-config-header">
-          <div>
-            <h1 id="settings-title">配置与用户偏好</h1>
-            <p>渠道聚合、模型选择和同步偏好</p>
+        <aside className="settings-modal__nav" aria-label="设置导航">
+          <div className="settings-modal__brand">
+            <p>设置</p>
+            <span>Endless Creation</span>
           </div>
-          {feedback ? <span className="settings-page__feedback" role="status">{feedback}</span> : null}
-        </header>
+          <nav className="settings-nav-list">
+            {settingsSections.map((section) => {
+              const selected = activeSection === section.id;
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  className={selected ? 'settings-nav-item settings-nav-item--active' : 'settings-nav-item'}
+                  aria-current={selected ? 'page' : undefined}
+                  onClick={() => setActiveSection(section.id)}
+                >
+                  <span className="settings-nav-item__dot" aria-hidden="true" />
+                  <span>{section.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
 
-        <div className="settings-config-tabs" role="tablist" aria-label="配置分类">
-          {configTabs.map((tab) => {
-            const selected = activeTab === tab.id;
-            return (
-              <button
-                id={`settings-tab-${tab.id}`}
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                aria-controls={`settings-panel-${tab.id}`}
-                tabIndex={selected ? 0 : -1}
-                className={selected ? 'settings-config-tab settings-config-tab--active' : 'settings-config-tab'}
-                onClick={() => changeTab(tab.id)}
-                onKeyDown={(event) => handleTabKeyDown(event, tab.id)}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+        <main className="settings-modal__content">
+          <header className="settings-content-header">
+            <div>
+              <p className="settings-page__eyebrow">本地偏好设置</p>
+              <h1 id="settings-title">{activeSectionMeta.label}</h1>
+              <p className="settings-page__subtitle">{activeSectionMeta.description}</p>
+            </div>
+            {feedback ? <span className="settings-page__feedback" role="status">{feedback}</span> : null}
+          </header>
 
-        <main className="settings-config-body">
-          {activeTab === 'channels' && (
-            <section id="settings-panel-channels" role="tabpanel" aria-labelledby="settings-tab-channels" className="settings-panel">
-              <div className="settings-panel-toolbar">
-                <div>
-                  <h2>渠道</h2>
-                  <p>配置 OpenAI-compatible 渠道并拉取模型。</p>
-                </div>
-                <div className="settings-inline-actions">
-                  <button className="settings-page__secondary" type="button" disabled={isTesting || !providerConfig.enabled} onClick={() => void testConnection()}>{isTesting ? '拉取中…' : '拉取全部'}</button>
-                  <button className="settings-page__secondary" type="button" onClick={() => setFeedback('多渠道后续接入，当前先保留一个默认渠道。')}>新增渠道</button>
-                </div>
-              </div>
-
-              <article className="settings-card settings-channel-card">
-                <div className="settings-card__header">
-                  <div>
-                    <h2>{providerConfig.label || '未命名渠道'}</h2>
-                    <p>{providerConfig.baseUrl || '未填写 Base URL'}</p>
+          <section className="settings-content-scroll">
+            {activeSection === 'appearance' && (
+              <div className="settings-section">
+                <article className="settings-card">
+                  <div className="settings-card__header">
+                    <div>
+                      <h2>主题模式</h2>
+                      <p>选择深色或浅色界面，立即应用到整个桌面端。</p>
+                    </div>
+                    <span className="settings-card__badge">{theme === 'dark' ? '深色模式' : '浅色模式'}</span>
                   </div>
-                  <span className={providerConfig.enabled ? 'settings-card__badge settings-card__badge--success' : 'settings-card__badge settings-card__badge--untested'}>{providerConfig.enabled ? '已启用' : '未启用'}</span>
-                </div>
-
-                <div className="settings-channel-summary">
-                  <span>API 格式：OpenAI-compatible</span>
-                  <span>默认模型：{providerConfig.defaultModel || '未设置'}</span>
-                  <span>测试状态：{statusTitle(providerConfig.lastTestStatus ?? 'untested')}</span>
-                </div>
-
-                <div className="settings-api-grid">
-                  <label className="settings-field">
-                    <span>渠道名称</span>
-                    <input value={providerConfig.label} onChange={(event) => updateProviderConfig({ label: event.target.value })} placeholder="OpenAI" />
-                  </label>
-                  <label className="settings-field">
-                    <span>API 格式</span>
-                    <input value="OpenAI-compatible" readOnly />
-                  </label>
-                  <label className="settings-field settings-field--wide">
-                    <span>Base URL</span>
-                    <input value={providerConfig.baseUrl} onChange={(event) => updateProviderConfig({ baseUrl: event.target.value })} placeholder="https://api.openai.com/v1" />
-                  </label>
-                  <label className="settings-field settings-field--wide">
-                    <span>API Key</span>
-                    <span className="settings-secret-field">
-                      <input value={providerConfig.apiKey} onChange={(event) => updateProviderConfig({ apiKey: event.target.value })} placeholder="sk-..." type={showApiKey ? 'text' : 'password'} />
-                      <button type="button" onClick={() => setShowApiKey((current) => !current)}>{showApiKey ? '隐藏' : '显示'}</button>
-                    </span>
-                  </label>
-                  <label className="settings-field settings-field--wide">
-                    <span>默认模型</span>
-                    <input value={providerConfig.defaultModel} onChange={(event) => updateProviderConfig({ defaultModel: event.target.value })} placeholder="gpt-4o-mini" />
-                  </label>
-                </div>
-
-                <ToggleRow title="启用此渠道" description="关闭后后续生成流程不会默认使用该配置。" checked={providerConfig.enabled} onChange={(enabled) => updateProviderConfig({ enabled })} />
-
-                <div className="settings-api-actions">
-                  <button className="settings-page__primary" type="button" onClick={() => saveProviderConfig()}>保存配置</button>
-                  <button className="settings-page__secondary" type="button" disabled={isTesting} onClick={() => void testConnection()}>{isTesting ? '测试中…' : '测试连接'}</button>
-                  <button className="settings-page__secondary" type="button" onClick={() => setFeedback('至少保留一个渠道。')}>删除</button>
-                </div>
-
-                <div className={`settings-api-status settings-api-status--${providerConfig.lastTestStatus ?? 'untested'}`} role="status">
-                  <strong>{statusTitle(providerConfig.lastTestStatus ?? 'untested')}</strong>
-                  <span>{testResult?.message ?? statusDescription(providerConfig)}</span>
-                  {modelPreferences.availableModels.length ? <em>模型示例：{modelPreferences.availableModels.slice(0, 6).join('、')}</em> : null}
-                </div>
-              </article>
-            </section>
-          )}
-
-          {activeTab === 'models' && (
-            <section id="settings-panel-models" role="tabpanel" aria-labelledby="settings-tab-models" className="settings-panel">
-              <div className="settings-panel-toolbar">
-                <div>
-                  <h2>模型</h2>
-                  <p>为文本、生图、视频和音频流程设置默认模型。</p>
-                </div>
-                <button className="settings-page__primary" type="button" onClick={saveModelPreferences}>保存模型偏好</button>
+                  <div className="settings-segmented" role="group" aria-label="主题模式">
+                    <button className={theme === 'dark' ? 'settings-segmented__item settings-segmented__item--active' : 'settings-segmented__item'} type="button" onClick={() => onThemeChange('dark')}>深色模式</button>
+                    <button className={theme === 'light' ? 'settings-segmented__item settings-segmented__item--active' : 'settings-segmented__item'} type="button" onClick={() => onThemeChange('light')}>浅色模式</button>
+                  </div>
+                </article>
               </div>
-              <article className="settings-card">
-                <div className="settings-model-grid">
-                  <ModelField label="默认文本模型" value={modelPreferences.textModel} options={modelOptions} onChange={(textModel) => updateModelPreferences({ textModel })} />
-                  <ModelField label="默认生图模型" value={modelPreferences.imageModel} options={modelOptions} onChange={(imageModel) => updateModelPreferences({ imageModel })} />
-                  <ModelField label="默认视频模型" value={modelPreferences.videoModel} options={modelOptions} onChange={(videoModel) => updateModelPreferences({ videoModel })} />
-                  <ModelField label="默认音频模型" value={modelPreferences.audioModel} options={modelOptions} onChange={(audioModel) => updateModelPreferences({ audioModel })} />
-                </div>
-                <div className="settings-api-status">
-                  <strong>可选模型列表</strong>
-                  <span>{modelPreferences.availableModels.length ? modelPreferences.availableModels.join('、') : '暂无拉取结果，可直接手动输入模型名称。'}</span>
-                </div>
-              </article>
-            </section>
-          )}
+            )}
 
-          {activeTab === 'preferences' && (
-            <section id="settings-panel-preferences" role="tabpanel" aria-labelledby="settings-tab-preferences" className="settings-panel">
-              <div className="settings-panel-toolbar">
-                <div>
-                  <h2>生成偏好</h2>
-                  <p>设置默认生成参数、界面主题和工作区偏好。</p>
-                </div>
-                <button className="settings-page__primary" type="button" onClick={saveGenerationPreferences}>保存生成偏好</button>
+            {activeSection === 'workspace' && (
+              <div className="settings-section">
+                <article className="settings-card">
+                  <div className="settings-card__header">
+                    <div>
+                      <h2>工作区偏好</h2>
+                      <p>配置启动页和画布展示密度，当前为本地开发保存。</p>
+                    </div>
+                    <button className="settings-page__primary" type="button" onClick={saveWorkspacePreferences}>保存设置</button>
+                  </div>
+                  <SelectField
+                    label="启动后打开"
+                    value={workspacePreferences.startupPage}
+                    options={['home', 'projects', 'last']}
+                    optionLabels={{ home: '首页', projects: '项目管理', last: '上次工作区' }}
+                    onChange={(startupPage) => setWorkspacePreferences((current) => ({ ...current, startupPage: startupPage as StartupPage }))}
+                  />
+                  <ToggleRow
+                    title="画布紧凑模式"
+                    description="减少画布节点和浮层间距，适合小屏或复杂画布。"
+                    checked={workspacePreferences.compactCanvas}
+                    onChange={(compactCanvas) => setWorkspacePreferences((current) => ({ ...current, compactCanvas }))}
+                  />
+                </article>
               </div>
-              <article className="settings-card">
-                <div className="settings-preference-grid">
-                  <SelectField label="生图质量" value={generationPreferences.imageQuality} options={['auto', 'low', 'medium', 'high']} onChange={(imageQuality) => updateGenerationPreferences({ imageQuality: imageQuality as GenerationPreferences['imageQuality'] })} />
-                  <SelectField label="图片比例" value={generationPreferences.imageRatio} options={['1:1', '16:9', '9:16', '4:3', '3:4']} onChange={(imageRatio) => updateGenerationPreferences({ imageRatio: imageRatio as GenerationPreferences['imageRatio'] })} />
-                  <SelectField label="生成张数" value={generationPreferences.imageCount} options={['1', '2', '4']} onChange={(imageCount) => updateGenerationPreferences({ imageCount: imageCount as GenerationPreferences['imageCount'] })} />
-                  <SelectField label="画布节点默认生成数量" value={generationPreferences.canvasImageCount} options={['1', '2', '3', '4']} onChange={(canvasImageCount) => updateGenerationPreferences({ canvasImageCount: canvasImageCount as GenerationPreferences['canvasImageCount'] })} />
-                  <SelectField label="视频秒数" value={generationPreferences.videoSeconds} options={['5', '6', '8', '10']} onChange={(videoSeconds) => updateGenerationPreferences({ videoSeconds: videoSeconds as GenerationPreferences['videoSeconds'] })} />
-                  <SelectField label="视频质量" value={generationPreferences.videoQuality} options={['720', '1080']} onChange={(videoQuality) => updateGenerationPreferences({ videoQuality: videoQuality as GenerationPreferences['videoQuality'] })} />
-                  <SelectField label="音频格式" value={generationPreferences.audioFormat} options={['mp3', 'wav']} onChange={(audioFormat) => updateGenerationPreferences({ audioFormat: audioFormat as GenerationPreferences['audioFormat'] })} />
-                  <SelectField label="音频语速" value={generationPreferences.audioSpeed} options={['0.8', '1', '1.2']} onChange={(audioSpeed) => updateGenerationPreferences({ audioSpeed: audioSpeed as GenerationPreferences['audioSpeed'] })} />
-                </div>
-              </article>
-              <article className="settings-card">
-                <div className="settings-card__header"><div><h2>界面与工作区偏好</h2><p>保留原设置中的主题、启动页和本地草稿体验。</p></div></div>
-                <div className="settings-segmented" role="group" aria-label="主题模式">
-                  <button className={theme === 'dark' ? 'settings-segmented__item settings-segmented__item--active' : 'settings-segmented__item'} type="button" aria-pressed={theme === 'dark'} onClick={() => onThemeChange('dark')}>深色模式</button>
-                  <button className={theme === 'light' ? 'settings-segmented__item settings-segmented__item--active' : 'settings-segmented__item'} type="button" aria-pressed={theme === 'light'} onClick={() => onThemeChange('light')}>浅色模式</button>
-                </div>
-                <label className="settings-field settings-field--section">
-                  <span>启动后打开</span>
-                  <select value={generationPreferences.startupPage} onChange={(event) => updateGenerationPreferences({ startupPage: event.target.value as StartupPage })}>
-                    <option value="home">首页</option>
-                    <option value="projects">项目管理</option>
-                    <option value="last">上次工作区</option>
-                  </select>
-                </label>
-                <ToggleRow title="画布紧凑模式" description="降低工具栏和节点间距，适合小屏工作。" checked={generationPreferences.compactCanvas} onChange={(compactCanvas) => updateGenerationPreferences({ compactCanvas })} />
-                <ToggleRow title="自动保存草稿" description="编辑 Prompt、画布节点时显示自动保存状态。" checked={generationPreferences.autoSave} onChange={(autoSave) => updateGenerationPreferences({ autoSave })} />
-              </article>
-            </section>
-          )}
+            )}
 
-          {activeTab === 'webdav' && (
-            <section id="settings-panel-webdav" role="tabpanel" aria-labelledby="settings-tab-webdav" className="settings-panel">
-              <div className="settings-panel-toolbar">
-                <div>
-                  <h2>WebDAV</h2>
-                  <p>保存同步入口配置，真实连接将在后续接入。</p>
-                </div>
-                <button className="settings-page__primary" type="button" onClick={() => saveWebdavConfig()}>保存 WebDAV</button>
+            {activeSection === 'local' && (
+              <div className="settings-section">
+                <article className="settings-card">
+                  <div className="settings-card__header">
+                    <div>
+                      <h2>本地创作</h2>
+                      <p>管理草稿保存和默认项目目录占位。本阶段不接真实文件系统。</p>
+                    </div>
+                    <button className="settings-page__primary" type="button" onClick={saveLocalCreationPreferences}>保存设置</button>
+                  </div>
+                  <ToggleRow
+                    title="自动保存草稿"
+                    description="在本地开发存储中保存草稿状态，后续迁移到更安全的桌面端存储。"
+                    checked={localCreationPreferences.autoSave}
+                    onChange={(autoSave) => setLocalCreationPreferences((current) => ({ ...current, autoSave }))}
+                  />
+                  <div className="settings-path">
+                    <span>默认项目目录</span>
+                    <strong>{localCreationPreferences.defaultProjectDirectory}</strong>
+                    <button type="button" onClick={() => setFeedback('目录选择后续接入。')}>更改</button>
+                  </div>
+                </article>
               </div>
-              <article className="settings-card">
-                <ToggleRow title="启用 WebDAV 同步" description="开启后后续同步功能会读取这组配置。" checked={webdavConfig.enabled} onChange={(enabled) => updateWebdavConfig({ enabled })} />
-                <div className="settings-api-grid settings-field--section">
-                  <label className="settings-field settings-field--wide">
-                    <span>WebDAV 地址</span>
-                    <input value={webdavConfig.url} onChange={(event) => updateWebdavConfig({ url: event.target.value })} placeholder="https://dav.example.com/remote.php/dav/files/user" />
-                  </label>
-                  <label className="settings-field">
-                    <span>用户名</span>
-                    <input value={webdavConfig.username} onChange={(event) => updateWebdavConfig({ username: event.target.value })} />
-                  </label>
-                  <label className="settings-field">
-                    <span>密码</span>
-                    <span className="settings-secret-field">
-                      <input value={webdavConfig.password} onChange={(event) => updateWebdavConfig({ password: event.target.value })} type={showWebdavPassword ? 'text' : 'password'} />
-                      <button type="button" onClick={() => setShowWebdavPassword((current) => !current)}>{showWebdavPassword ? '隐藏' : '显示'}</button>
-                    </span>
-                  </label>
-                  <label className="settings-field">
-                    <span>目录</span>
-                    <input value={webdavConfig.directory} onChange={(event) => updateWebdavConfig({ directory: event.target.value })} placeholder="endless-creation" />
-                  </label>
-                  <SelectField label="代理模式" value={webdavConfig.proxyMode} options={['direct', 'app-proxy']} onChange={(proxyMode) => updateWebdavConfig({ proxyMode: proxyMode as WebdavConfig['proxyMode'] })} />
+            )}
+
+            {activeSection === 'api' && (
+              <div className="settings-section settings-section--api">
+                <div className="settings-config-tabs" role="tablist" aria-label="API配置分类">
+                  {apiConfigTabs.map((tab) => {
+                    const selected = activeApiTab === tab.id;
+                    return (
+                      <button
+                        id={`settings-api-tab-${tab.id}`}
+                        key={tab.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={selected}
+                        aria-controls={`settings-api-panel-${tab.id}`}
+                        tabIndex={selected ? 0 : -1}
+                        className={selected ? 'settings-config-tab settings-config-tab--active' : 'settings-config-tab'}
+                        onClick={() => setActiveApiTab(tab.id)}
+                        onKeyDown={(event) => handleApiTabKeyDown(event, tab.id)}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
                 </div>
-                <div className="settings-api-actions">
-                  <button className="settings-page__secondary" type="button" onClick={testWebdavConfig}>测试连接</button>
-                  <button className="settings-page__secondary" type="button" onClick={() => setFeedback('同步功能后续接入，当前仅保存配置。')}>同步</button>
-                </div>
-                <div className={`settings-api-status settings-api-status--${webdavConfig.lastStatus ?? 'untested'}`} role="status">
-                  <strong>{webdavConfig.lastStatus === 'success' ? '配置可用' : webdavConfig.lastStatus === 'failed' ? '缺少地址' : '未测试'}</strong>
-                  <span>{webdavConfig.lastTestedAt ? `上次测试：${webdavConfig.lastTestedAt}` : '填写 WebDAV 地址后可保存并进行占位测试。'}</span>
-                </div>
-              </article>
-              <article className="settings-card">
-                <div className="settings-card__header"><div><h2>关于 Endless Creation</h2><p>当前处于桌面端 MVP 阶段，优先验证本地创作工作流。</p></div><span className="settings-card__badge settings-card__badge--muted">MVP</span></div>
-                <div className="settings-about-list">
-                  <div><span>版本</span><strong>0.1.0 Mock Preview</strong></div>
-                  <div><span>运行模式</span><strong>Electron + Vite + React</strong></div>
-                  <div><span>数据说明</span><strong>当前不接账号、不做云同步、不写入真实 API Key 到代码。</strong></div>
-                </div>
-              </article>
-            </section>
-          )}
+
+                {activeApiTab === 'channels' && (
+                  <section id="settings-api-panel-channels" role="tabpanel" aria-labelledby="settings-api-tab-channels" className="settings-panel">
+                    <div className="settings-panel-toolbar">
+                      <div>
+                        <h2>渠道</h2>
+                        <p>配置 OpenAI-compatible 接口并验证 API 可用性。</p>
+                      </div>
+                      <div className="settings-inline-actions">
+                        <button className="settings-page__secondary" type="button" disabled={isTesting || !providerConfig.enabled} onClick={() => void testConnection()}>{isTesting ? '拉取中…' : '拉取全部'}</button>
+                        <button className="settings-page__secondary" type="button" onClick={() => setFeedback('多渠道后续接入，当前先保留一个默认渠道。')}>新增渠道</button>
+                      </div>
+                    </div>
+
+                    <article className="settings-card settings-card--api settings-channel-card">
+                      <div className="settings-card__header">
+                        <div>
+                          <h2>{providerConfig.label || '未命名渠道'}</h2>
+                          <p>{providerConfig.baseUrl || '未填写 Base URL'}</p>
+                        </div>
+                        <span className={providerConfig.enabled ? 'settings-card__badge settings-card__badge--success' : 'settings-card__badge settings-card__badge--untested'}>{providerConfig.enabled ? '已启用' : '未启用'}</span>
+                      </div>
+
+                      <div className="settings-channel-summary">
+                        <span>API 格式：OpenAI-compatible</span>
+                        <span>默认模型：{providerConfig.defaultModel || '未设置'}</span>
+                        <span>测试状态：{statusTitle(providerConfig.lastTestStatus ?? 'untested')}</span>
+                      </div>
+
+                      <div className="settings-api-grid">
+                        <label className="settings-field">
+                          <span>渠道名称</span>
+                          <input value={providerConfig.label} onChange={(event) => updateProviderConfig({ label: event.target.value })} placeholder="OpenAI" />
+                        </label>
+                        <label className="settings-field">
+                          <span>API 格式</span>
+                          <input value="OpenAI-compatible" readOnly />
+                        </label>
+                        <label className="settings-field settings-field--wide">
+                          <span>Base URL</span>
+                          <input value={providerConfig.baseUrl} onChange={(event) => updateProviderConfig({ baseUrl: event.target.value })} placeholder="https://api.openai.com/v1" />
+                        </label>
+                        <label className="settings-field settings-field--wide">
+                          <span>API Key</span>
+                          <span className="settings-secret-field">
+                            <input value={providerConfig.apiKey} onChange={(event) => updateProviderConfig({ apiKey: event.target.value })} placeholder="sk-..." type={showApiKey ? 'text' : 'password'} />
+                            <button type="button" onClick={() => setShowApiKey((current) => !current)}>{showApiKey ? '隐藏' : '显示'}</button>
+                          </span>
+                        </label>
+                        <label className="settings-field settings-field--wide">
+                          <span>默认模型</span>
+                          <input value={providerConfig.defaultModel} onChange={(event) => updateProviderConfig({ defaultModel: event.target.value })} placeholder="gpt-4o-mini" />
+                        </label>
+                      </div>
+
+                      <ToggleRow title="启用此渠道" description="关闭后，后续生成流程不会默认使用该配置。" checked={providerConfig.enabled} onChange={(enabled) => updateProviderConfig({ enabled })} />
+
+                      <div className="settings-api-actions">
+                        <button className="settings-page__primary" type="button" onClick={() => saveProviderConfig()}>保存配置</button>
+                        <button className="settings-page__secondary" type="button" disabled={isTesting} onClick={() => void testConnection()}>{isTesting ? '测试中…' : '测试连接'}</button>
+                        <button className="settings-page__secondary" type="button" onClick={() => setFeedback('至少保留一个渠道。')}>删除</button>
+                      </div>
+
+                      <div className={`settings-api-status settings-api-status--${providerConfig.lastTestStatus ?? 'untested'}`} role="status">
+                        <strong>{statusTitle(providerConfig.lastTestStatus ?? 'untested')}</strong>
+                        <span>{testResult?.message ?? statusDescription(providerConfig)}</span>
+                        {modelPreferences.availableModels.length ? <em>模型示例：{modelPreferences.availableModels.slice(0, 6).join('、')}</em> : null}
+                        <p className="settings-api-note">当前配置保存到本地开发存储，后续迁移到安全存储。不会在控制台打印 API Key。</p>
+                      </div>
+                    </article>
+                  </section>
+                )}
+
+                {activeApiTab === 'models' && (
+                  <section id="settings-api-panel-models" role="tabpanel" aria-labelledby="settings-api-tab-models" className="settings-panel">
+                    <div className="settings-panel-toolbar">
+                      <div>
+                        <h2>模型</h2>
+                        <p>为文本、生图、视频和音频流程设置默认模型。</p>
+                      </div>
+                      <button className="settings-page__primary" type="button" onClick={saveModelPreferences}>保存模型偏好</button>
+                    </div>
+                    <article className="settings-card">
+                      <div className="settings-model-grid">
+                        <ModelField label="默认文本模型" value={modelPreferences.textModel} options={modelOptions} onChange={(textModel) => setModelPreferences((current) => ({ ...current, textModel }))} />
+                        <ModelField label="默认生图模型" value={modelPreferences.imageModel} options={modelOptions} onChange={(imageModel) => setModelPreferences((current) => ({ ...current, imageModel }))} />
+                        <ModelField label="默认视频模型" value={modelPreferences.videoModel} options={modelOptions} onChange={(videoModel) => setModelPreferences((current) => ({ ...current, videoModel }))} />
+                        <ModelField label="默认音频模型" value={modelPreferences.audioModel} options={modelOptions} onChange={(audioModel) => setModelPreferences((current) => ({ ...current, audioModel }))} />
+                      </div>
+                      <div className="settings-api-status">
+                        <strong>可选模型列表</strong>
+                        <span>{modelPreferences.availableModels.length ? modelPreferences.availableModels.join('、') : '暂无拉取结果，可直接手动输入模型名称。'}</span>
+                      </div>
+                    </article>
+                  </section>
+                )}
+
+                {activeApiTab === 'preferences' && (
+                  <section id="settings-api-panel-preferences" role="tabpanel" aria-labelledby="settings-api-tab-preferences" className="settings-panel">
+                    <div className="settings-panel-toolbar">
+                      <div>
+                        <h2>生成偏好</h2>
+                        <p>设置默认生成参数，供后续生图、视频、音频和画布节点复用。</p>
+                      </div>
+                      <button className="settings-page__primary" type="button" onClick={saveGenerationPreferences}>保存生成偏好</button>
+                    </div>
+                    <article className="settings-card">
+                      <div className="settings-preference-grid">
+                        <SelectField label="生图质量" value={generationPreferences.imageQuality} options={['auto', 'low', 'medium', 'high']} onChange={(imageQuality) => setGenerationPreferences((current) => ({ ...current, imageQuality: imageQuality as GenerationPreferences['imageQuality'] }))} />
+                        <SelectField label="图片比例" value={generationPreferences.imageRatio} options={['1:1', '16:9', '9:16', '4:3', '3:4']} onChange={(imageRatio) => setGenerationPreferences((current) => ({ ...current, imageRatio: imageRatio as GenerationPreferences['imageRatio'] }))} />
+                        <SelectField label="生成张数" value={generationPreferences.imageCount} options={['1', '2', '4']} onChange={(imageCount) => setGenerationPreferences((current) => ({ ...current, imageCount: imageCount as GenerationPreferences['imageCount'] }))} />
+                        <SelectField label="画布节点默认生成数量" value={generationPreferences.canvasImageCount} options={['1', '2', '3', '4']} onChange={(canvasImageCount) => setGenerationPreferences((current) => ({ ...current, canvasImageCount: canvasImageCount as GenerationPreferences['canvasImageCount'] }))} />
+                        <SelectField label="视频秒数" value={generationPreferences.videoSeconds} options={['5', '6', '8', '10']} onChange={(videoSeconds) => setGenerationPreferences((current) => ({ ...current, videoSeconds: videoSeconds as GenerationPreferences['videoSeconds'] }))} />
+                        <SelectField label="视频质量" value={generationPreferences.videoQuality} options={['720', '1080']} onChange={(videoQuality) => setGenerationPreferences((current) => ({ ...current, videoQuality: videoQuality as GenerationPreferences['videoQuality'] }))} />
+                        <SelectField label="音频格式" value={generationPreferences.audioFormat} options={['mp3', 'wav']} onChange={(audioFormat) => setGenerationPreferences((current) => ({ ...current, audioFormat: audioFormat as GenerationPreferences['audioFormat'] }))} />
+                        <SelectField label="音频语速" value={generationPreferences.audioSpeed} options={['0.8', '1', '1.2']} onChange={(audioSpeed) => setGenerationPreferences((current) => ({ ...current, audioSpeed: audioSpeed as GenerationPreferences['audioSpeed'] }))} />
+                      </div>
+                    </article>
+                  </section>
+                )}
+
+                {activeApiTab === 'webdav' && (
+                  <section id="settings-api-panel-webdav" role="tabpanel" aria-labelledby="settings-api-tab-webdav" className="settings-panel">
+                    <div className="settings-panel-toolbar">
+                      <div>
+                        <h2>WebDAV</h2>
+                        <p>保存同步参数。本阶段只做本地配置和占位测试，不发起真实 WebDAV 请求。</p>
+                      </div>
+                      <button className="settings-page__primary" type="button" onClick={() => saveWebdavConfig()}>保存 WebDAV</button>
+                    </div>
+                    <article className="settings-card settings-card--api">
+                      <ToggleRow title="启用 WebDAV 同步" description="开启后，后续版本可将项目数据同步到你的 WebDAV 服务。" checked={webdavConfig.enabled} onChange={(enabled) => setWebdavConfig((current) => ({ ...current, enabled }))} />
+                      <div className="settings-api-grid">
+                        <label className="settings-field settings-field--wide">
+                          <span>WebDAV 地址</span>
+                          <input value={webdavConfig.url} onChange={(event) => setWebdavConfig((current) => ({ ...current, url: event.target.value }))} placeholder="https://example.com/dav" />
+                        </label>
+                        <label className="settings-field">
+                          <span>用户名</span>
+                          <input value={webdavConfig.username} onChange={(event) => setWebdavConfig((current) => ({ ...current, username: event.target.value }))} placeholder="username" />
+                        </label>
+                        <label className="settings-field">
+                          <span>密码</span>
+                          <span className="settings-secret-field">
+                            <input value={webdavConfig.password} onChange={(event) => setWebdavConfig((current) => ({ ...current, password: event.target.value }))} type={showWebdavPassword ? 'text' : 'password'} placeholder="••••••••" />
+                            <button type="button" onClick={() => setShowWebdavPassword((current) => !current)}>{showWebdavPassword ? '隐藏' : '显示'}</button>
+                          </span>
+                        </label>
+                        <label className="settings-field">
+                          <span>目录</span>
+                          <input value={webdavConfig.directory} onChange={(event) => setWebdavConfig((current) => ({ ...current, directory: event.target.value }))} placeholder="endless-creation" />
+                        </label>
+                        <SelectField label="代理模式" value={webdavConfig.proxyMode} options={['direct', 'app-proxy']} optionLabels={{ direct: 'direct', 'app-proxy': 'app-proxy' }} onChange={(proxyMode) => setWebdavConfig((current) => ({ ...current, proxyMode: proxyMode as WebdavConfig['proxyMode'] }))} />
+                      </div>
+                      <div className="settings-api-actions">
+                        <button className="settings-page__secondary" type="button" onClick={testWebdavConfig}>测试连接</button>
+                        <button className="settings-page__secondary" type="button" onClick={() => setFeedback('同步功能后续接入。')}>同步</button>
+                      </div>
+                      <div className={`settings-api-status settings-api-status--${webdavConfig.lastStatus ?? 'untested'}`} role="status">
+                        <strong>{webdavConfig.lastStatus === 'success' ? '配置可用' : webdavConfig.lastStatus === 'failed' ? '配置不完整' : '未测试'}</strong>
+                        <span>{webdavConfig.lastTestedAt ? `上次测试：${webdavConfig.lastTestedAt}` : '填写地址后可进行占位测试。'}</span>
+                      </div>
+                    </article>
+                  </section>
+                )}
+              </div>
+            )}
+
+            {activeSection === 'about' && (
+              <div className="settings-section">
+                <article className="settings-card">
+                  <div className="settings-card__header">
+                    <div>
+                      <h2>关于 Endless Creation</h2>
+                      <p>当前处于桌面端 MVP 阶段，设置会优先保存在本地。</p>
+                    </div>
+                    <span className="settings-card__badge">MVP</span>
+                  </div>
+                  <div className="settings-about-list">
+                    <div><span>版本</span><strong>0.1.0</strong></div>
+                    <div><span>运行模式</span><strong>Electron + Vite + React</strong></div>
+                    <div><span>数据说明</span><strong>本阶段不接账号、云同步和真实文件系统。</strong></div>
+                  </div>
+                </article>
+              </div>
+            )}
+          </section>
         </main>
       </section>
     </div>
   );
 }
 
-function ToggleRow({ title, description, checked, onChange }: { title: string; description: string; checked: boolean; onChange: (checked: boolean) => void }) {
+interface ToggleRowProps {
+  title: string;
+  description: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}
+
+function ToggleRow({ title, description, checked, onChange }: ToggleRowProps) {
   return (
     <div className="settings-toggle-row">
       <div>
@@ -474,31 +600,52 @@ function ToggleRow({ title, description, checked, onChange }: { title: string; d
         <span>{description}</span>
       </div>
       <button className={checked ? 'settings-toggle settings-toggle--on' : 'settings-toggle'} type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)}>
-        <span />
+        <span aria-hidden="true" />
       </button>
     </div>
   );
 }
 
-function ModelField({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
-  const listId = `${label.replace(/\s+/g, '-')}-models`;
+interface ModelFieldProps {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}
+
+function ModelField({ label, value, options, onChange }: ModelFieldProps) {
+  const hasOptions = options.length > 0;
   return (
     <label className="settings-field">
       <span>{label}</span>
-      <input list={listId} value={value} onChange={(event) => onChange(event.target.value)} />
-      <datalist id={listId}>
-        {options.map((option) => <option value={option} key={option} />)}
-      </datalist>
+      {hasOptions ? (
+        <input value={value} list={`${label}-models`} onChange={(event) => onChange(event.target.value)} placeholder="输入或选择模型" />
+      ) : (
+        <input value={value} onChange={(event) => onChange(event.target.value)} placeholder="手动输入模型名称" />
+      )}
+      {hasOptions ? (
+        <datalist id={`${label}-models`}>
+          {options.map((option) => <option value={option} key={option} />)}
+        </datalist>
+      ) : null}
     </label>
   );
 }
 
-function SelectField({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (value: string) => void }) {
+interface SelectFieldProps {
+  label: string;
+  value: string;
+  options: string[];
+  optionLabels?: Record<string, string>;
+  onChange: (value: string) => void;
+}
+
+function SelectField({ label, value, options, optionLabels, onChange }: SelectFieldProps) {
   return (
     <label className="settings-field">
       <span>{label}</span>
       <select value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map((option) => <option value={option} key={option}>{option}</option>)}
+        {options.map((option) => <option value={option} key={option}>{optionLabels?.[option] ?? option}</option>)}
       </select>
     </label>
   );
