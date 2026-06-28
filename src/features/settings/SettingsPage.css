@@ -1387,7 +1387,7 @@
 
 .settings-model-default-dropdown {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 2px);
   left: 0;
   z-index: 24;
   width: max(100%, 260px);
@@ -1404,7 +1404,7 @@
 
 .settings-model-default-dropdown--above {
   top: auto;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% - 6px);
 }
 
 .settings-model-default-dropdown::-webkit-scrollbar {
