@@ -1012,6 +1012,33 @@
   width: 17px;
   height: 17px;
   color: var(--image-muted);
+  pointer-events: none;
+}
+
+.image-studio__model-picker {
+  min-width: 0;
+  width: 100%;
+  padding: 0 22px 0 0;
+  border: 0;
+  color: #dfe6f4;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  appearance: none;
+  cursor: pointer;
+}
+
+.image-studio__model-picker:disabled {
+  color: var(--image-muted);
+  cursor: not-allowed;
+}
+
+.image-studio__model-picker:focus {
+  outline: 0;
 }
 
 .image-studio__params > .image-studio__field:nth-child(2) {

@@ -12,16 +12,23 @@ interface ImageGenerationConfig { modelId: string; size: string; quality: Qualit
 interface ImageGenerationRequest { id: string; prompt: string; negativePrompt: string; references: ReferenceImage[]; config: ImageGenerationConfig; createdAt: string; }
 interface GenerationResult { id: string; requestId: string; variantName: string; status: 'succeeded' | 'failed'; palette: Palette; }
 interface GenerationHistoryItem { id: string; request: ImageGenerationRequest; status: GenerationStatus; results: GenerationResult[]; createdAt: string; durationMs?: number; errorMessage?: string; }
+interface ModelPreferences { imageModel?: string; imageModels?: string[]; }
+interface ApiProviderStore { channels?: Array<{ id: string; name?: string; models?: string[] }>; }
+interface ImageModelOption { value: string; modelName: string; channelName: string; label: string; }
 
+const MODEL_PREFERENCES_STORAGE_KEY = 'endless-creation.model-preferences';
+const API_PROVIDER_STORAGE_KEY = 'endless-creation.api-provider-config';
 const qualityOptions: QualityOption[] = ['自动', '高', '中', '低'];
 const quickActionsTop = ['提示词库', '方案库', '参数设置', '改稿实验', '存为模板'] as const;
 const quickActionsBottom = ['存方案包', '复制', '清空', 'Prompt Lab'] as const;
 const palettes: Palette[] = ['blue', 'cyan', 'violet', 'orange'];
-const baseConfig: ImageGenerationConfig = { modelId: 'GPT Image 2', size: '1536×1024', quality: '高', count: 4, style: '电影感', styleStrength: 72, referenceWeight: 60, saveToProject: true };
+const baseConfig: ImageGenerationConfig = { modelId: '', size: '1536×1024', quality: '高', count: 4, style: '电影感', styleStrength: 72, referenceWeight: 60, saveToProject: true };
 let idSeed = 0;
 function createId(prefix: string) { idSeed += 1; return `${prefix}-${Date.now()}-${idSeed}`; }
 
 export function ImageWorkbench() {
+  const [modelPreferences] = useState<ModelPreferences>(() => readLocalStorage(MODEL_PREFERENCES_STORAGE_KEY, {}));
+  const [apiProviderStore] = useState<ApiProviderStore>(() => readLocalStorage(API_PROVIDER_STORAGE_KEY, {}));
   const [promptText, setPromptText] = useState('');
   const [negativePrompt, setNegativePrompt] = useState('');
   const [references, setReferences] = useState<ReferenceImage[]>([]);
@@ -39,7 +46,16 @@ export function ImageWorkbench() {
   const canGenerate = trimmedPrompt.length > 0 && status !== 'generating';
   const statusLabel = getStatusLabel(status);
   const selectedResult = results.find((result) => result.id === selectedResultId) ?? null;
-  const parameterSummary = `${config.modelId} · ${config.size} · ${config.quality} · ${config.count} 张`;
+  const imageModelOptions = useMemo(() => resolveImageModelOptions(modelPreferences, apiProviderStore), [apiProviderStore, modelPreferences]);
+  const selectedImageModel = imageModelOptions.find((option) => option.value === config.modelId) ?? null;
+  const imageModelLabel = selectedImageModel?.label ?? '未配置图片模型';
+  const parameterSummary = `${imageModelLabel} · ${config.size} · ${config.quality} · ${config.count} 张`;
+
+  useEffect(() => {
+    const preferredModel = normalizeImageModelValue(modelPreferences.imageModel, imageModelOptions);
+    const nextModelId = preferredModel || imageModelOptions[0]?.value || '';
+    setConfig((current) => current.modelId === nextModelId ? current : { ...current, modelId: nextModelId });
+  }, [imageModelOptions, modelPreferences.imageModel]);
 
   const createRequestSnapshot = useCallback((): ImageGenerationRequest => ({ id: createId('request'), prompt: promptText.trim(), negativePrompt, references: references.map((item) => ({ ...item })), config: { ...config }, createdAt: new Date().toISOString() }), [config, negativePrompt, promptText, references]);
   const clearGenerationTimer = useCallback(() => { if (timerRef.current !== null) { window.clearTimeout(timerRef.current); timerRef.current = null; } }, []);
@@ -81,7 +97,7 @@ export function ImageWorkbench() {
         <header className="image-workbench__topbar"><div className="image-workbench__title-group"><p className="image-workbench__eyebrow">智能生成</p><h1>生图工作台</h1><p>参数 + 提示词 + 结果</p></div><div className="image-workbench__top-actions"><button className="image-workbench__button" onClick={() => addMockReference()} type="button">导入参考图</button><button className="image-workbench__button image-workbench__button--primary" disabled={!canGenerate} onClick={handleGenerate} type="button">{generateLabel}</button></div></header>
         <div className="image-workbench__columns image-workbench__columns--merged">
           <section className="image-workbench__card image-workbench__card--composer image-workbench__card--image-studio">
-            <div className="image-studio__params" aria-label="生图参数"><div className="image-studio__field image-studio__field--select"><span>图片模型</span><strong>{config.modelId} · 3 通道</strong><ChevronDownIcon /></div><div className="image-studio__field"><span>尺寸</span><strong>{config.size}</strong></div><div className="image-studio__field image-studio__field--quality"><span>质量</span><div className="image-studio__quality-group" role="group" aria-label="质量">{qualityOptions.map((option) => <button aria-pressed={config.quality === option} className={config.quality === option ? 'image-studio__quality image-studio__quality--active' : 'image-studio__quality'} key={option} onClick={() => updateConfig({ quality: option })} type="button">{option}</button>)}</div></div><CompactNumber label="数量" value={config.count} min={1} max={4} onChange={(count) => updateConfig({ count })} /></div>
+            <div className="image-studio__params" aria-label="生图参数"><label className="image-studio__field image-studio__field--select"><span>图片模型</span><select className="image-studio__model-picker" value={selectedImageModel ? config.modelId : ''} disabled={imageModelOptions.length === 0} onChange={(event) => updateConfig({ modelId: event.target.value })} aria-label="图片模型">{imageModelOptions.length ? imageModelOptions.map((option) => <option value={option.value} key={option.value}>{option.label}</option>) : <option value="">未配置图片模型</option>}</select><ChevronDownIcon /></label><div className="image-studio__field"><span>尺寸</span><strong>{config.size}</strong></div><div className="image-studio__field image-studio__field--quality"><span>质量</span><div className="image-studio__quality-group" role="group" aria-label="质量">{qualityOptions.map((option) => <button aria-pressed={config.quality === option} className={config.quality === option ? 'image-studio__quality image-studio__quality--active' : 'image-studio__quality'} key={option} onClick={() => updateConfig({ quality: option })} type="button">{option}</button>)}</div></div><CompactNumber label="数量" value={config.count} min={1} max={4} onChange={(count) => updateConfig({ count })} /></div>
             <div className="image-studio__status-strip"><label className="image-studio__save-option"><input checked={config.saveToProject} onChange={(event) => updateConfig({ saveToProject: event.target.checked })} type="checkbox" /><span aria-hidden="true" className="image-workbench__checkbox"><CheckIcon /></span><span>保存到本地项目</span></label><div className="image-studio__queue-inline"><span>队列</span><strong>{status === 'generating' ? 'Mock 任务执行中' : '暂无等待任务'}</strong></div></div>
             <label className="image-studio__prompt-area"><span>提示词</span><textarea aria-invalid={Boolean(promptError)} aria-label="提示词" maxLength={4000} onChange={(event) => updatePrompt(event.target.value)} placeholder="描述画面主体、风格、构图、光线和用途" value={promptText} /></label><div className="image-studio__count" aria-live="polite">{promptText.length}/4000</div>{promptError && <div className="image-studio__hint image-studio__hint--error" role="alert">{promptError}</div>}
             <label className="image-studio__prompt-area image-studio__prompt-area--negative"><span>反向提示词</span><textarea aria-label="反向提示词" maxLength={1000} onChange={(event) => setNegativePrompt(event.target.value)} placeholder="不希望出现的元素，例如低清晰度、畸形、过曝" value={negativePrompt} /></label>
@@ -107,6 +123,47 @@ function MockImage({ palette }: { palette: Palette }) { const colorA = palette =
 function getStatusLabel(status: GenerationStatus) { return ({ idle: '未开始', editing: '编辑中', ready: '待生成', generating: '正在生成…', succeeded: '已完成', failed: '失败', cancelled: '已取消' } satisfies Record<GenerationStatus, string>)[status]; }
 function summarize(text: string) { return text.length > 34 ? `${text.slice(0, 34)}…` : text; }
 function formatTime(value: string) { return new Date(value).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }); }
+function readLocalStorage<T>(key: string, fallback: T): T {
+  try {
+    const rawValue = window.localStorage.getItem(key);
+    if (!rawValue) return fallback;
+    return JSON.parse(rawValue) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function resolveImageModelOptions(modelPreferences: ModelPreferences, apiProviderStore: ApiProviderStore): ImageModelOption[] {
+  const channelMap = new Map((apiProviderStore.channels ?? []).map((channel) => [channel.id, channel.name?.trim() || '未命名渠道']));
+  return uniqueStrings(modelPreferences.imageModels ?? []).map((value) => {
+    const decoded = decodeChannelModel(value);
+    const modelName = decoded?.model || value;
+    const channelName = decoded ? (channelMap.get(decoded.channelId) ?? '未知渠道') : '本地偏好';
+    return { value, modelName, channelName, label: `${modelName} · ${channelName}` };
+  });
+}
+
+function normalizeImageModelValue(value: string | undefined, options: ImageModelOption[]) {
+  if (!value) return '';
+  const exactMatch = options.find((option) => option.value === value);
+  if (exactMatch) return exactMatch.value;
+  const modelNameMatch = options.find((option) => option.modelName === value);
+  return modelNameMatch?.value ?? '';
+}
+
+function decodeChannelModel(value: string) {
+  const separatorIndex = value.indexOf('::');
+  if (separatorIndex <= 0) return null;
+  const channelId = value.slice(0, separatorIndex);
+  const model = value.slice(separatorIndex + 2);
+  if (!channelId || !model) return null;
+  return { channelId, model };
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
 function ActionIcon({ variant }: { variant: number }) { const paths = [<path key="book" d="M5 5.5h9a3 3 0 0 1 3 3v10H8a3 3 0 0 0-3 3v-16Z" />, <path key="box" d="M4 8h16M7 8V5h10v3M7 12h10M8 16h8" />, <path key="gear" d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7ZM12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3" />, <path key="flask" d="M9 3h6M10 3v5l-5 9a3 3 0 0 0 2.6 4.5h8.8A3 3 0 0 0 19 17l-5-9V3" />, <path key="bookmark" d="M6 4h12v17l-6-3-6 3V4Z" />, <path key="save" d="M5 4h12l2 2v14H5V4ZM8 4v6h8M8 17h8" />, <path key="copy" d="M8 8h11v11H8zM5 5h11" />, <path key="clear" d="M5 7h14M10 11v6M14 11v6M8 7l1-3h6l1 3M7 7l1 14h8l1-14" />, <path key="lab" d="M7 17 17 7M9 7h8v8" />]; return <SvgIcon>{paths[variant] ?? paths[0]}</SvgIcon>; }
 function SvgIcon({ children }: { children: ReactNode }) { return <svg aria-hidden="true" fill="none" focusable="false" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" viewBox="0 0 24 24">{children}</svg>; }
 function CheckIcon() { return <SvgIcon><path d="M5 12l4 4L19 6" /></SvgIcon>; }
