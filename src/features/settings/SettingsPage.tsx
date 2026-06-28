@@ -1003,6 +1003,8 @@ function ModelOptionGroup({ title, values, options, onChange }: ModelOptionGroup
   const rootRef = useRef<HTMLElement>(null);
   const selected = values.filter((value) => options.some((option) => option.value === value));
   const selectedOptions = optionsByValues(selected, options);
+  const visibleSelectedOptions = selectedOptions.slice(0, 2);
+  const hiddenSelectedCount = Math.max(selectedOptions.length - visibleSelectedOptions.length, 0);
 
   useEffect(() => {
     function closeOnOutsideClick(event: MouseEvent) {
@@ -1025,7 +1027,7 @@ function ModelOptionGroup({ title, values, options, onChange }: ModelOptionGroup
       </div>
       <button className={isOpen ? 'settings-model-select settings-model-select--open' : 'settings-model-select'} type="button" aria-expanded={isOpen} onClick={() => setOpen((current) => !current)}>
         <span className="settings-model-selected-tags">
-          {selectedOptions.length ? selectedOptions.map((option) => (
+          {selectedOptions.length ? visibleSelectedOptions.map((option) => (
             <span className="settings-model-tag" key={option.value} title={option.label}>
               <span>{option.label}</span>
               <em
@@ -1039,6 +1041,7 @@ function ModelOptionGroup({ title, values, options, onChange }: ModelOptionGroup
               </em>
             </span>
           )) : <span className="settings-model-select__placeholder">请选择或输入模型可选项</span>}
+          {hiddenSelectedCount > 0 ? <span className="settings-model-more-badge">+{hiddenSelectedCount}</span> : null}
         </span>
         <span className="settings-model-select__chevron" aria-hidden="true">⌄</span>
       </button>
