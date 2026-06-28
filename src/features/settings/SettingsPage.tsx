@@ -754,10 +754,6 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
                         <ModelField dropdownId="default:text" label="默认文本模型" value={normalizeSingleModelValue(modelPreferences.textModel, allModelOptions)} options={optionsByValues(textModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:text'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:text' : null)} onChange={(textModel) => setModelPreferences((current) => ({ ...current, textModel }))} />
                         <ModelField dropdownId="default:audio" label="默认音频模型" value={normalizeSingleModelValue(modelPreferences.audioModel, allModelOptions)} options={optionsByValues(audioModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:audio'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:audio' : null)} onChange={(audioModel) => setModelPreferences((current) => ({ ...current, audioModel }))} />
                       </div>
-                      <div className="settings-api-status">
-                        <strong>可选模型列表</strong>
-                        <span>{allModelOptions.length ? allModelOptions.map((option) => option.label).join('、') : '暂无拉取结果，请先在渠道中获取模型，或手动输入模型名称。'}</span>
-                      </div>
                     </article>
                   </section>
                 )}
