@@ -192,7 +192,6 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
   const [testResult, setTestResult] = useState<ApiConnectionTestResult | null>(null);
   const [openModelPreferenceDropdown, setOpenModelPreferenceDropdown] = useState<ModelPreferenceDropdownId | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const modelPreferencesDropdownRef = useRef<HTMLElement>(null);
 
   const activeSectionMeta = settingsSections.find((section) => section.id === activeSection) ?? settingsSections[0];
   const editingChannel = editingChannelDraft;
@@ -217,7 +216,9 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
     if (!openModelPreferenceDropdown) return;
 
     function closeOnOutsideClick(event: MouseEvent) {
-      if (!modelPreferencesDropdownRef.current?.contains(event.target as Node)) {
+      const target = event.target as Element | null;
+      const dropdownRoot = target?.closest('[data-model-dropdown-root]') as HTMLElement | null;
+      if (dropdownRoot?.dataset.modelDropdownId !== openModelPreferenceDropdown) {
         setOpenModelPreferenceDropdown(null);
       }
     }
@@ -736,22 +737,22 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
                       </div>
                       <button className="settings-page__primary" type="button" onClick={saveModelPreferences}>保存模型偏好</button>
                     </div>
-                    <article className="settings-card" ref={modelPreferencesDropdownRef}>
+                    <article className="settings-card">
                       <div className="settings-model-card-intro">
                         <h3>默认模型和可选项</h3>
                         <p>可选项决定各处下拉框展示哪些模型；同名模型会以括号里的渠道名区分。</p>
                       </div>
                       <div className="settings-model-option-grid">
-                        <ModelOptionGroup title="生图模型可选项" values={imageModelValues} options={allModelOptions.filter((option) => option.capability === 'image')} isOpen={openModelPreferenceDropdown === 'option:image'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:image' : null)} onChange={(imageModels) => setModelPreferences((current) => ({ ...current, imageModels, modelOptionsInitialized: true }))} />
-                        <ModelOptionGroup title="视频模型可选项" values={videoModelValues} options={allModelOptions.filter((option) => option.capability === 'video')} isOpen={openModelPreferenceDropdown === 'option:video'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:video' : null)} onChange={(videoModels) => setModelPreferences((current) => ({ ...current, videoModels, modelOptionsInitialized: true }))} />
-                        <ModelOptionGroup title="文本模型可选项" values={textModelValues} options={allModelOptions.filter((option) => option.capability === 'text')} isOpen={openModelPreferenceDropdown === 'option:text'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:text' : null)} onChange={(textModels) => setModelPreferences((current) => ({ ...current, textModels, modelOptionsInitialized: true }))} />
-                        <ModelOptionGroup title="音频模型可选项" values={audioModelValues} options={allModelOptions.filter((option) => option.capability === 'audio')} isOpen={openModelPreferenceDropdown === 'option:audio'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:audio' : null)} onChange={(audioModels) => setModelPreferences((current) => ({ ...current, audioModels, modelOptionsInitialized: true }))} />
+                        <ModelOptionGroup dropdownId="option:image" title="生图模型可选项" values={imageModelValues} options={allModelOptions.filter((option) => option.capability === 'image')} isOpen={openModelPreferenceDropdown === 'option:image'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:image' : null)} onChange={(imageModels) => setModelPreferences((current) => ({ ...current, imageModels, modelOptionsInitialized: true }))} />
+                        <ModelOptionGroup dropdownId="option:video" title="视频模型可选项" values={videoModelValues} options={allModelOptions.filter((option) => option.capability === 'video')} isOpen={openModelPreferenceDropdown === 'option:video'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:video' : null)} onChange={(videoModels) => setModelPreferences((current) => ({ ...current, videoModels, modelOptionsInitialized: true }))} />
+                        <ModelOptionGroup dropdownId="option:text" title="文本模型可选项" values={textModelValues} options={allModelOptions.filter((option) => option.capability === 'text')} isOpen={openModelPreferenceDropdown === 'option:text'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:text' : null)} onChange={(textModels) => setModelPreferences((current) => ({ ...current, textModels, modelOptionsInitialized: true }))} />
+                        <ModelOptionGroup dropdownId="option:audio" title="音频模型可选项" values={audioModelValues} options={allModelOptions.filter((option) => option.capability === 'audio')} isOpen={openModelPreferenceDropdown === 'option:audio'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:audio' : null)} onChange={(audioModels) => setModelPreferences((current) => ({ ...current, audioModels, modelOptionsInitialized: true }))} />
                       </div>
                       <div className="settings-model-default-grid">
-                        <ModelField label="默认生图模型" value={normalizeSingleModelValue(modelPreferences.imageModel, allModelOptions)} options={optionsByValues(imageModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:image'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:image' : null)} onChange={(imageModel) => setModelPreferences((current) => ({ ...current, imageModel }))} />
-                        <ModelField label="默认视频模型" value={normalizeSingleModelValue(modelPreferences.videoModel, allModelOptions)} options={optionsByValues(videoModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:video'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:video' : null)} onChange={(videoModel) => setModelPreferences((current) => ({ ...current, videoModel }))} />
-                        <ModelField label="默认文本模型" value={normalizeSingleModelValue(modelPreferences.textModel, allModelOptions)} options={optionsByValues(textModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:text'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:text' : null)} onChange={(textModel) => setModelPreferences((current) => ({ ...current, textModel }))} />
-                        <ModelField label="默认音频模型" value={normalizeSingleModelValue(modelPreferences.audioModel, allModelOptions)} options={optionsByValues(audioModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:audio'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:audio' : null)} onChange={(audioModel) => setModelPreferences((current) => ({ ...current, audioModel }))} />
+                        <ModelField dropdownId="default:image" label="默认生图模型" value={normalizeSingleModelValue(modelPreferences.imageModel, allModelOptions)} options={optionsByValues(imageModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:image'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:image' : null)} onChange={(imageModel) => setModelPreferences((current) => ({ ...current, imageModel }))} />
+                        <ModelField dropdownId="default:video" label="默认视频模型" value={normalizeSingleModelValue(modelPreferences.videoModel, allModelOptions)} options={optionsByValues(videoModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:video'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:video' : null)} onChange={(videoModel) => setModelPreferences((current) => ({ ...current, videoModel }))} />
+                        <ModelField dropdownId="default:text" label="默认文本模型" value={normalizeSingleModelValue(modelPreferences.textModel, allModelOptions)} options={optionsByValues(textModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:text'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:text' : null)} onChange={(textModel) => setModelPreferences((current) => ({ ...current, textModel }))} />
+                        <ModelField dropdownId="default:audio" label="默认音频模型" value={normalizeSingleModelValue(modelPreferences.audioModel, allModelOptions)} options={optionsByValues(audioModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:audio'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:audio' : null)} onChange={(audioModel) => setModelPreferences((current) => ({ ...current, audioModel }))} />
                       </div>
                       <div className="settings-api-status">
                         <strong>可选模型列表</strong>
@@ -986,6 +987,7 @@ function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange
 }
 
 interface ModelFieldProps {
+  dropdownId: ModelPreferenceDropdownId;
   label: string;
   value: string;
   options: ModelOption[];
@@ -994,14 +996,14 @@ interface ModelFieldProps {
   onChange: (value: string) => void;
 }
 
-function ModelField({ label, value, options, isOpen, onOpenChange, onChange }: ModelFieldProps) {
+function ModelField({ dropdownId, label, value, options, isOpen, onOpenChange, onChange }: ModelFieldProps) {
   const selectedOption = options.find((option) => option.value === value);
   const icon = selectedOption?.model.toLowerCase().includes('gpt') || value.toLowerCase().includes('gpt') ? '◎' : '▣';
   const selectedLabel = selectedOption?.label ?? (value.trim() ? `自定义：${value}` : '选择模型');
   const hasOptions = options.length > 0;
 
   return (
-    <div className="settings-field settings-model-default-field">
+    <div className="settings-field settings-model-default-field" data-model-dropdown-root data-model-dropdown-id={dropdownId}>
       <span>{label}</span>
       <button
         className={isOpen ? 'settings-model-pill settings-model-pill--open' : 'settings-model-pill'}
@@ -1048,6 +1050,7 @@ function ModelField({ label, value, options, isOpen, onOpenChange, onChange }: M
 }
 
 interface ModelOptionGroupProps {
+  dropdownId: ModelPreferenceDropdownId;
   title: string;
   values: string[];
   options: ModelOption[];
@@ -1056,7 +1059,7 @@ interface ModelOptionGroupProps {
   onChange: (values: string[]) => void;
 }
 
-function ModelOptionGroup({ title, values, options, isOpen, onOpenChange, onChange }: ModelOptionGroupProps) {
+function ModelOptionGroup({ dropdownId, title, values, options, isOpen, onOpenChange, onChange }: ModelOptionGroupProps) {
   const selected = values.filter((value) => options.some((option) => option.value === value));
   const selectedOptions = optionsByValues(selected, options);
   const visibleSelectedOptions = selectedOptions.slice(0, 2);
@@ -1067,7 +1070,7 @@ function ModelOptionGroup({ title, values, options, isOpen, onOpenChange, onChan
   }
 
   return (
-    <section className="settings-model-option-group">
+    <section className="settings-model-option-group" data-model-dropdown-root data-model-dropdown-id={dropdownId}>
       <div className="settings-model-option-group__header">
         <strong>{title}</strong>
         <span>{selected.length}/{options.length}</span>
