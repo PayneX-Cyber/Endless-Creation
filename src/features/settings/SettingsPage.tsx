@@ -107,7 +107,7 @@ const settingsSections: Array<{ id: SettingsSectionId; label: string; descriptio
 
 const apiConfigTabs: Array<{ id: ApiConfigTabId; label: string }> = [
   { id: 'channels', label: '渠道' },
-  { id: 'models', label: '模型' },
+  { id: 'models', label: '模型偏好' },
   { id: 'preferences', label: '生成偏好' },
   { id: 'webdav', label: 'WebDAV' },
 ];
@@ -713,7 +713,7 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
                   <section id="settings-api-panel-models" role="tabpanel" aria-labelledby="settings-api-tab-models" className="settings-panel">
                     <div className="settings-panel-toolbar">
                       <div>
-                        <h2>模型</h2>
+                        <h2>模型偏好</h2>
                         <p>默认模型可从所有渠道已拉取的模型中选择，也可以手动输入。</p>
                       </div>
                       <button className="settings-page__primary" type="button" onClick={saveModelPreferences}>保存模型偏好</button>
@@ -975,23 +975,65 @@ interface ModelFieldProps {
 }
 
 function ModelField({ label, value, options, onChange }: ModelFieldProps) {
-  const hasCustomValue = value.trim() && !options.some((option) => option.value === value);
+  const [isOpen, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const selectedOption = options.find((option) => option.value === value);
   const icon = selectedOption?.model.toLowerCase().includes('gpt') || value.toLowerCase().includes('gpt') ? '◎' : '▣';
+  const selectedLabel = selectedOption?.label ?? (value.trim() ? `自定义：${value}` : '选择模型');
+
+  useEffect(() => {
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+  }, []);
+
   return (
-    <label className="settings-field settings-model-default-field">
+    <div className="settings-field settings-model-default-field" ref={rootRef}>
       <span>{label}</span>
-      <span className="settings-model-pill">
+      <button
+        className={isOpen ? 'settings-model-pill settings-model-pill--open' : 'settings-model-pill'}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        onClick={() => setOpen((current) => !current)}
+      >
         <span className="settings-model-pill__icon" aria-hidden="true">{icon}</span>
-        <select value={hasCustomValue ? '__custom__' : value} onChange={(event) => {
-          if (event.target.value !== '__custom__') onChange(event.target.value);
-        }}>
-          <option value="">选择模型</option>
-          {options.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
-          {hasCustomValue ? <option value="__custom__">自定义：{value}</option> : null}
-        </select>
-      </span>
-    </label>
+        <span className={value ? 'settings-model-pill__label' : 'settings-model-pill__label settings-model-pill__label--placeholder'}>{selectedLabel}</span>
+        <span className="settings-model-pill__chevron" aria-hidden="true">⌄</span>
+      </button>
+      {isOpen ? (
+        <div className="settings-model-default-dropdown" role="listbox" aria-label={label}>
+          {options.length ? (
+            options.map((option) => {
+              const isSelected = option.value === value;
+              const optionIcon = option.model.toLowerCase().includes('gpt') ? '◎' : '▣';
+              return (
+                <button
+                  className={isSelected ? 'settings-model-default-option settings-model-default-option--selected' : 'settings-model-default-option'}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  key={option.value}
+                  onClick={() => {
+                    onChange(option.value);
+                    setOpen(false);
+                  }}
+                >
+                  <span className="settings-model-default-option__icon" aria-hidden="true">{optionIcon}</span>
+                  <span className="settings-model-default-option__label">{option.label}</span>
+                  {isSelected ? <span className="settings-model-default-option__check" aria-hidden="true">✓</span> : null}
+                </button>
+              );
+            })
+          ) : (
+            <div className="settings-model-default-empty">请先在上方配置可选模型</div>
+          )}
+        </div>
+      ) : null}
+    </div>
   );
 }
 

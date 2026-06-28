@@ -1289,21 +1289,39 @@
 }
 
 .settings-model-default-field {
+  position: relative;
   margin-bottom: 0;
 }
 
 .settings-model-pill {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   height: 42px;
   min-width: 0;
-  padding: 0 10px;
+  width: 100%;
+  padding: 0 12px 0 10px;
   border: 1px solid var(--border-strong);
   border-radius: 999px;
+  color: var(--ink);
   background: color-mix(in srgb, var(--surface) 88%, transparent);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.settings-model-pill:hover,
+.settings-model-pill--open {
+  border-color: rgba(91, 140, 255, 0.42);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: 0 12px 24px rgba(35, 99, 255, 0.16);
+}
+
+.settings-model-pill:focus-visible {
+  outline: 2px solid rgba(91, 140, 255, 0.36);
+  outline-offset: 3px;
 }
 
 .settings-model-pill__icon {
@@ -1319,16 +1337,9 @@
   line-height: 1;
 }
 
-.settings-model-pill select {
-  width: 100%;
+.settings-model-pill__label {
   min-width: 0;
-  height: 40px;
-  padding: 0 22px 0 0;
-  border: 0;
-  border-radius: 0;
   color: var(--ink);
-  background: transparent;
-  box-shadow: none;
   font-size: 14px;
   font-weight: 800;
   overflow: hidden;
@@ -1336,13 +1347,97 @@
   white-space: nowrap;
 }
 
-.settings-model-pill select:focus {
-  outline: 0;
+.settings-model-pill__label--placeholder {
+  color: var(--muted);
+  font-weight: 750;
+}
+
+.settings-model-pill__chevron {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.settings-model-default-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 24;
+  width: max(100%, 260px);
+  max-height: 230px;
+  padding: 6px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+}
+
+.settings-model-default-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 10px;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.settings-model-default-option:hover,
+.settings-model-default-option--selected {
+  background: color-mix(in srgb, var(--surface) 72%, rgba(148, 163, 184, 0.16));
+}
+
+.settings-model-default-option__icon {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.settings-model-default-option__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 760;
+}
+
+.settings-model-default-option__check {
+  color: #22c55e;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.settings-model-default-empty {
+  display: grid;
+  min-height: 40px;
+  place-items: center;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .app-shell[data-theme='light'] .settings-model-pill {
   background: rgba(255, 255, 255, 0.96);
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.app-shell[data-theme='light'] .settings-model-default-dropdown {
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
 }
 
 .settings-field--section {
