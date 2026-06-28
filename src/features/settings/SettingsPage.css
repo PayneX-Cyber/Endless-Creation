@@ -1183,7 +1183,7 @@
 
 .settings-model-option-dropdown {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% - 2px);
   left: 0;
   right: 0;
   z-index: 16;
@@ -1202,7 +1202,7 @@
 
 .settings-model-option-dropdown--above {
   top: auto;
-  bottom: calc(100% + 8px);
+  bottom: calc(100% - 22px);
 }
 
 .settings-model-option-actions {
