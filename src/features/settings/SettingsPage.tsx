@@ -175,7 +175,14 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
   const activeSectionMeta = settingsSections.find((section) => section.id === activeSection) ?? settingsSections[0];
   const editingChannel = editingChannelDraft;
   const allChannelModels = useMemo(() => uniqueModels(apiStore.channels.flatMap((channel) => channel.models)), [apiStore.channels]);
-  const modelOptions = useMemo(() => uniqueModels([...allChannelModels, ...modelPreferences.availableModels]), [allChannelModels, modelPreferences.availableModels]);
+  const modelOptions = useMemo(() => uniqueModels([
+    ...allChannelModels,
+    ...modelPreferences.availableModels,
+    modelPreferences.imageModel,
+    modelPreferences.videoModel,
+    modelPreferences.textModel,
+    modelPreferences.audioModel,
+  ]), [allChannelModels, modelPreferences]);
   const isTesting = apiStore.channels.some((channel) => channel.lastTestStatus === 'testing');
 
   useEffect(() => {
@@ -290,8 +297,24 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
       activeChannelId: channelToSave.id,
       channels: apiStore.channels.map((channel) => channel.id === channelToSave.id ? channelToSave : channel),
     };
+    syncModelPreferencesWithChannels(nextStore.channels);
     persistApiStore(nextStore);
     closeChannelEditor();
+  }
+
+  function syncModelPreferencesWithChannels(channels: ModelChannel[]) {
+    const availableModels = uniqueModels([
+      ...channels.flatMap((channel) => channel.models),
+      ...modelPreferences.availableModels,
+      modelPreferences.imageModel,
+      modelPreferences.videoModel,
+      modelPreferences.textModel,
+      modelPreferences.audioModel,
+    ]);
+    const nextPreferences = { ...modelPreferences, availableModels };
+    setModelPreferences(nextPreferences);
+    writeStorage(MODEL_PREFERENCES_STORAGE_KEY, nextPreferences);
+    return nextPreferences;
   }
 
   function toggleCandidateModel(model: string, checked: boolean) {
@@ -355,12 +378,13 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
     const mergedModels = uniqueModels([...modelPreferences.availableModels, ...testedDraft.models]);
     setEditingChannelDraft(testedDraft);
     setTestResult(result);
-    setModelPreferences((current) => ({ ...current, availableModels: mergedModels }));
+    const nextPreferences = { ...modelPreferences, availableModels: mergedModels };
+    setModelPreferences(nextPreferences);
     persistApiStore({
       ...nextStore,
       channels: nextStore.channels.map((channel) => channel.id === testedDraft.id ? testedDraft : channel),
     }, true);
-    writeStorage(MODEL_PREFERENCES_STORAGE_KEY, { ...modelPreferences, availableModels: mergedModels });
+    writeStorage(MODEL_PREFERENCES_STORAGE_KEY, nextPreferences);
   }
 
   function saveModelPreferences() {
@@ -913,20 +937,19 @@ interface ModelFieldProps {
 }
 
 function ModelField({ label, value, options, onChange }: ModelFieldProps) {
-  const hasOptions = options.length > 0;
+  const normalizedOptions = uniqueModels(options);
+  const hasCustomValue = value.trim() && !normalizedOptions.includes(value);
   return (
     <label className="settings-field">
       <span>{label}</span>
-      {hasOptions ? (
-        <input value={value} list={`${label}-models`} onChange={(event) => onChange(event.target.value)} placeholder="输入或选择模型" />
-      ) : (
-        <input value={value} onChange={(event) => onChange(event.target.value)} placeholder="手动输入模型名称" />
-      )}
-      {hasOptions ? (
-        <datalist id={`${label}-models`}>
-          {options.map((option) => <option value={option} key={option} />)}
-        </datalist>
-      ) : null}
+      <select value={hasCustomValue ? '__custom__' : value} onChange={(event) => {
+        if (event.target.value !== '__custom__') onChange(event.target.value);
+      }}>
+        <option value="">请选择模型</option>
+        {normalizedOptions.map((option) => <option value={option} key={option}>{option}</option>)}
+        {hasCustomValue ? <option value="__custom__">自定义：{value}</option> : null}
+      </select>
+      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder="自定义模型名称" />
     </label>
   );
 }
