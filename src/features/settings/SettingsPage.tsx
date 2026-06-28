@@ -1027,14 +1027,29 @@ interface ModelFieldProps {
 }
 
 function ModelField({ dropdownId, label, value, options, isOpen, onOpenChange, onChange }: ModelFieldProps) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [dropUp, setDropUp] = useState(false);
+  const [dropdownMaxHeight, setDropdownMaxHeight] = useState(230);
   const selectedOption = options.find((option) => option.value === value);
   const iconKind = selectedOption && isOpenAIModel(selectedOption.model) ? 'openai' : 'generic';
   const selectedLabel = selectedOption?.label ?? '选择模型';
   const hasSelectedOption = Boolean(selectedOption);
   const hasOptions = options.length > 0;
 
+  useEffect(() => {
+    if (!isOpen || !rootRef.current) return;
+    const rect = rootRef.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const bottomSpace = viewportHeight - rect.bottom;
+    const topSpace = rect.top;
+    const shouldDropUp = bottomSpace < 260 && topSpace > bottomSpace;
+    const availableSpace = shouldDropUp ? topSpace : bottomSpace;
+    setDropUp(shouldDropUp);
+    setDropdownMaxHeight(Math.max(140, Math.min(260, availableSpace - 18)));
+  }, [isOpen]);
+
   return (
-    <div className="settings-field settings-model-default-field" data-model-dropdown-root data-model-dropdown-id={dropdownId}>
+    <div className="settings-field settings-model-default-field" ref={rootRef} data-model-dropdown-root data-model-dropdown-id={dropdownId}>
       <span>{label}</span>
       <button
         className={isOpen ? 'settings-model-pill settings-model-pill--open' : 'settings-model-pill'}
@@ -1052,7 +1067,7 @@ function ModelField({ dropdownId, label, value, options, isOpen, onOpenChange, o
         <span className="settings-model-pill__chevron" aria-hidden="true">⌄</span>
       </button>
       {isOpen && hasOptions ? (
-        <div className="settings-model-default-dropdown" role="listbox" aria-label={label}>
+        <div className={dropUp ? 'settings-model-default-dropdown settings-model-default-dropdown--above' : 'settings-model-default-dropdown'} role="listbox" aria-label={label} style={{ maxHeight: `${dropdownMaxHeight}px` }}>
           {options.map((option) => {
             const isSelected = option.value === value;
             const optionIconKind = isOpenAIModel(option.model) ? 'openai' : 'generic';
