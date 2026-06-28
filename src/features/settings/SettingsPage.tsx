@@ -30,7 +30,7 @@ const settingsSections: Array<{ id: SettingsSectionId; label: string; descriptio
   { id: 'appearance', label: '外观', description: '主题与界面显示偏好。' },
   { id: 'workspace', label: '工作区', description: '启动页与画布体验。' },
   { id: 'local', label: '本地创作', description: '草稿与本地项目偏好。' },
-  { id: 'ai', label: 'AI 与生成', description: '配置 OpenAI-compatible 接口并验证 API 可用性。' },
+  { id: 'ai', label: 'API配置', description: '配置 OpenAI-compatible 接口并验证 API 可用性。' },
   { id: 'about', label: '关于', description: '版本、阶段与说明。' },
 ];
 
@@ -315,4 +315,3 @@ function readProviderConfig(): ApiProviderConfig {
     return defaultProviderConfig;
   }
 }
-
