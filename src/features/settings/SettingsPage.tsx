@@ -13,6 +13,25 @@ interface SettingsPageProps {
 type SettingsSectionId = 'appearance' | 'workspace' | 'local' | 'api' | 'about';
 type ApiConfigTabId = 'channels' | 'models' | 'preferences' | 'webdav';
 type StartupPage = 'home' | 'projects' | 'last';
+type ApiCallFormat = 'openai' | 'gemini';
+
+interface ModelChannel {
+  id: string;
+  name: string;
+  baseUrl: string;
+  apiKey: string;
+  apiFormat: ApiCallFormat;
+  enabled: boolean;
+  models: string[];
+  extraHeaders: string;
+  lastTestedAt?: string;
+  lastTestStatus?: 'untested' | 'testing' | 'success' | 'failed';
+}
+
+interface ApiProviderStore {
+  channels: ModelChannel[];
+  activeChannelId: string;
+}
 
 interface ModelPreferences {
   textModel: string;
@@ -61,6 +80,9 @@ export const WEBDAV_CONFIG_STORAGE_KEY = 'endless-creation.webdav-config';
 const WORKSPACE_PREFERENCES_STORAGE_KEY = 'endless-creation.workspace-preferences';
 const LOCAL_CREATION_PREFERENCES_STORAGE_KEY = 'endless-creation.local-creation-preferences';
 
+const OPENAI_BASE_URL = 'https://api.openai.com/v1';
+const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com';
+
 const settingsSections: Array<{ id: SettingsSectionId; label: string; description: string }> = [
   { id: 'appearance', label: '外观', description: '主题与界面显示偏好。' },
   { id: 'workspace', label: '工作区', description: '启动页与画布体验。' },
@@ -76,15 +98,21 @@ const apiConfigTabs: Array<{ id: ApiConfigTabId; label: string }> = [
   { id: 'webdav', label: 'WebDAV' },
 ];
 
-const defaultProviderConfig: ApiProviderConfig = {
-  id: 'openai-compatible-default',
-  label: 'OpenAI',
-  type: 'openai-compatible',
-  baseUrl: 'https://api.openai.com/v1',
+const defaultChannel: ModelChannel = {
+  id: 'openai-default',
+  name: 'OpenAI',
+  baseUrl: OPENAI_BASE_URL,
   apiKey: '',
-  defaultModel: 'gpt-4o-mini',
+  apiFormat: 'openai',
   enabled: true,
+  models: ['gpt-4o-mini'],
+  extraHeaders: '',
   lastTestStatus: 'untested',
+};
+
+const defaultApiProviderStore: ApiProviderStore = {
+  channels: [defaultChannel],
+  activeChannelId: defaultChannel.id,
 };
 
 const defaultModelPreferences: ModelPreferences = {
@@ -130,7 +158,8 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
   const [activeSection, setActiveSection] = useState<SettingsSectionId>('appearance');
   const [activeApiTab, setActiveApiTab] = useState<ApiConfigTabId>('channels');
   const [feedback, setFeedback] = useState('');
-  const [providerConfig, setProviderConfig] = useState<ApiProviderConfig>(() => readStorage(API_PROVIDER_STORAGE_KEY, defaultProviderConfig));
+  const [apiStore, setApiStore] = useState<ApiProviderStore>(() => readApiProviderStore());
+  const [editingChannelId, setEditingChannelId] = useState<string>(() => readApiProviderStore().activeChannelId);
   const [modelPreferences, setModelPreferences] = useState<ModelPreferences>(() => readStorage(MODEL_PREFERENCES_STORAGE_KEY, defaultModelPreferences));
   const [generationPreferences, setGenerationPreferences] = useState<GenerationPreferences>(() => readStorage(GENERATION_PREFERENCES_STORAGE_KEY, defaultGenerationPreferences));
   const [workspacePreferences, setWorkspacePreferences] = useState<WorkspacePreferences>(() => readStorage(WORKSPACE_PREFERENCES_STORAGE_KEY, defaultWorkspacePreferences));
@@ -140,9 +169,12 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
   const [showWebdavPassword, setShowWebdavPassword] = useState(false);
   const [testResult, setTestResult] = useState<ApiConnectionTestResult | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const isTesting = providerConfig.lastTestStatus === 'testing';
+
   const activeSectionMeta = settingsSections.find((section) => section.id === activeSection) ?? settingsSections[0];
-  const modelOptions = useMemo(() => uniqueModels([providerConfig.defaultModel, ...modelPreferences.availableModels]), [modelPreferences.availableModels, providerConfig.defaultModel]);
+  const editingChannel = apiStore.channels.find((channel) => channel.id === editingChannelId) ?? apiStore.channels[0];
+  const allChannelModels = useMemo(() => uniqueModels(apiStore.channels.flatMap((channel) => channel.models)), [apiStore.channels]);
+  const modelOptions = useMemo(() => uniqueModels([...allChannelModels, ...modelPreferences.availableModels]), [allChannelModels, modelPreferences.availableModels]);
+  const isTesting = apiStore.channels.some((channel) => channel.lastTestStatus === 'testing');
 
   useEffect(() => {
     closeButtonRef.current?.focus();
@@ -163,35 +195,54 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
     return () => document.removeEventListener('keydown', closeOnEscape);
   }, [onClose]);
 
-  function updateProviderConfig(patch: Partial<ApiProviderConfig>) {
-    setProviderConfig((current) => ({ ...current, ...patch }));
-  }
-
-  function saveProviderConfig(nextConfig = providerConfig, quiet = false) {
-    writeStorage(API_PROVIDER_STORAGE_KEY, nextConfig);
+  function persistApiStore(nextStore: ApiProviderStore, quiet = false) {
+    const normalized = normalizeApiProviderStore(nextStore);
+    setApiStore(normalized);
+    writeStorage(API_PROVIDER_STORAGE_KEY, normalized);
     if (!quiet) setFeedback('渠道配置已保存。');
   }
 
-  async function testConnection() {
-    const testingConfig: ApiProviderConfig = { ...providerConfig, lastTestStatus: 'testing' };
-    setProviderConfig(testingConfig);
-    setTestResult({ ok: false, message: '正在测试连接…' });
-
-    const result = await rendererBridge.testApiConnection(testingConfig);
-    const nextProvider: ApiProviderConfig = {
-      ...testingConfig,
-      lastTestedAt: new Date().toLocaleString(),
-      lastTestStatus: result.ok ? 'success' : 'failed',
+  function updateChannel(channelId: string, patch: Partial<ModelChannel>) {
+    const nextStore = {
+      ...apiStore,
+      channels: apiStore.channels.map((channel) => {
+        if (channel.id !== channelId) return channel;
+        const apiFormat = patch.apiFormat ?? channel.apiFormat;
+        const shouldResetBaseUrl = patch.apiFormat && patch.apiFormat !== channel.apiFormat;
+        return {
+          ...channel,
+          ...patch,
+          apiFormat,
+          baseUrl: shouldResetBaseUrl ? defaultBaseUrlForApiFormat(apiFormat) : patch.baseUrl ?? channel.baseUrl,
+        };
+      }),
     };
-    const nextModels: ModelPreferences = result.models?.length
-      ? { ...modelPreferences, availableModels: uniqueModels([...modelPreferences.availableModels, ...result.models]) }
-      : modelPreferences;
+    setApiStore(nextStore);
+  }
 
-    setProviderConfig(nextProvider);
-    setModelPreferences(nextModels);
-    setTestResult(result);
-    writeStorage(API_PROVIDER_STORAGE_KEY, nextProvider);
-    writeStorage(MODEL_PREFERENCES_STORAGE_KEY, nextModels);
+  function addChannel() {
+    const nextChannel = createChannel({
+      name: `渠道 ${apiStore.channels.length + 1}`,
+      apiFormat: 'openai',
+      models: [],
+    });
+    persistApiStore({
+      channels: [...apiStore.channels, nextChannel],
+      activeChannelId: nextChannel.id,
+    }, true);
+    setEditingChannelId(nextChannel.id);
+    setFeedback('已新增渠道，请补充 API Key 和模型。');
+  }
+
+  function deleteChannel(channelId: string) {
+    if (apiStore.channels.length <= 1) {
+      setFeedback('至少保留一个渠道。');
+      return;
+    }
+    const channels = apiStore.channels.filter((channel) => channel.id !== channelId);
+    const activeChannelId = apiStore.activeChannelId === channelId ? channels[0].id : apiStore.activeChannelId;
+    persistApiStore({ channels, activeChannelId });
+    setEditingChannelId(activeChannelId);
   }
 
   function saveModelPreferences() {
@@ -230,10 +281,58 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
     setFeedback(webdavConfig.url.trim() ? 'WebDAV 配置已保存，真实连接后续接入。' : '请先填写 WebDAV 地址。');
   }
 
+  async function testChannel(channelId: string) {
+    const channel = apiStore.channels.find((item) => item.id === channelId);
+    if (!channel) return;
+
+    if (channel.apiFormat === 'gemini') {
+      updateChannel(channelId, { lastTestStatus: 'failed', lastTestedAt: new Date().toLocaleString() });
+      persistApiStore({
+        ...apiStore,
+        channels: apiStore.channels.map((item) => item.id === channelId ? { ...item, lastTestStatus: 'failed', lastTestedAt: new Date().toLocaleString() } : item),
+      }, true);
+      setFeedback('Gemini 模型拉取后续完善。');
+      return;
+    }
+
+    const testingChannels = apiStore.channels.map((item) => item.id === channelId ? { ...item, lastTestStatus: 'testing' as const } : item);
+    setApiStore({ ...apiStore, channels: testingChannels });
+    setTestResult({ ok: false, message: '正在测试连接…' });
+
+    const result = await rendererBridge.testApiConnection(channelToProviderConfig(channel));
+    const nextModels = result.models?.length ? uniqueModels(result.models) : channel.models;
+    const nextChannels = apiStore.channels.map((item) => item.id === channelId
+      ? {
+          ...item,
+          models: nextModels,
+          lastTestedAt: new Date().toLocaleString(),
+          lastTestStatus: result.ok ? 'success' as const : 'failed' as const,
+        }
+      : item);
+    const nextStore = { ...apiStore, channels: nextChannels, activeChannelId: channelId };
+    const mergedModels = uniqueModels([...modelPreferences.availableModels, ...nextModels]);
+
+    setApiStore(nextStore);
+    setModelPreferences((current) => ({ ...current, availableModels: mergedModels }));
+    setTestResult(result);
+    writeStorage(API_PROVIDER_STORAGE_KEY, nextStore);
+    writeStorage(MODEL_PREFERENCES_STORAGE_KEY, { ...modelPreferences, availableModels: mergedModels });
+  }
+
+  async function testAllChannels() {
+    const enabled = apiStore.channels.filter((channel) => channel.enabled);
+    if (!enabled.length) {
+      setFeedback('请先启用至少一个渠道。');
+      return;
+    }
+    for (const channel of enabled) {
+      await testChannel(channel.id);
+    }
+  }
+
   function handleApiTabKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, tabId: ApiConfigTabId) {
     const currentIndex = apiConfigTabs.findIndex((tab) => tab.id === tabId);
     if (currentIndex < 0) return;
-
     const nextIndex = event.key === 'ArrowRight'
       ? (currentIndex + 1) % apiConfigTabs.length
       : event.key === 'ArrowLeft'
@@ -292,8 +391,8 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
           <header className="settings-content-header">
             <div>
               <p className="settings-page__eyebrow">本地偏好设置</p>
-              <h1 id="settings-title">{activeSectionMeta.label}</h1>
-              <p className="settings-page__subtitle">{activeSectionMeta.description}</p>
+              <h1 id="settings-title">{activeSection === 'api' ? '配置与用户偏好' : activeSectionMeta.label}</h1>
+              <p className="settings-page__subtitle">{activeSection === 'api' ? '渠道聚合、模型选择和同步偏好' : activeSectionMeta.description}</p>
             </div>
             {feedback ? <span className="settings-page__feedback" role="status">{feedback}</span> : null}
           </header>
@@ -395,73 +494,104 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
 
                 {activeApiTab === 'channels' && (
                   <section id="settings-api-panel-channels" role="tabpanel" aria-labelledby="settings-api-tab-channels" className="settings-panel">
-                    <div className="settings-panel-toolbar">
-                      <div>
-                        <h2>渠道</h2>
-                        <p>配置 OpenAI-compatible 接口并验证 API 可用性。</p>
+                    <div className="settings-channel-topbar">
+                      <div className="settings-channel-notice">
+                        <strong>重要：</strong>
+                        <span>新增或拉取模型后，需要到“模型”Tab 选择可选项才会显示。</span>
+                        <button type="button" onClick={() => setActiveApiTab('models')}>去模型设置</button>
+                        <button type="button" onClick={() => setFeedback('已了解模型选择提示。')}>我知道了</button>
                       </div>
                       <div className="settings-inline-actions">
-                        <button className="settings-page__secondary" type="button" disabled={isTesting || !providerConfig.enabled} onClick={() => void testConnection()}>{isTesting ? '拉取中…' : '拉取全部'}</button>
-                        <button className="settings-page__secondary" type="button" onClick={() => setFeedback('多渠道后续接入，当前先保留一个默认渠道。')}>新增渠道</button>
+                        <button className="settings-page__secondary" type="button" disabled={isTesting} onClick={() => void testAllChannels()}>{isTesting ? '拉取中…' : '拉取全部'}</button>
+                        <button className="settings-page__primary" type="button" onClick={addChannel}>+ 新增渠道</button>
                       </div>
                     </div>
 
-                    <article className="settings-card settings-card--api settings-channel-card">
-                      <div className="settings-card__header">
-                        <div>
-                          <h2>{providerConfig.label || '未命名渠道'}</h2>
-                          <p>{providerConfig.baseUrl || '未填写 Base URL'}</p>
+                    <div className="settings-channel-grid">
+                      {apiStore.channels.map((channel) => (
+                        <article className={editingChannelId === channel.id ? 'settings-channel-tile settings-channel-tile--active' : 'settings-channel-tile'} key={channel.id}>
+                          <div className="settings-channel-tile__head">
+                            <div className="settings-channel-tile__title">
+                              <span className={channel.enabled ? 'settings-channel-dot settings-channel-dot--on' : 'settings-channel-dot'} aria-hidden="true" />
+                              <strong title={channel.name}>{channel.name || '未命名渠道'}</strong>
+                              <em>· {apiFormatLabel(channel.apiFormat)}</em>
+                            </div>
+                            <ToggleSwitch checked={channel.enabled} label={channel.enabled ? '禁用渠道' : '启用渠道'} onChange={(enabled) => updateChannel(channel.id, { enabled })} />
+                          </div>
+                          <span className={channel.enabled ? 'settings-card__badge settings-card__badge--success' : 'settings-card__badge settings-card__badge--untested'}>{channel.enabled ? '已启用' : '未启用'}</span>
+                          <div className="settings-channel-tile__body">
+                            <div>
+                              <span className="settings-channel-server-icon" aria-hidden="true">▦</span>
+                              <span title={primaryModel(channel)}>{primaryModel(channel)}</span>
+                              {channel.models.length > 1 ? <em>+{channel.models.length - 1}</em> : null}
+                            </div>
+                            <code title={channel.baseUrl}>{compactUrl(channel.baseUrl)}</code>
+                          </div>
+                          <div className="settings-channel-tile__actions">
+                            <button type="button" title="拉取/测试" aria-label={`拉取或测试 ${channel.name}`} onClick={() => void testChannel(channel.id)}>↻</button>
+                            <button type="button" title="编辑" aria-label={`编辑 ${channel.name}`} onClick={() => setEditingChannelId(channel.id)}>✎</button>
+                            <button type="button" title="删除" aria-label={`删除 ${channel.name}`} className="settings-channel-delete" onClick={() => deleteChannel(channel.id)}>⌫</button>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+
+                    {editingChannel ? (
+                      <article className="settings-card settings-card--api settings-channel-editor">
+                        <div className="settings-card__header">
+                          <div>
+                            <h2>编辑渠道</h2>
+                            <p>支持 OpenAI-compatible 与 Gemini 格式。Gemini 模型拉取将在后续完善。</p>
+                          </div>
+                          <span className={`settings-card__badge settings-card__badge--${editingChannel.lastTestStatus ?? 'untested'}`}>{statusTitle(editingChannel.lastTestStatus ?? 'untested')}</span>
                         </div>
-                        <span className={providerConfig.enabled ? 'settings-card__badge settings-card__badge--success' : 'settings-card__badge settings-card__badge--untested'}>{providerConfig.enabled ? '已启用' : '未启用'}</span>
-                      </div>
 
-                      <div className="settings-channel-summary">
-                        <span>API 格式：OpenAI-compatible</span>
-                        <span>默认模型：{providerConfig.defaultModel || '未设置'}</span>
-                        <span>测试状态：{statusTitle(providerConfig.lastTestStatus ?? 'untested')}</span>
-                      </div>
+                        <div className="settings-api-grid">
+                          <label className="settings-field">
+                            <span>渠道名称</span>
+                            <input value={editingChannel.name} onChange={(event) => updateChannel(editingChannel.id, { name: event.target.value })} placeholder="OpenAI" />
+                          </label>
+                          <SelectField
+                            label="API 格式"
+                            value={editingChannel.apiFormat}
+                            options={['openai', 'gemini']}
+                            optionLabels={{ openai: 'OpenAI', gemini: 'Gemini' }}
+                            onChange={(apiFormat) => updateChannel(editingChannel.id, { apiFormat: apiFormat as ApiCallFormat })}
+                          />
+                          <label className="settings-field settings-field--wide">
+                            <span>Base URL</span>
+                            <input value={editingChannel.baseUrl} onChange={(event) => updateChannel(editingChannel.id, { baseUrl: event.target.value })} placeholder={defaultBaseUrlForApiFormat(editingChannel.apiFormat)} />
+                          </label>
+                          <label className="settings-field settings-field--wide">
+                            <span>API Key</span>
+                            <span className="settings-secret-field">
+                              <input value={editingChannel.apiKey} onChange={(event) => updateChannel(editingChannel.id, { apiKey: event.target.value })} placeholder="sk-..." type={showApiKey ? 'text' : 'password'} />
+                              <button type="button" onClick={() => setShowApiKey((current) => !current)}>{showApiKey ? '隐藏' : '显示'}</button>
+                            </span>
+                          </label>
+                          <label className="settings-field settings-field--wide">
+                            <span>模型列表</span>
+                            <textarea value={editingChannel.models.join('\n')} onChange={(event) => updateChannel(editingChannel.id, { models: splitLines(event.target.value) })} placeholder="每行一个模型，例如 gpt-4o-mini" />
+                          </label>
+                          <label className="settings-field settings-field--wide">
+                            <span>额外 Headers（JSON，占位）</span>
+                            <textarea value={editingChannel.extraHeaders} onChange={(event) => updateChannel(editingChannel.id, { extraHeaders: event.target.value })} placeholder='{"x-custom-header":"value"}' />
+                          </label>
+                        </div>
 
-                      <div className="settings-api-grid">
-                        <label className="settings-field">
-                          <span>渠道名称</span>
-                          <input value={providerConfig.label} onChange={(event) => updateProviderConfig({ label: event.target.value })} placeholder="OpenAI" />
-                        </label>
-                        <label className="settings-field">
-                          <span>API 格式</span>
-                          <input value="OpenAI-compatible" readOnly />
-                        </label>
-                        <label className="settings-field settings-field--wide">
-                          <span>Base URL</span>
-                          <input value={providerConfig.baseUrl} onChange={(event) => updateProviderConfig({ baseUrl: event.target.value })} placeholder="https://api.openai.com/v1" />
-                        </label>
-                        <label className="settings-field settings-field--wide">
-                          <span>API Key</span>
-                          <span className="settings-secret-field">
-                            <input value={providerConfig.apiKey} onChange={(event) => updateProviderConfig({ apiKey: event.target.value })} placeholder="sk-..." type={showApiKey ? 'text' : 'password'} />
-                            <button type="button" onClick={() => setShowApiKey((current) => !current)}>{showApiKey ? '隐藏' : '显示'}</button>
-                          </span>
-                        </label>
-                        <label className="settings-field settings-field--wide">
-                          <span>默认模型</span>
-                          <input value={providerConfig.defaultModel} onChange={(event) => updateProviderConfig({ defaultModel: event.target.value })} placeholder="gpt-4o-mini" />
-                        </label>
-                      </div>
+                        <div className="settings-api-actions">
+                          <button className="settings-page__primary" type="button" onClick={() => persistApiStore(apiStore)}>保存配置</button>
+                          <button className="settings-page__secondary" type="button" disabled={editingChannel.lastTestStatus === 'testing'} onClick={() => void testChannel(editingChannel.id)}>{editingChannel.lastTestStatus === 'testing' ? '测试中…' : '拉取/测试'}</button>
+                          <button className="settings-page__secondary" type="button" onClick={() => deleteChannel(editingChannel.id)}>删除</button>
+                        </div>
 
-                      <ToggleRow title="启用此渠道" description="关闭后，后续生成流程不会默认使用该配置。" checked={providerConfig.enabled} onChange={(enabled) => updateProviderConfig({ enabled })} />
-
-                      <div className="settings-api-actions">
-                        <button className="settings-page__primary" type="button" onClick={() => saveProviderConfig()}>保存配置</button>
-                        <button className="settings-page__secondary" type="button" disabled={isTesting} onClick={() => void testConnection()}>{isTesting ? '测试中…' : '测试连接'}</button>
-                        <button className="settings-page__secondary" type="button" onClick={() => setFeedback('至少保留一个渠道。')}>删除</button>
-                      </div>
-
-                      <div className={`settings-api-status settings-api-status--${providerConfig.lastTestStatus ?? 'untested'}`} role="status">
-                        <strong>{statusTitle(providerConfig.lastTestStatus ?? 'untested')}</strong>
-                        <span>{testResult?.message ?? statusDescription(providerConfig)}</span>
-                        {modelPreferences.availableModels.length ? <em>模型示例：{modelPreferences.availableModels.slice(0, 6).join('、')}</em> : null}
-                        <p className="settings-api-note">当前配置保存到本地开发存储，后续迁移到安全存储。不会在控制台打印 API Key。</p>
-                      </div>
-                    </article>
+                        <div className={`settings-api-status settings-api-status--${editingChannel.lastTestStatus ?? 'untested'}`} role="status">
+                          <strong>{statusTitle(editingChannel.lastTestStatus ?? 'untested')}</strong>
+                          <span>{testResult?.message ?? statusDescription(editingChannel)}</span>
+                          {editingChannel.models.length ? <em>模型示例：{editingChannel.models.slice(0, 6).join('、')}</em> : null}
+                        </div>
+                      </article>
+                    ) : null}
                   </section>
                 )}
 
@@ -470,20 +600,20 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
                     <div className="settings-panel-toolbar">
                       <div>
                         <h2>模型</h2>
-                        <p>为文本、生图、视频和音频流程设置默认模型。</p>
+                        <p>默认模型可从所有渠道已拉取的模型中选择，也可以手动输入。</p>
                       </div>
                       <button className="settings-page__primary" type="button" onClick={saveModelPreferences}>保存模型偏好</button>
                     </div>
                     <article className="settings-card">
                       <div className="settings-model-grid">
-                        <ModelField label="默认文本模型" value={modelPreferences.textModel} options={modelOptions} onChange={(textModel) => setModelPreferences((current) => ({ ...current, textModel }))} />
                         <ModelField label="默认生图模型" value={modelPreferences.imageModel} options={modelOptions} onChange={(imageModel) => setModelPreferences((current) => ({ ...current, imageModel }))} />
                         <ModelField label="默认视频模型" value={modelPreferences.videoModel} options={modelOptions} onChange={(videoModel) => setModelPreferences((current) => ({ ...current, videoModel }))} />
+                        <ModelField label="默认文本模型" value={modelPreferences.textModel} options={modelOptions} onChange={(textModel) => setModelPreferences((current) => ({ ...current, textModel }))} />
                         <ModelField label="默认音频模型" value={modelPreferences.audioModel} options={modelOptions} onChange={(audioModel) => setModelPreferences((current) => ({ ...current, audioModel }))} />
                       </div>
                       <div className="settings-api-status">
                         <strong>可选模型列表</strong>
-                        <span>{modelPreferences.availableModels.length ? modelPreferences.availableModels.join('、') : '暂无拉取结果，可直接手动输入模型名称。'}</span>
+                        <span>{modelOptions.length ? modelOptions.join('、') : '暂无拉取结果，可直接手动输入模型名称。'}</span>
                       </div>
                     </article>
                   </section>
@@ -599,10 +729,16 @@ function ToggleRow({ title, description, checked, onChange }: ToggleRowProps) {
         <strong>{title}</strong>
         <span>{description}</span>
       </div>
-      <button className={checked ? 'settings-toggle settings-toggle--on' : 'settings-toggle'} type="button" role="switch" aria-checked={checked} onClick={() => onChange(!checked)}>
-        <span aria-hidden="true" />
-      </button>
+      <ToggleSwitch checked={checked} onChange={onChange} label={title} />
     </div>
+  );
+}
+
+function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange: (checked: boolean) => void; label: string }) {
+  return (
+    <button className={checked ? 'settings-toggle settings-toggle--on' : 'settings-toggle'} type="button" role="switch" aria-checked={checked} aria-label={label} onClick={() => onChange(!checked)}>
+      <span aria-hidden="true" />
+    </button>
   );
 }
 
@@ -651,17 +787,117 @@ function SelectField({ label, value, options, optionLabels, onChange }: SelectFi
   );
 }
 
-function statusTitle(status: NonNullable<ApiProviderConfig['lastTestStatus']>) {
+function createChannel(channel?: Partial<ModelChannel>): ModelChannel {
+  const apiFormat = normalizeApiFormat(channel?.apiFormat);
+  return {
+    id: channel?.id?.trim() || `channel-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    name: channel?.name?.trim() || '新渠道',
+    baseUrl: channel?.baseUrl?.trim() || defaultBaseUrlForApiFormat(apiFormat),
+    apiKey: channel?.apiKey || '',
+    apiFormat,
+    enabled: channel?.enabled !== false,
+    models: uniqueModels(channel?.models || []),
+    extraHeaders: channel?.extraHeaders || '',
+    lastTestedAt: channel?.lastTestedAt,
+    lastTestStatus: channel?.lastTestStatus || 'untested',
+  };
+}
+
+function normalizeApiProviderStore(value?: unknown): ApiProviderStore {
+  const raw = value && typeof value === 'object' ? value as Partial<ApiProviderStore> & Partial<ApiProviderConfig> : {};
+  let channels: ModelChannel[] = [];
+
+  if (Array.isArray(raw.channels)) {
+    channels = raw.channels.map((channel, index) => createChannel({
+      ...channel,
+      id: channel.id || (index === 0 ? 'openai-default' : `channel-${index + 1}`),
+    }));
+  } else if ('baseUrl' in raw || 'apiKey' in raw || 'defaultModel' in raw) {
+    channels = [createChannel({
+      id: raw.id || 'openai-default',
+      name: raw.label || 'OpenAI',
+      baseUrl: raw.baseUrl || OPENAI_BASE_URL,
+      apiKey: raw.apiKey || '',
+      apiFormat: 'openai',
+      enabled: raw.enabled !== false,
+      models: uniqueModels([raw.defaultModel || '', ...(Array.isArray((raw as { models?: string[] }).models) ? (raw as { models: string[] }).models : [])]),
+      lastTestedAt: raw.lastTestedAt,
+      lastTestStatus: raw.lastTestStatus || 'untested',
+    })];
+  }
+
+  if (!channels.length) channels = [createChannel(defaultChannel)];
+  const activeChannelId = raw.activeChannelId && channels.some((channel) => channel.id === raw.activeChannelId)
+    ? raw.activeChannelId
+    : channels[0].id;
+  return { channels, activeChannelId };
+}
+
+function readApiProviderStore() {
+  try {
+    const stored = localStorage.getItem(API_PROVIDER_STORAGE_KEY);
+    if (!stored) return defaultApiProviderStore;
+    return normalizeApiProviderStore(JSON.parse(stored));
+  } catch {
+    return defaultApiProviderStore;
+  }
+}
+
+function channelToProviderConfig(channel: ModelChannel): ApiProviderConfig {
+  return {
+    id: channel.id,
+    label: channel.name,
+    type: 'openai-compatible',
+    baseUrl: channel.baseUrl,
+    apiKey: channel.apiKey,
+    defaultModel: channel.models[0] || 'gpt-4o-mini',
+    enabled: channel.enabled,
+    lastTestedAt: channel.lastTestedAt,
+    lastTestStatus: channel.lastTestStatus,
+  };
+}
+
+function statusTitle(status: NonNullable<ModelChannel['lastTestStatus']>) {
   if (status === 'testing') return '测试中';
   if (status === 'success') return '测试成功';
   if (status === 'failed') return '测试失败';
-  return '未配置';
+  return '未测试';
 }
 
-function statusDescription(config: ApiProviderConfig) {
-  if (config.lastTestStatus === 'success' && config.lastTestedAt) return `上次测试：${config.lastTestedAt}`;
-  if (config.lastTestStatus === 'failed' && config.lastTestedAt) return `上次失败：${config.lastTestedAt}`;
+function statusDescription(channel: ModelChannel) {
+  if (channel.apiFormat === 'gemini') return 'Gemini 模型拉取后续完善。';
+  if (channel.lastTestStatus === 'success' && channel.lastTestedAt) return `上次测试：${channel.lastTestedAt}`;
+  if (channel.lastTestStatus === 'failed' && channel.lastTestedAt) return `上次失败：${channel.lastTestedAt}`;
   return '填写 Base URL 与 API Key 后，可以测试 /models 接口是否可用。';
+}
+
+function apiFormatLabel(apiFormat: ApiCallFormat) {
+  return apiFormat === 'gemini' ? 'Gemini' : 'OpenAI';
+}
+
+function normalizeApiFormat(apiFormat: unknown): ApiCallFormat {
+  return apiFormat === 'gemini' ? 'gemini' : 'openai';
+}
+
+function defaultBaseUrlForApiFormat(apiFormat: ApiCallFormat) {
+  return apiFormat === 'gemini' ? GEMINI_BASE_URL : OPENAI_BASE_URL;
+}
+
+function primaryModel(channel: ModelChannel) {
+  return channel.models[0] || '未设置模型';
+}
+
+function compactUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return `${url.host}${url.pathname}`.replace(/\/$/, '');
+  } catch {
+    return value || '未填写 Base URL';
+  }
+}
+
+function splitLines(value: string) {
+  return uniqueModels(value.split(/\r?\n|,/));
 }
 
 function readStorage<T>(key: string, fallback: T): T {

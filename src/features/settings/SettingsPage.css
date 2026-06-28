@@ -957,3 +957,212 @@
   justify-self: start;
   margin: 0 0 2px;
 }
+
+.settings-channel-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.settings-channel-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(245, 158, 11, 0.58);
+  border-radius: 12px;
+  color: var(--ink);
+  background: rgba(245, 158, 11, 0.08);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.settings-channel-notice strong {
+  color: #b45309;
+}
+
+.settings-channel-notice button {
+  border: 0;
+  color: var(--ink);
+  background: transparent;
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.settings-channel-notice button:hover {
+  color: #4b83ff;
+}
+
+.settings-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.settings-channel-tile {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.13);
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.settings-channel-tile--active,
+.settings-channel-tile:hover {
+  border-color: rgba(91, 140, 255, 0.36);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.16);
+  transform: translateY(-1px);
+}
+
+.settings-channel-tile__head,
+.settings-channel-tile__title,
+.settings-channel-tile__body div,
+.settings-channel-tile__actions {
+  display: flex;
+  align-items: center;
+}
+
+.settings-channel-tile__head {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-channel-tile__title {
+  min-width: 0;
+  gap: 8px;
+}
+
+.settings-channel-tile__title strong,
+.settings-channel-tile__body span,
+.settings-channel-tile__body code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-channel-tile__title strong {
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.settings-channel-tile__title em,
+.settings-channel-tile__body code {
+  color: var(--muted);
+  font-size: 12px;
+  font-style: normal;
+}
+
+.settings-channel-dot {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+.settings-channel-dot--on {
+  background: #10b981;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12);
+}
+
+.settings-channel-tile__body {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.settings-channel-tile__body div {
+  gap: 8px;
+  min-width: 0;
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.settings-channel-tile__body em {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--surface-2);
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 850;
+}
+
+.settings-channel-server-icon {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.settings-channel-tile__actions {
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.settings-channel-tile__actions button {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  color: var(--ink);
+  background: var(--surface-2);
+  font: inherit;
+  font-size: 17px;
+  cursor: pointer;
+  transition: color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.settings-channel-tile__actions button:hover {
+  color: #4b83ff;
+  background: rgba(91, 140, 255, 0.14);
+  transform: translateY(-1px);
+}
+
+.settings-channel-tile__actions .settings-channel-delete:hover {
+  color: #fb7185;
+  background: rgba(251, 113, 133, 0.12);
+}
+
+.settings-channel-editor textarea,
+.settings-field textarea {
+  width: 100%;
+  min-height: 84px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  color: var(--ink);
+  background: var(--surface-2);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.app-shell[data-theme='light'] .settings-channel-tile {
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
+}
+
+@media (max-width: 980px) {
+  .settings-channel-topbar {
+    display: grid;
+  }
+
+  .settings-channel-grid {
+    grid-template-columns: 1fr;
+  }
+}
