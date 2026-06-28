@@ -410,10 +410,6 @@
   font-weight: 700;
 }
 
-.settings-field select + input {
-  margin-top: 4px;
-}
-
 .settings-field input::placeholder {
   color: color-mix(in srgb, var(--muted) 72%, transparent);
 }
@@ -1290,6 +1286,63 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
+}
+
+.settings-model-default-field {
+  margin-bottom: 0;
+}
+
+.settings-model-pill {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  height: 42px;
+  min-width: 0;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.settings-model-pill__icon {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.settings-model-pill select {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 0 22px 0 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--ink);
+  background: transparent;
+  box-shadow: none;
+  font-size: 14px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-model-pill select:focus {
+  outline: 0;
+}
+
+.app-shell[data-theme='light'] .settings-model-pill {
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
 }
 
 .settings-field--section {

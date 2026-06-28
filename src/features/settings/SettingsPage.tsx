@@ -976,17 +976,21 @@ interface ModelFieldProps {
 
 function ModelField({ label, value, options, onChange }: ModelFieldProps) {
   const hasCustomValue = value.trim() && !options.some((option) => option.value === value);
+  const selectedOption = options.find((option) => option.value === value);
+  const icon = selectedOption?.model.toLowerCase().includes('gpt') || value.toLowerCase().includes('gpt') ? '◎' : '▣';
   return (
-    <label className="settings-field">
+    <label className="settings-field settings-model-default-field">
       <span>{label}</span>
-      <select value={hasCustomValue ? '__custom__' : value} onChange={(event) => {
-        if (event.target.value !== '__custom__') onChange(event.target.value);
-      }}>
-        <option value="">请选择模型</option>
-        {options.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
-        {hasCustomValue ? <option value="__custom__">自定义：{value}</option> : null}
-      </select>
-      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder="自定义模型名称" />
+      <span className="settings-model-pill">
+        <span className="settings-model-pill__icon" aria-hidden="true">{icon}</span>
+        <select value={hasCustomValue ? '__custom__' : value} onChange={(event) => {
+          if (event.target.value !== '__custom__') onChange(event.target.value);
+        }}>
+          <option value="">选择模型</option>
+          {options.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+          {hasCustomValue ? <option value="__custom__">自定义：{value}</option> : null}
+        </select>
+      </span>
     </label>
   );
 }
