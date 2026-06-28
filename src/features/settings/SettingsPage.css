@@ -1231,7 +1231,8 @@
   display: grid;
   gap: 6px;
   max-height: 220px;
-  overflow: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -1386,16 +1387,36 @@
   z-index: 24;
   width: max(100%, 260px);
   padding: 6px;
-  overflow: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--border);
   border-radius: 14px;
   background: color-mix(in srgb, var(--surface) 96%, transparent);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.22);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.32) transparent;
 }
 
 .settings-model-default-dropdown--above {
   top: auto;
   bottom: calc(100% + 8px);
+}
+
+.settings-model-default-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settings-model-default-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.settings-model-default-dropdown::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.28);
+}
+
+.settings-model-default-dropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.44);
 }
 
 .settings-model-default-option {
