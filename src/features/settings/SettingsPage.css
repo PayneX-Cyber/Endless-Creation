@@ -418,6 +418,38 @@
   grid-column: 1 / -1;
 }
 
+.settings-field__label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.settings-field__action {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(91, 140, 255, 0.42);
+  border-radius: 10px;
+  color: #ffffff;
+  background: #4b83ff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
+}
+
+.settings-field__action:hover:not(:disabled) {
+  background: #3f76ee;
+  transform: translateY(-1px);
+}
+
+.settings-field__action:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
 .settings-toggle-row {
   display: flex;
   align-items: center;

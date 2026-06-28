@@ -782,10 +782,20 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
                       </span>
                     </label>
                     <ToggleRow title="启用此渠道" description="关闭后，后续生成流程不会默认使用该配置。" checked={editingChannel.enabled} onChange={(enabled) => updateEditingChannelDraft({ enabled })} />
-                    <label className="settings-field settings-field--wide">
-                      <span>模型列表</span>
+                    <div className="settings-field settings-field--wide">
+                      <div className="settings-field__label-row">
+                        <span>模型列表</span>
+                        <button
+                          className="settings-field__action"
+                          type="button"
+                          disabled={editingChannel.lastTestStatus === 'testing'}
+                          onClick={testEditingChannel}
+                        >
+                          {editingChannel.lastTestStatus === 'testing' ? '获取中…' : '获取模型'}
+                        </button>
+                      </div>
                       <textarea value={editingChannel.models.join('\n')} onChange={(event) => updateEditingChannelDraft({ models: splitLines(event.target.value) })} placeholder="每行一个模型，例如 gpt-4o-mini" />
-                    </label>
+                    </div>
                     <label className="settings-field settings-field--wide">
                       <span>额外 Headers（JSON，占位）</span>
                       <textarea value={editingChannel.extraHeaders} onChange={(event) => updateEditingChannelDraft({ extraHeaders: event.target.value })} placeholder='{"x-custom-header":"value"}' />
