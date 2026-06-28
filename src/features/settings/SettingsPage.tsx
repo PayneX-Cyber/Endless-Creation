@@ -685,11 +685,9 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
                 {activeApiTab === 'channels' && (
                   <section id="settings-api-panel-channels" role="tabpanel" aria-labelledby="settings-api-tab-channels" className="settings-panel">
                     <div className="settings-channel-topbar">
-                      <div className="settings-channel-notice">
-                        <strong>重要：</strong>
-                        <span>新增或拉取模型后，需要到“模型”Tab 选择可选项才会显示。</span>
-                        <button type="button" onClick={() => setActiveApiTab('models')}>去模型设置</button>
-                        <button type="button" onClick={() => setFeedback('已了解模型选择提示。')}>我知道了</button>
+                      <div className="settings-channel-heading">
+                        <h2>渠道</h2>
+                        <p>管理 OpenAI / Gemini API 渠道，拉取模型并配置启用状态。</p>
                       </div>
                       <div className="settings-inline-actions">
                         <button className="settings-page__secondary" type="button" disabled={isTesting} onClick={() => void testAllChannels()}>{isTesting ? '拉取中…' : '拉取全部'}</button>

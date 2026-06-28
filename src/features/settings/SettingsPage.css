@@ -1524,41 +1524,35 @@
 
 .settings-channel-topbar {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 14px;
+  gap: 18px;
+  padding: 2px 0 4px;
 }
 
-.settings-channel-notice {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
+.settings-channel-heading {
   min-width: 0;
-  padding: 10px 12px;
-  border: 1px solid rgba(245, 158, 11, 0.58);
-  border-radius: 12px;
+}
+
+.settings-channel-heading h2 {
+  margin: 0;
   color: var(--ink);
-  background: rgba(245, 158, 11, 0.08);
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.settings-channel-heading p {
+  margin: 6px 0 0;
+  color: var(--muted);
   font-size: 13px;
-  line-height: 1.45;
+  line-height: 1.5;
 }
 
-.settings-channel-notice strong {
-  color: #b45309;
-}
-
-.settings-channel-notice button {
-  border: 0;
-  color: var(--ink);
-  background: transparent;
-  font: inherit;
-  font-weight: 850;
-  cursor: pointer;
-}
-
-.settings-channel-notice button:hover {
-  color: #4b83ff;
+.settings-channel-topbar .settings-inline-actions {
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 2px;
 }
 
 .settings-channel-grid {
@@ -1723,6 +1717,10 @@
 @media (max-width: 980px) {
   .settings-channel-topbar {
     display: grid;
+  }
+
+  .settings-channel-topbar .settings-inline-actions {
+    justify-content: flex-start;
   }
 
   .settings-channel-grid {
