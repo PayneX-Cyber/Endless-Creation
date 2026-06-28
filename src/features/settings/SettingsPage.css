@@ -1200,6 +1200,11 @@
   display: grid;
 }
 
+.settings-model-option-dropdown--above {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
 .settings-model-option-actions {
   justify-content: flex-end;
 }

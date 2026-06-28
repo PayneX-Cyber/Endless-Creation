@@ -1106,17 +1106,36 @@ interface ModelOptionGroupProps {
 }
 
 function ModelOptionGroup({ dropdownId, title, values, options, isOpen, onOpenChange, onChange }: ModelOptionGroupProps) {
+  const rootRef = useRef<HTMLElement>(null);
+  const [dropUp, setDropUp] = useState(false);
+  const [listMaxHeight, setListMaxHeight] = useState(220);
   const selected = values.filter((value) => options.some((option) => option.value === value));
   const selectedOptions = optionsByValues(selected, options);
   const visibleSelectedOptions = selectedOptions.slice(0, 2);
   const hiddenSelectedCount = Math.max(selectedOptions.length - visibleSelectedOptions.length, 0);
+
+  useEffect(() => {
+    if (!isOpen || !rootRef.current) return;
+    const rect = rootRef.current.getBoundingClientRect();
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const bottomSpace = viewportHeight - rect.bottom;
+    const topSpace = rect.top;
+    const defaultGrid = rootRef.current.closest('.settings-card')?.querySelector('.settings-model-default-grid');
+    const defaultGridTop = defaultGrid?.getBoundingClientRect().top ?? Number.POSITIVE_INFINITY;
+    const dropdownHeight = 300;
+    const wouldCoverDefaultGrid = rect.bottom < defaultGridTop && rect.bottom + dropdownHeight > defaultGridTop;
+    const shouldDropUp = (wouldCoverDefaultGrid || bottomSpace < dropdownHeight) && topSpace > 180;
+    const availableSpace = shouldDropUp ? topSpace : Math.min(bottomSpace, defaultGridTop - rect.bottom || bottomSpace);
+    setDropUp(shouldDropUp);
+    setListMaxHeight(Math.max(120, Math.min(240, availableSpace - 76)));
+  }, [isOpen]);
 
   function toggleOption(value: string, checked: boolean) {
     onChange(checked ? uniqueModels([...selected, value]) : selected.filter((item) => item !== value));
   }
 
   return (
-    <section className="settings-model-option-group" data-model-dropdown-root data-model-dropdown-id={dropdownId}>
+    <section className="settings-model-option-group" ref={rootRef} data-model-dropdown-root data-model-dropdown-id={dropdownId}>
       <div className="settings-model-option-group__header">
         <strong>{title}</strong>
         <span>{selected.length}/{options.length}</span>
@@ -1141,12 +1160,16 @@ function ModelOptionGroup({ dropdownId, title, values, options, isOpen, onOpenCh
         </span>
         <span className="settings-model-select__chevron" aria-hidden="true">⌄</span>
       </button>
-      <div className={isOpen ? 'settings-model-option-dropdown settings-model-option-dropdown--open' : 'settings-model-option-dropdown'}>
+      <div className={[
+        'settings-model-option-dropdown',
+        isOpen ? 'settings-model-option-dropdown--open' : '',
+        dropUp ? 'settings-model-option-dropdown--above' : '',
+      ].filter(Boolean).join(' ')}>
         <div className="settings-model-option-actions">
           <button type="button" disabled={!options.length} onClick={() => onChange(options.map((option) => option.value))}>全选</button>
           <button type="button" disabled={!selected.length} onClick={() => onChange([])}>清空</button>
         </div>
-        <div className="settings-model-option-list">
+        <div className="settings-model-option-list" style={{ maxHeight: `${listMaxHeight}px` }}>
           {options.length ? options.map((option) => (
             <label key={option.value}>
               <input type="checkbox" checked={selected.includes(option.value)} onChange={(event) => toggleOption(option.value, event.target.checked)} />
