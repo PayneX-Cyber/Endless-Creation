@@ -410,6 +410,10 @@
   font-weight: 700;
 }
 
+.settings-field select + input {
+  margin-top: 4px;
+}
+
 .settings-field input::placeholder {
   color: color-mix(in srgb, var(--muted) 72%, transparent);
 }
