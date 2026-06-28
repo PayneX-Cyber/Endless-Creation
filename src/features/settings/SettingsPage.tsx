@@ -999,38 +999,62 @@ interface ModelOptionGroupProps {
 }
 
 function ModelOptionGroup({ title, values, options, onChange }: ModelOptionGroupProps) {
+  const [isOpen, setOpen] = useState(false);
+  const rootRef = useRef<HTMLElement>(null);
   const selected = values.filter((value) => options.some((option) => option.value === value));
   const selectedOptions = optionsByValues(selected, options);
+
+  useEffect(() => {
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+  }, []);
 
   function toggleOption(value: string, checked: boolean) {
     onChange(checked ? uniqueModels([...selected, value]) : selected.filter((item) => item !== value));
   }
 
   return (
-    <section className="settings-model-option-group">
+    <section className="settings-model-option-group" ref={rootRef}>
       <div className="settings-model-option-group__header">
         <strong>{title}</strong>
         <span>{selected.length}/{options.length}</span>
       </div>
-      <div className="settings-model-selected-tags">
-        {selectedOptions.length ? selectedOptions.map((option) => (
-          <button type="button" key={option.value} title={option.label} onClick={() => toggleOption(option.value, false)}>
-            <span>{option.label}</span>
-            <em aria-hidden="true">×</em>
-          </button>
-        )) : <p>请选择或输入模型可选项</p>}
-      </div>
-      <div className="settings-model-option-actions">
-        <button type="button" disabled={!options.length} onClick={() => onChange(options.map((option) => option.value))}>全选</button>
-        <button type="button" disabled={!selected.length} onClick={() => onChange([])}>清空</button>
-      </div>
-      <div className="settings-model-option-list">
-        {options.length ? options.map((option) => (
-          <label key={option.value}>
-            <input type="checkbox" checked={selected.includes(option.value)} onChange={(event) => toggleOption(option.value, event.target.checked)} />
-            <span title={option.label}>{option.label}</span>
-          </label>
-        )) : <p>暂无模型，请先在渠道中获取模型。</p>}
+      <button className={isOpen ? 'settings-model-select settings-model-select--open' : 'settings-model-select'} type="button" aria-expanded={isOpen} onClick={() => setOpen((current) => !current)}>
+        <span className="settings-model-selected-tags">
+          {selectedOptions.length ? selectedOptions.map((option) => (
+            <span className="settings-model-tag" key={option.value} title={option.label}>
+              <span>{option.label}</span>
+              <em
+                aria-hidden="true"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  toggleOption(option.value, false);
+                }}
+              >
+                ×
+              </em>
+            </span>
+          )) : <span className="settings-model-select__placeholder">请选择或输入模型可选项</span>}
+        </span>
+        <span className="settings-model-select__chevron" aria-hidden="true">⌄</span>
+      </button>
+      <div className={isOpen ? 'settings-model-option-dropdown settings-model-option-dropdown--open' : 'settings-model-option-dropdown'}>
+        <div className="settings-model-option-actions">
+          <button type="button" disabled={!options.length} onClick={() => onChange(options.map((option) => option.value))}>全选</button>
+          <button type="button" disabled={!selected.length} onClick={() => onChange([])}>清空</button>
+        </div>
+        <div className="settings-model-option-list">
+          {options.length ? options.map((option) => (
+            <label key={option.value}>
+              <input type="checkbox" checked={selected.includes(option.value)} onChange={(event) => toggleOption(option.value, event.target.checked)} />
+              <span title={option.label}>{option.label}</span>
+            </label>
+          )) : <p>暂无模型，请先在渠道中获取模型。</p>}
+        </div>
       </div>
     </section>
   );
