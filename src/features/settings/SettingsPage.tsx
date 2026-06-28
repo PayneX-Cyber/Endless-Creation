@@ -159,7 +159,8 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
   const [activeApiTab, setActiveApiTab] = useState<ApiConfigTabId>('channels');
   const [feedback, setFeedback] = useState('');
   const [apiStore, setApiStore] = useState<ApiProviderStore>(() => readApiProviderStore());
-  const [editingChannelId, setEditingChannelId] = useState<string>(() => readApiProviderStore().activeChannelId);
+  const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
+  const [editingChannelDraft, setEditingChannelDraft] = useState<ModelChannel | null>(null);
   const [modelPreferences, setModelPreferences] = useState<ModelPreferences>(() => readStorage(MODEL_PREFERENCES_STORAGE_KEY, defaultModelPreferences));
   const [generationPreferences, setGenerationPreferences] = useState<GenerationPreferences>(() => readStorage(GENERATION_PREFERENCES_STORAGE_KEY, defaultGenerationPreferences));
   const [workspacePreferences, setWorkspacePreferences] = useState<WorkspacePreferences>(() => readStorage(WORKSPACE_PREFERENCES_STORAGE_KEY, defaultWorkspacePreferences));
@@ -171,7 +172,7 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
   const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   const activeSectionMeta = settingsSections.find((section) => section.id === activeSection) ?? settingsSections[0];
-  const editingChannel = apiStore.channels.find((channel) => channel.id === editingChannelId) ?? apiStore.channels[0];
+  const editingChannel = editingChannelDraft;
   const allChannelModels = useMemo(() => uniqueModels(apiStore.channels.flatMap((channel) => channel.models)), [apiStore.channels]);
   const modelOptions = useMemo(() => uniqueModels([...allChannelModels, ...modelPreferences.availableModels]), [allChannelModels, modelPreferences.availableModels]);
   const isTesting = apiStore.channels.some((channel) => channel.lastTestStatus === 'testing');
@@ -188,12 +189,17 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
 
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
+      if (event.key !== 'Escape') return;
+      if (editingChannelDraft) {
+        closeChannelEditor();
+        return;
+      }
+      onClose();
     }
 
     document.addEventListener('keydown', closeOnEscape);
     return () => document.removeEventListener('keydown', closeOnEscape);
-  }, [onClose]);
+  }, [editingChannelDraft, onClose]);
 
   function persistApiStore(nextStore: ApiProviderStore, quiet = false) {
     const normalized = normalizeApiProviderStore(nextStore);
@@ -230,7 +236,7 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
       channels: [...apiStore.channels, nextChannel],
       activeChannelId: nextChannel.id,
     }, true);
-    setEditingChannelId(nextChannel.id);
+    openChannelEditor(nextChannel.id, nextChannel);
     setFeedback('已新增渠道，请补充 API Key 和模型。');
   }
 
@@ -242,7 +248,86 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
     const channels = apiStore.channels.filter((channel) => channel.id !== channelId);
     const activeChannelId = apiStore.activeChannelId === channelId ? channels[0].id : apiStore.activeChannelId;
     persistApiStore({ channels, activeChannelId });
-    setEditingChannelId(activeChannelId);
+    if (editingChannelId === channelId) closeChannelEditor();
+  }
+
+  function openChannelEditor(channelId: string, fallback?: ModelChannel) {
+    const channel = fallback ?? apiStore.channels.find((item) => item.id === channelId);
+    if (!channel) return;
+    setEditingChannelId(channelId);
+    setEditingChannelDraft({ ...channel, models: [...channel.models] });
+    setShowApiKey(false);
+  }
+
+  function closeChannelEditor() {
+    setEditingChannelId(null);
+    setEditingChannelDraft(null);
+    setShowApiKey(false);
+  }
+
+  function updateEditingChannelDraft(patch: Partial<ModelChannel>) {
+    setEditingChannelDraft((current) => {
+      if (!current) return current;
+      const apiFormat = patch.apiFormat ?? current.apiFormat;
+      const shouldResetBaseUrl = patch.apiFormat && patch.apiFormat !== current.apiFormat;
+      return {
+        ...current,
+        ...patch,
+        apiFormat,
+        baseUrl: shouldResetBaseUrl ? defaultBaseUrlForApiFormat(apiFormat) : patch.baseUrl ?? current.baseUrl,
+      };
+    });
+  }
+
+  function saveEditingChannel() {
+    if (!editingChannelDraft) return;
+    const nextStore = {
+      ...apiStore,
+      activeChannelId: editingChannelDraft.id,
+      channels: apiStore.channels.map((channel) => channel.id === editingChannelDraft.id ? editingChannelDraft : channel),
+    };
+    persistApiStore(nextStore);
+    closeChannelEditor();
+  }
+
+  async function testEditingChannel() {
+    if (!editingChannelDraft) return;
+    const nextStore = {
+      ...apiStore,
+      activeChannelId: editingChannelDraft.id,
+      channels: apiStore.channels.map((channel) => channel.id === editingChannelDraft.id ? editingChannelDraft : channel),
+    };
+    persistApiStore(nextStore, true);
+
+    if (editingChannelDraft.apiFormat === 'gemini') {
+      const failedDraft = { ...editingChannelDraft, lastTestStatus: 'failed' as const, lastTestedAt: new Date().toLocaleString() };
+      setEditingChannelDraft(failedDraft);
+      persistApiStore({
+        ...nextStore,
+        channels: nextStore.channels.map((channel) => channel.id === failedDraft.id ? failedDraft : channel),
+      }, true);
+      setFeedback('Gemini 模型拉取后续完善。');
+      return;
+    }
+
+    setEditingChannelDraft({ ...editingChannelDraft, lastTestStatus: 'testing' });
+    setTestResult({ ok: false, message: '正在测试连接…' });
+    const result = await rendererBridge.testApiConnection(channelToProviderConfig(editingChannelDraft));
+    const testedDraft = {
+      ...editingChannelDraft,
+      models: result.models?.length ? uniqueModels(result.models) : editingChannelDraft.models,
+      lastTestedAt: new Date().toLocaleString(),
+      lastTestStatus: result.ok ? 'success' as const : 'failed' as const,
+    };
+    const mergedModels = uniqueModels([...modelPreferences.availableModels, ...testedDraft.models]);
+    setEditingChannelDraft(testedDraft);
+    setTestResult(result);
+    setModelPreferences((current) => ({ ...current, availableModels: mergedModels }));
+    persistApiStore({
+      ...nextStore,
+      channels: nextStore.channels.map((channel) => channel.id === testedDraft.id ? testedDraft : channel),
+    }, true);
+    writeStorage(MODEL_PREFERENCES_STORAGE_KEY, { ...modelPreferences, availableModels: mergedModels });
   }
 
   function saveModelPreferences() {
@@ -529,69 +614,13 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
                           </div>
                           <div className="settings-channel-tile__actions">
                             <button type="button" title="拉取/测试" aria-label={`拉取或测试 ${channel.name}`} onClick={() => void testChannel(channel.id)}>↻</button>
-                            <button type="button" title="编辑" aria-label={`编辑 ${channel.name}`} onClick={() => setEditingChannelId(channel.id)}>✎</button>
+                            <button type="button" title="编辑" aria-label={`编辑 ${channel.name}`} onClick={() => openChannelEditor(channel.id)}>✎</button>
                             <button type="button" title="删除" aria-label={`删除 ${channel.name}`} className="settings-channel-delete" onClick={() => deleteChannel(channel.id)}>⌫</button>
                           </div>
                         </article>
                       ))}
                     </div>
 
-                    {editingChannel ? (
-                      <article className="settings-card settings-card--api settings-channel-editor">
-                        <div className="settings-card__header">
-                          <div>
-                            <h2>编辑渠道</h2>
-                            <p>支持 OpenAI-compatible 与 Gemini 格式。Gemini 模型拉取将在后续完善。</p>
-                          </div>
-                          <span className={`settings-card__badge settings-card__badge--${editingChannel.lastTestStatus ?? 'untested'}`}>{statusTitle(editingChannel.lastTestStatus ?? 'untested')}</span>
-                        </div>
-
-                        <div className="settings-api-grid">
-                          <label className="settings-field">
-                            <span>渠道名称</span>
-                            <input value={editingChannel.name} onChange={(event) => updateChannel(editingChannel.id, { name: event.target.value })} placeholder="OpenAI" />
-                          </label>
-                          <SelectField
-                            label="API 格式"
-                            value={editingChannel.apiFormat}
-                            options={['openai', 'gemini']}
-                            optionLabels={{ openai: 'OpenAI', gemini: 'Gemini' }}
-                            onChange={(apiFormat) => updateChannel(editingChannel.id, { apiFormat: apiFormat as ApiCallFormat })}
-                          />
-                          <label className="settings-field settings-field--wide">
-                            <span>Base URL</span>
-                            <input value={editingChannel.baseUrl} onChange={(event) => updateChannel(editingChannel.id, { baseUrl: event.target.value })} placeholder={defaultBaseUrlForApiFormat(editingChannel.apiFormat)} />
-                          </label>
-                          <label className="settings-field settings-field--wide">
-                            <span>API Key</span>
-                            <span className="settings-secret-field">
-                              <input value={editingChannel.apiKey} onChange={(event) => updateChannel(editingChannel.id, { apiKey: event.target.value })} placeholder="sk-..." type={showApiKey ? 'text' : 'password'} />
-                              <button type="button" onClick={() => setShowApiKey((current) => !current)}>{showApiKey ? '隐藏' : '显示'}</button>
-                            </span>
-                          </label>
-                          <label className="settings-field settings-field--wide">
-                            <span>模型列表</span>
-                            <textarea value={editingChannel.models.join('\n')} onChange={(event) => updateChannel(editingChannel.id, { models: splitLines(event.target.value) })} placeholder="每行一个模型，例如 gpt-4o-mini" />
-                          </label>
-                          <label className="settings-field settings-field--wide">
-                            <span>额外 Headers（JSON，占位）</span>
-                            <textarea value={editingChannel.extraHeaders} onChange={(event) => updateChannel(editingChannel.id, { extraHeaders: event.target.value })} placeholder='{"x-custom-header":"value"}' />
-                          </label>
-                        </div>
-
-                        <div className="settings-api-actions">
-                          <button className="settings-page__primary" type="button" onClick={() => persistApiStore(apiStore)}>保存配置</button>
-                          <button className="settings-page__secondary" type="button" disabled={editingChannel.lastTestStatus === 'testing'} onClick={() => void testChannel(editingChannel.id)}>{editingChannel.lastTestStatus === 'testing' ? '测试中…' : '拉取/测试'}</button>
-                          <button className="settings-page__secondary" type="button" onClick={() => deleteChannel(editingChannel.id)}>删除</button>
-                        </div>
-
-                        <div className={`settings-api-status settings-api-status--${editingChannel.lastTestStatus ?? 'untested'}`} role="status">
-                          <strong>{statusTitle(editingChannel.lastTestStatus ?? 'untested')}</strong>
-                          <span>{testResult?.message ?? statusDescription(editingChannel)}</span>
-                          {editingChannel.models.length ? <em>模型示例：{editingChannel.models.slice(0, 6).join('、')}</em> : null}
-                        </div>
-                      </article>
-                    ) : null}
                   </section>
                 )}
 
@@ -709,6 +738,75 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
               </div>
             )}
           </section>
+
+          {editingChannel ? (
+            <div className="settings-submodal" role="presentation" onMouseDown={closeChannelEditor}>
+              <article
+                className="settings-submodal__dialog"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="settings-channel-editor-title"
+                onMouseDown={(event) => event.stopPropagation()}
+              >
+                <button className="settings-submodal__close" type="button" aria-label="关闭编辑渠道" title="关闭编辑渠道" onClick={closeChannelEditor}>×</button>
+                <div className="settings-card__header">
+                  <div>
+                    <h2 id="settings-channel-editor-title">编辑渠道</h2>
+                    <p>支持 OpenAI-compatible 与 Gemini 格式。Gemini 模型拉取将在后续完善。</p>
+                  </div>
+                  <span className={`settings-card__badge settings-card__badge--${editingChannel.lastTestStatus ?? 'untested'}`}>{statusTitle(editingChannel.lastTestStatus ?? 'untested')}</span>
+                </div>
+
+                <div className="settings-submodal__body">
+                  <div className="settings-api-grid">
+                    <label className="settings-field">
+                      <span>渠道名称</span>
+                      <input value={editingChannel.name} onChange={(event) => updateEditingChannelDraft({ name: event.target.value })} placeholder="OpenAI" />
+                    </label>
+                    <SelectField
+                      label="API 格式"
+                      value={editingChannel.apiFormat}
+                      options={['openai', 'gemini']}
+                      optionLabels={{ openai: 'OpenAI', gemini: 'Gemini' }}
+                      onChange={(apiFormat) => updateEditingChannelDraft({ apiFormat: apiFormat as ApiCallFormat })}
+                    />
+                    <label className="settings-field settings-field--wide">
+                      <span>Base URL</span>
+                      <input value={editingChannel.baseUrl} onChange={(event) => updateEditingChannelDraft({ baseUrl: event.target.value })} placeholder={defaultBaseUrlForApiFormat(editingChannel.apiFormat)} />
+                    </label>
+                    <label className="settings-field settings-field--wide">
+                      <span>API Key</span>
+                      <span className="settings-secret-field">
+                        <input value={editingChannel.apiKey} onChange={(event) => updateEditingChannelDraft({ apiKey: event.target.value })} placeholder="sk-..." type={showApiKey ? 'text' : 'password'} />
+                        <button type="button" onClick={() => setShowApiKey((current) => !current)}>{showApiKey ? '隐藏' : '显示'}</button>
+                      </span>
+                    </label>
+                    <ToggleRow title="启用此渠道" description="关闭后，后续生成流程不会默认使用该配置。" checked={editingChannel.enabled} onChange={(enabled) => updateEditingChannelDraft({ enabled })} />
+                    <label className="settings-field settings-field--wide">
+                      <span>模型列表</span>
+                      <textarea value={editingChannel.models.join('\n')} onChange={(event) => updateEditingChannelDraft({ models: splitLines(event.target.value) })} placeholder="每行一个模型，例如 gpt-4o-mini" />
+                    </label>
+                    <label className="settings-field settings-field--wide">
+                      <span>额外 Headers（JSON，占位）</span>
+                      <textarea value={editingChannel.extraHeaders} onChange={(event) => updateEditingChannelDraft({ extraHeaders: event.target.value })} placeholder='{"x-custom-header":"value"}' />
+                    </label>
+                  </div>
+
+                  <div className={`settings-api-status settings-api-status--${editingChannel.lastTestStatus ?? 'untested'}`} role="status">
+                    <strong>{statusTitle(editingChannel.lastTestStatus ?? 'untested')}</strong>
+                    <span>{testResult?.message ?? statusDescription(editingChannel)}</span>
+                    {editingChannel.models.length ? <em>模型示例：{editingChannel.models.slice(0, 6).join('、')}</em> : null}
+                  </div>
+                </div>
+
+                <div className="settings-submodal__footer">
+                  <button className="settings-page__secondary" type="button" onClick={closeChannelEditor}>取消</button>
+                  <button className="settings-page__secondary" type="button" disabled={editingChannel.lastTestStatus === 'testing'} onClick={testEditingChannel}>{editingChannel.lastTestStatus === 'testing' ? '测试中…' : '测试连接'}</button>
+                  <button className="settings-page__primary" type="button" onClick={saveEditingChannel}>保存</button>
+                </div>
+              </article>
+            </div>
+          ) : null}
         </main>
       </section>
     </div>
