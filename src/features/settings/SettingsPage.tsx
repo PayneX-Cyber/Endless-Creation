@@ -999,7 +999,8 @@ interface ModelFieldProps {
 function ModelField({ dropdownId, label, value, options, isOpen, onOpenChange, onChange }: ModelFieldProps) {
   const selectedOption = options.find((option) => option.value === value);
   const icon = selectedOption?.model.toLowerCase().includes('gpt') || value.toLowerCase().includes('gpt') ? '◎' : '▣';
-  const selectedLabel = selectedOption?.label ?? (value.trim() ? `自定义：${value}` : '选择模型');
+  const selectedLabel = selectedOption?.label ?? '选择模型';
+  const hasSelectedOption = Boolean(selectedOption);
   const hasOptions = options.length > 0;
 
   return (
@@ -1017,7 +1018,7 @@ function ModelField({ dropdownId, label, value, options, isOpen, onOpenChange, o
         }}
       >
         <span className="settings-model-pill__icon" aria-hidden="true">{icon}</span>
-        <span className={value ? 'settings-model-pill__label' : 'settings-model-pill__label settings-model-pill__label--placeholder'}>{selectedLabel}</span>
+        <span className={hasSelectedOption ? 'settings-model-pill__label' : 'settings-model-pill__label settings-model-pill__label--placeholder'}>{selectedLabel}</span>
         <span className="settings-model-pill__chevron" aria-hidden="true">⌄</span>
       </button>
       {isOpen && hasOptions ? (
