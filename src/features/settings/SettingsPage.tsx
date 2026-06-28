@@ -15,6 +15,7 @@ type ApiConfigTabId = 'channels' | 'models' | 'preferences' | 'webdav';
 type StartupPage = 'home' | 'projects' | 'last';
 type ApiCallFormat = 'openai' | 'gemini';
 type ModelCapability = 'image' | 'video' | 'text' | 'audio';
+type ModelPreferenceDropdownId = `option:${ModelCapability}` | `default:${ModelCapability}`;
 
 interface ModelChannel {
   id: string;
@@ -189,7 +190,9 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
   const [showApiKey, setShowApiKey] = useState(false);
   const [showWebdavPassword, setShowWebdavPassword] = useState(false);
   const [testResult, setTestResult] = useState<ApiConnectionTestResult | null>(null);
+  const [openModelPreferenceDropdown, setOpenModelPreferenceDropdown] = useState<ModelPreferenceDropdownId | null>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const modelPreferencesDropdownRef = useRef<HTMLElement>(null);
 
   const activeSectionMeta = settingsSections.find((section) => section.id === activeSection) ?? settingsSections[0];
   const editingChannel = editingChannelDraft;
@@ -209,6 +212,23 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
     const timer = window.setTimeout(() => setFeedback(''), 1800);
     return () => window.clearTimeout(timer);
   }, [feedback]);
+
+  useEffect(() => {
+    if (!openModelPreferenceDropdown) return;
+
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (!modelPreferencesDropdownRef.current?.contains(event.target as Node)) {
+        setOpenModelPreferenceDropdown(null);
+      }
+    }
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+  }, [openModelPreferenceDropdown]);
+
+  useEffect(() => {
+    if (activeApiTab !== 'models') setOpenModelPreferenceDropdown(null);
+  }, [activeApiTab]);
 
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
@@ -718,22 +738,22 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
                       </div>
                       <button className="settings-page__primary" type="button" onClick={saveModelPreferences}>保存模型偏好</button>
                     </div>
-                    <article className="settings-card">
+                    <article className="settings-card" ref={modelPreferencesDropdownRef}>
                       <div className="settings-model-card-intro">
                         <h3>默认模型和可选项</h3>
                         <p>可选项决定各处下拉框展示哪些模型；同名模型会以括号里的渠道名区分。</p>
                       </div>
                       <div className="settings-model-option-grid">
-                        <ModelOptionGroup title="生图模型可选项" values={imageModelValues} options={allModelOptions.filter((option) => option.capability === 'image')} onChange={(imageModels) => setModelPreferences((current) => ({ ...current, imageModels, modelOptionsInitialized: true }))} />
-                        <ModelOptionGroup title="视频模型可选项" values={videoModelValues} options={allModelOptions.filter((option) => option.capability === 'video')} onChange={(videoModels) => setModelPreferences((current) => ({ ...current, videoModels, modelOptionsInitialized: true }))} />
-                        <ModelOptionGroup title="文本模型可选项" values={textModelValues} options={allModelOptions.filter((option) => option.capability === 'text')} onChange={(textModels) => setModelPreferences((current) => ({ ...current, textModels, modelOptionsInitialized: true }))} />
-                        <ModelOptionGroup title="音频模型可选项" values={audioModelValues} options={allModelOptions.filter((option) => option.capability === 'audio')} onChange={(audioModels) => setModelPreferences((current) => ({ ...current, audioModels, modelOptionsInitialized: true }))} />
+                        <ModelOptionGroup title="生图模型可选项" values={imageModelValues} options={allModelOptions.filter((option) => option.capability === 'image')} isOpen={openModelPreferenceDropdown === 'option:image'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:image' : null)} onChange={(imageModels) => setModelPreferences((current) => ({ ...current, imageModels, modelOptionsInitialized: true }))} />
+                        <ModelOptionGroup title="视频模型可选项" values={videoModelValues} options={allModelOptions.filter((option) => option.capability === 'video')} isOpen={openModelPreferenceDropdown === 'option:video'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:video' : null)} onChange={(videoModels) => setModelPreferences((current) => ({ ...current, videoModels, modelOptionsInitialized: true }))} />
+                        <ModelOptionGroup title="文本模型可选项" values={textModelValues} options={allModelOptions.filter((option) => option.capability === 'text')} isOpen={openModelPreferenceDropdown === 'option:text'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:text' : null)} onChange={(textModels) => setModelPreferences((current) => ({ ...current, textModels, modelOptionsInitialized: true }))} />
+                        <ModelOptionGroup title="音频模型可选项" values={audioModelValues} options={allModelOptions.filter((option) => option.capability === 'audio')} isOpen={openModelPreferenceDropdown === 'option:audio'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:audio' : null)} onChange={(audioModels) => setModelPreferences((current) => ({ ...current, audioModels, modelOptionsInitialized: true }))} />
                       </div>
                       <div className="settings-model-default-grid">
-                        <ModelField label="默认生图模型" value={normalizeSingleModelValue(modelPreferences.imageModel, allModelOptions)} options={optionsByValues(imageModelValues, allModelOptions)} onChange={(imageModel) => setModelPreferences((current) => ({ ...current, imageModel }))} />
-                        <ModelField label="默认视频模型" value={normalizeSingleModelValue(modelPreferences.videoModel, allModelOptions)} options={optionsByValues(videoModelValues, allModelOptions)} onChange={(videoModel) => setModelPreferences((current) => ({ ...current, videoModel }))} />
-                        <ModelField label="默认文本模型" value={normalizeSingleModelValue(modelPreferences.textModel, allModelOptions)} options={optionsByValues(textModelValues, allModelOptions)} onChange={(textModel) => setModelPreferences((current) => ({ ...current, textModel }))} />
-                        <ModelField label="默认音频模型" value={normalizeSingleModelValue(modelPreferences.audioModel, allModelOptions)} options={optionsByValues(audioModelValues, allModelOptions)} onChange={(audioModel) => setModelPreferences((current) => ({ ...current, audioModel }))} />
+                        <ModelField label="默认生图模型" value={normalizeSingleModelValue(modelPreferences.imageModel, allModelOptions)} options={optionsByValues(imageModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:image'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:image' : null)} onChange={(imageModel) => setModelPreferences((current) => ({ ...current, imageModel }))} />
+                        <ModelField label="默认视频模型" value={normalizeSingleModelValue(modelPreferences.videoModel, allModelOptions)} options={optionsByValues(videoModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:video'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:video' : null)} onChange={(videoModel) => setModelPreferences((current) => ({ ...current, videoModel }))} />
+                        <ModelField label="默认文本模型" value={normalizeSingleModelValue(modelPreferences.textModel, allModelOptions)} options={optionsByValues(textModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:text'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:text' : null)} onChange={(textModel) => setModelPreferences((current) => ({ ...current, textModel }))} />
+                        <ModelField label="默认音频模型" value={normalizeSingleModelValue(modelPreferences.audioModel, allModelOptions)} options={optionsByValues(audioModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:audio'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:audio' : null)} onChange={(audioModel) => setModelPreferences((current) => ({ ...current, audioModel }))} />
                       </div>
                       <div className="settings-api-status">
                         <strong>可选模型列表</strong>
@@ -971,66 +991,58 @@ interface ModelFieldProps {
   label: string;
   value: string;
   options: ModelOption[];
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
   onChange: (value: string) => void;
 }
 
-function ModelField({ label, value, options, onChange }: ModelFieldProps) {
-  const [isOpen, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+function ModelField({ label, value, options, isOpen, onOpenChange, onChange }: ModelFieldProps) {
   const selectedOption = options.find((option) => option.value === value);
   const icon = selectedOption?.model.toLowerCase().includes('gpt') || value.toLowerCase().includes('gpt') ? '◎' : '▣';
   const selectedLabel = selectedOption?.label ?? (value.trim() ? `自定义：${value}` : '选择模型');
-
-  useEffect(() => {
-    function closeOnOutsideClick(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-
-    document.addEventListener('mousedown', closeOnOutsideClick);
-    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
-  }, []);
+  const hasOptions = options.length > 0;
 
   return (
-    <div className="settings-field settings-model-default-field" ref={rootRef}>
+    <div className="settings-field settings-model-default-field">
       <span>{label}</span>
       <button
         className={isOpen ? 'settings-model-pill settings-model-pill--open' : 'settings-model-pill'}
         type="button"
         aria-haspopup="listbox"
-        aria-expanded={isOpen}
-        onClick={() => setOpen((current) => !current)}
+        aria-expanded={hasOptions && isOpen}
+        disabled={!hasOptions}
+        title={hasOptions ? undefined : '请先在上方配置可选模型'}
+        onClick={() => {
+          if (hasOptions) onOpenChange(!isOpen);
+        }}
       >
         <span className="settings-model-pill__icon" aria-hidden="true">{icon}</span>
         <span className={value ? 'settings-model-pill__label' : 'settings-model-pill__label settings-model-pill__label--placeholder'}>{selectedLabel}</span>
         <span className="settings-model-pill__chevron" aria-hidden="true">⌄</span>
       </button>
-      {isOpen ? (
+      {isOpen && hasOptions ? (
         <div className="settings-model-default-dropdown" role="listbox" aria-label={label}>
-          {options.length ? (
-            options.map((option) => {
-              const isSelected = option.value === value;
-              const optionIcon = option.model.toLowerCase().includes('gpt') ? '◎' : '▣';
-              return (
-                <button
-                  className={isSelected ? 'settings-model-default-option settings-model-default-option--selected' : 'settings-model-default-option'}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  key={option.value}
-                  onClick={() => {
-                    onChange(option.value);
-                    setOpen(false);
-                  }}
-                >
-                  <span className="settings-model-default-option__icon" aria-hidden="true">{optionIcon}</span>
-                  <span className="settings-model-default-option__label">{option.label}</span>
-                  {isSelected ? <span className="settings-model-default-option__check" aria-hidden="true">✓</span> : null}
-                </button>
-              );
-            })
-          ) : (
-            <div className="settings-model-default-empty">请先在上方配置可选模型</div>
-          )}
+          {options.map((option) => {
+            const isSelected = option.value === value;
+            const optionIcon = option.model.toLowerCase().includes('gpt') ? '◎' : '▣';
+            return (
+              <button
+                className={isSelected ? 'settings-model-default-option settings-model-default-option--selected' : 'settings-model-default-option'}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                key={option.value}
+                onClick={() => {
+                  onChange(option.value);
+                  onOpenChange(false);
+                }}
+              >
+                <span className="settings-model-default-option__icon" aria-hidden="true">{optionIcon}</span>
+                <span className="settings-model-default-option__label">{option.label}</span>
+                {isSelected ? <span className="settings-model-default-option__check" aria-hidden="true">✓</span> : null}
+              </button>
+            );
+          })}
         </div>
       ) : null}
     </div>
@@ -1041,37 +1053,28 @@ interface ModelOptionGroupProps {
   title: string;
   values: string[];
   options: ModelOption[];
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
   onChange: (values: string[]) => void;
 }
 
-function ModelOptionGroup({ title, values, options, onChange }: ModelOptionGroupProps) {
-  const [isOpen, setOpen] = useState(false);
-  const rootRef = useRef<HTMLElement>(null);
+function ModelOptionGroup({ title, values, options, isOpen, onOpenChange, onChange }: ModelOptionGroupProps) {
   const selected = values.filter((value) => options.some((option) => option.value === value));
   const selectedOptions = optionsByValues(selected, options);
   const visibleSelectedOptions = selectedOptions.slice(0, 2);
   const hiddenSelectedCount = Math.max(selectedOptions.length - visibleSelectedOptions.length, 0);
-
-  useEffect(() => {
-    function closeOnOutsideClick(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-
-    document.addEventListener('mousedown', closeOnOutsideClick);
-    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
-  }, []);
 
   function toggleOption(value: string, checked: boolean) {
     onChange(checked ? uniqueModels([...selected, value]) : selected.filter((item) => item !== value));
   }
 
   return (
-    <section className="settings-model-option-group" ref={rootRef}>
+    <section className="settings-model-option-group">
       <div className="settings-model-option-group__header">
         <strong>{title}</strong>
         <span>{selected.length}/{options.length}</span>
       </div>
-      <button className={isOpen ? 'settings-model-select settings-model-select--open' : 'settings-model-select'} type="button" aria-expanded={isOpen} onClick={() => setOpen((current) => !current)}>
+      <button className={isOpen ? 'settings-model-select settings-model-select--open' : 'settings-model-select'} type="button" aria-expanded={isOpen} onClick={() => onOpenChange(!isOpen)}>
         <span className="settings-model-selected-tags">
           {selectedOptions.length ? visibleSelectedOptions.map((option) => (
             <span className="settings-model-tag" key={option.value} title={option.label}>

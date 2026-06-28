@@ -1319,6 +1319,17 @@
   box-shadow: 0 12px 24px rgba(35, 99, 255, 0.16);
 }
 
+.settings-model-pill:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  box-shadow: none;
+}
+
+.settings-model-pill:disabled:hover {
+  border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+
 .settings-model-pill:focus-visible {
   outline: 2px solid rgba(91, 140, 255, 0.36);
   outline-offset: 3px;
