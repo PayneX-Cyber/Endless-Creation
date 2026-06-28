@@ -52,6 +52,7 @@ interface ModelOption {
   value: string;
   model: string;
   label: string;
+  channelId: string;
   channelName: string;
   capability: ModelCapability;
 }
@@ -1109,10 +1110,16 @@ function ModelOptionGroup({ dropdownId, title, values, options, isOpen, onOpenCh
   const rootRef = useRef<HTMLElement>(null);
   const [dropUp, setDropUp] = useState(false);
   const [listMaxHeight, setListMaxHeight] = useState(220);
+  const [searchTerm, setSearchTerm] = useState('');
   const selected = values.filter((value) => options.some((option) => option.value === value));
   const selectedOptions = optionsByValues(selected, options);
   const visibleSelectedOptions = selectedOptions.slice(0, 2);
   const hiddenSelectedCount = Math.max(selectedOptions.length - visibleSelectedOptions.length, 0);
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  const filteredOptions = normalizedSearchTerm
+    ? options.filter((option) => option.model.toLowerCase().includes(normalizedSearchTerm) || option.channelName.toLowerCase().includes(normalizedSearchTerm))
+    : options;
+  const groupedOptions = groupModelOptionsByChannel(filteredOptions, selected);
 
   useEffect(() => {
     if (!isOpen || !rootRef.current) return;
@@ -1130,8 +1137,21 @@ function ModelOptionGroup({ dropdownId, title, values, options, isOpen, onOpenCh
     setListMaxHeight(Math.max(120, Math.min(240, availableSpace - 76)));
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) setSearchTerm('');
+  }, [isOpen]);
+
   function toggleOption(value: string, checked: boolean) {
     onChange(checked ? uniqueModels([...selected, value]) : selected.filter((item) => item !== value));
+  }
+
+  function updateChannelOptions(channelOptions: ModelOption[], checked: boolean) {
+    const channelValues = channelOptions.map((option) => option.value);
+    if (checked) {
+      onChange(uniqueModels([...selected, ...channelValues]));
+      return;
+    }
+    onChange(selected.filter((value) => !channelValues.includes(value)));
   }
 
   return (
@@ -1165,17 +1185,32 @@ function ModelOptionGroup({ dropdownId, title, values, options, isOpen, onOpenCh
         isOpen ? 'settings-model-option-dropdown--open' : '',
         dropUp ? 'settings-model-option-dropdown--above' : '',
       ].filter(Boolean).join(' ')}>
-        <div className="settings-model-option-actions">
-          <button type="button" disabled={!options.length} onClick={() => onChange(options.map((option) => option.value))}>全选</button>
-          <button type="button" disabled={!selected.length} onClick={() => onChange([])}>清空</button>
+        <div className="settings-model-option-search">
+          <input value={searchTerm} type="search" placeholder="搜索模型或渠道" onChange={(event) => setSearchTerm(event.target.value)} />
         </div>
         <div className="settings-model-option-list" style={{ maxHeight: `${listMaxHeight}px` }}>
-          {options.length ? options.map((option) => (
-            <label key={option.value}>
-              <input type="checkbox" checked={selected.includes(option.value)} onChange={(event) => toggleOption(option.value, event.target.checked)} />
-              <span title={option.label}>{option.label}</span>
-            </label>
-          )) : <p>暂无模型，请先在渠道中获取模型。</p>}
+          {options.length && groupedOptions.length ? groupedOptions.map((group) => {
+            const selectedCount = group.options.filter((option) => selected.includes(option.value)).length;
+            const allSelected = selectedCount === group.options.length;
+            return (
+              <section className="settings-model-channel-group" key={group.channelId}>
+                <div className="settings-model-channel-group__header">
+                  <strong title={group.channelName}>{group.channelName}</strong>
+                  <span>{selectedCount}/{group.options.length}</span>
+                  <button type="button" onClick={() => updateChannelOptions(group.options, !allSelected)}>{allSelected ? '清空' : '全选'}</button>
+                  {selectedCount > 0 && !allSelected ? <button type="button" onClick={() => updateChannelOptions(group.options, false)}>清空</button> : null}
+                </div>
+                <div className="settings-model-channel-group__items">
+                  {group.options.map((option) => (
+                    <label key={option.value}>
+                      <input type="checkbox" checked={selected.includes(option.value)} onChange={(event) => toggleOption(option.value, event.target.checked)} />
+                      <span title={option.model}>{option.model}</span>
+                    </label>
+                  ))}
+                </div>
+              </section>
+            );
+          }) : <p>{options.length ? '没有匹配的模型' : '暂无模型，请先在渠道中获取模型。'}</p>}
         </div>
       </div>
     </section>
@@ -1351,9 +1386,25 @@ function modelOptionsFromChannels(channels: ModelChannel[]): ModelOption[] {
     value: encodeChannelModel(channel.id, model),
     model,
     label: `${model}（${channel.name || '未命名渠道'}）`,
+    channelId: channel.id,
     channelName: channel.name || '未命名渠道',
     capability: modelCapability(model),
   })));
+}
+
+function groupModelOptionsByChannel(options: ModelOption[], selected: string[]) {
+  const selectedSet = new Set(selected);
+  const groups = new Map<string, { channelId: string; channelName: string; options: ModelOption[] }>();
+  options.forEach((option) => {
+    const group = groups.get(option.channelId) ?? { channelId: option.channelId, channelName: option.channelName, options: [] };
+    group.options.push(option);
+    groups.set(option.channelId, group);
+  });
+
+  return Array.from(groups.values()).map((group) => ({
+    ...group,
+    options: [...group.options].sort((first, second) => Number(selectedSet.has(second.value)) - Number(selectedSet.has(first.value)) || first.model.localeCompare(second.model)),
+  }));
 }
 
 function selectedModelValues(capability: ModelCapability, values: string[], options: ModelOption[], legacyModels: string[], initialized: boolean) {
