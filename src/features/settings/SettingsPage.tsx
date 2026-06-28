@@ -986,6 +986,40 @@ function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange
   );
 }
 
+function isOpenAIModel(model: string) {
+  const normalized = model.toLowerCase();
+  return normalized.includes('gpt') || normalized.includes('openai') || normalized.includes('o1') || normalized.includes('o3') || normalized.includes('o4');
+}
+
+function ModelProviderIcon({ kind }: { kind: 'openai' | 'generic' }) {
+  if (kind === 'openai') {
+    return (
+      <span className="settings-model-provider-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" focusable="false">
+          <path d="M12 4.4c1.4-1 3.4-.7 4.5.7.8 1 .9 2.3.4 3.4" />
+          <path d="M16.8 8.1c1.7.2 3 1.7 2.9 3.5-.1 1.3-.9 2.4-2 3" />
+          <path d="M17.2 14.2c.7 1.6 0 3.5-1.6 4.3-1.2.6-2.5.4-3.6-.4" />
+          <path d="M12.1 17.8c-1.4 1-3.4.8-4.5-.6-.8-1-.9-2.3-.4-3.5" />
+          <path d="M7.2 13.9c-1.7-.2-3-1.7-2.9-3.5.1-1.3.9-2.4 2-3" />
+          <path d="M6.8 9.8c-.7-1.6 0-3.5 1.6-4.3 1.2-.6 2.5-.4 3.6.4" />
+          <path d="M8.7 8.5 12 6.6l3.3 1.9v3.8L12 14.2l-3.3-1.9z" />
+          <path d="m8.7 12.3 3.3-1.9 3.3 1.9" />
+        </svg>
+      </span>
+    );
+  }
+
+  return (
+    <span className="settings-model-provider-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" focusable="false">
+        <rect x="7" y="7" width="10" height="10" rx="2.2" />
+        <rect x="10" y="10" width="4" height="4" rx="0.8" />
+        <path d="M9 4.5v2.2M12 4.5v2.2M15 4.5v2.2M9 17.3v2.2M12 17.3v2.2M15 17.3v2.2M4.5 9h2.2M4.5 12h2.2M4.5 15h2.2M17.3 9h2.2M17.3 12h2.2M17.3 15h2.2" />
+      </svg>
+    </span>
+  );
+}
+
 interface ModelFieldProps {
   dropdownId: ModelPreferenceDropdownId;
   label: string;
@@ -998,7 +1032,7 @@ interface ModelFieldProps {
 
 function ModelField({ dropdownId, label, value, options, isOpen, onOpenChange, onChange }: ModelFieldProps) {
   const selectedOption = options.find((option) => option.value === value);
-  const icon = selectedOption?.model.toLowerCase().includes('gpt') || value.toLowerCase().includes('gpt') ? '◎' : '▣';
+  const iconKind = selectedOption && isOpenAIModel(selectedOption.model) ? 'openai' : 'generic';
   const selectedLabel = selectedOption?.label ?? '选择模型';
   const hasSelectedOption = Boolean(selectedOption);
   const hasOptions = options.length > 0;
@@ -1017,7 +1051,7 @@ function ModelField({ dropdownId, label, value, options, isOpen, onOpenChange, o
           if (hasOptions) onOpenChange(!isOpen);
         }}
       >
-        <span className="settings-model-pill__icon" aria-hidden="true">{icon}</span>
+        <ModelProviderIcon kind={iconKind} />
         <span className={hasSelectedOption ? 'settings-model-pill__label' : 'settings-model-pill__label settings-model-pill__label--placeholder'}>{selectedLabel}</span>
         <span className="settings-model-pill__chevron" aria-hidden="true">⌄</span>
       </button>
@@ -1025,7 +1059,7 @@ function ModelField({ dropdownId, label, value, options, isOpen, onOpenChange, o
         <div className="settings-model-default-dropdown" role="listbox" aria-label={label}>
           {options.map((option) => {
             const isSelected = option.value === value;
-            const optionIcon = option.model.toLowerCase().includes('gpt') ? '◎' : '▣';
+            const optionIconKind = isOpenAIModel(option.model) ? 'openai' : 'generic';
             return (
               <button
                 className={isSelected ? 'settings-model-default-option settings-model-default-option--selected' : 'settings-model-default-option'}
@@ -1038,7 +1072,7 @@ function ModelField({ dropdownId, label, value, options, isOpen, onOpenChange, o
                   onOpenChange(false);
                 }}
               >
-                <span className="settings-model-default-option__icon" aria-hidden="true">{optionIcon}</span>
+                <ModelProviderIcon kind={optionIconKind} />
                 <span className="settings-model-default-option__label">{option.label}</span>
                 {isSelected ? <span className="settings-model-default-option__check" aria-hidden="true">✓</span> : null}
               </button>
