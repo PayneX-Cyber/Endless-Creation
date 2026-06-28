@@ -421,8 +421,18 @@
 .settings-field__label-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
+}
+
+.settings-field__label-row > span:first-child {
+  margin-right: auto;
+}
+
+.settings-field__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .settings-field__action {
@@ -448,6 +458,108 @@
 .settings-field__action:disabled {
   cursor: wait;
   opacity: 0.68;
+}
+
+.settings-field__ghost-action {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  color: var(--ink);
+  background: var(--surface-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.settings-field__ghost-action:hover:not(:disabled) {
+  border-color: rgba(91, 140, 255, 0.38);
+  background: rgba(91, 140, 255, 0.12);
+}
+
+.settings-field__ghost-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+.settings-model-candidates {
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-2);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.32) transparent;
+}
+
+.settings-model-candidates::-webkit-scrollbar {
+  width: 6px;
+}
+
+.settings-model-candidates::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.settings-model-candidates::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.28);
+}
+
+.settings-model-candidate {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.settings-model-candidate:hover {
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
+.settings-model-candidate input {
+  width: 16px;
+  height: 16px;
+  accent-color: #4b83ff;
+}
+
+.settings-model-candidate span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-empty-hint {
+  margin: 0;
+  padding: 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 14px;
+  color: var(--muted);
+  background: var(--surface-2);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.settings-manual-models {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-manual-models summary {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 850;
+  cursor: pointer;
 }
 
 .settings-toggle-row {

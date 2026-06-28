@@ -161,6 +161,7 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
   const [apiStore, setApiStore] = useState<ApiProviderStore>(() => readApiProviderStore());
   const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
   const [editingChannelDraft, setEditingChannelDraft] = useState<ModelChannel | null>(null);
+  const [candidateModels, setCandidateModels] = useState<string[]>([]);
   const [modelPreferences, setModelPreferences] = useState<ModelPreferences>(() => readStorage(MODEL_PREFERENCES_STORAGE_KEY, defaultModelPreferences));
   const [generationPreferences, setGenerationPreferences] = useState<GenerationPreferences>(() => readStorage(GENERATION_PREFERENCES_STORAGE_KEY, defaultGenerationPreferences));
   const [workspacePreferences, setWorkspacePreferences] = useState<WorkspacePreferences>(() => readStorage(WORKSPACE_PREFERENCES_STORAGE_KEY, defaultWorkspacePreferences));
@@ -256,12 +257,14 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
     if (!channel) return;
     setEditingChannelId(channelId);
     setEditingChannelDraft({ ...channel, models: [...channel.models] });
+    setCandidateModels([...channel.models]);
     setShowApiKey(false);
   }
 
   function closeChannelEditor() {
     setEditingChannelId(null);
     setEditingChannelDraft(null);
+    setCandidateModels([]);
     setShowApiKey(false);
   }
 
@@ -281,13 +284,40 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
 
   function saveEditingChannel() {
     if (!editingChannelDraft) return;
+    const channelToSave = { ...editingChannelDraft, models: uniqueModels(editingChannelDraft.models) };
     const nextStore = {
       ...apiStore,
-      activeChannelId: editingChannelDraft.id,
-      channels: apiStore.channels.map((channel) => channel.id === editingChannelDraft.id ? editingChannelDraft : channel),
+      activeChannelId: channelToSave.id,
+      channels: apiStore.channels.map((channel) => channel.id === channelToSave.id ? channelToSave : channel),
     };
     persistApiStore(nextStore);
     closeChannelEditor();
+  }
+
+  function toggleCandidateModel(model: string, checked: boolean) {
+    setEditingChannelDraft((current) => {
+      if (!current) return current;
+      const models = checked
+        ? uniqueModels([...current.models, model])
+        : current.models.filter((item) => item !== model);
+      return { ...current, models };
+    });
+  }
+
+  function selectAllCandidateModels() {
+    if (!editingChannelDraft) return;
+    setEditingChannelDraft({ ...editingChannelDraft, models: uniqueModels(candidateModels) });
+  }
+
+  function clearSelectedModels() {
+    if (!editingChannelDraft) return;
+    setEditingChannelDraft({ ...editingChannelDraft, models: [] });
+  }
+
+  function updateManualModels(value: string) {
+    const models = splitLines(value);
+    setCandidateModels((current) => uniqueModels([...current, ...models]));
+    updateEditingChannelDraft({ models });
   }
 
   async function testEditingChannel() {
@@ -315,10 +345,13 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
     const result = await rendererBridge.testApiConnection(channelToProviderConfig(editingChannelDraft));
     const testedDraft = {
       ...editingChannelDraft,
-      models: result.models?.length ? uniqueModels(result.models) : editingChannelDraft.models,
+      models: result.models?.length ? uniqueModels([...editingChannelDraft.models, ...result.models]) : editingChannelDraft.models,
       lastTestedAt: new Date().toLocaleString(),
       lastTestStatus: result.ok ? 'success' as const : 'failed' as const,
     };
+    if (result.models?.length) {
+      setCandidateModels((current) => uniqueModels([...current, ...result.models!]));
+    }
     const mergedModels = uniqueModels([...modelPreferences.availableModels, ...testedDraft.models]);
     setEditingChannelDraft(testedDraft);
     setTestResult(result);
@@ -785,6 +818,10 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
                     <div className="settings-field settings-field--wide">
                       <div className="settings-field__label-row">
                         <span>模型列表</span>
+                        <span className="settings-field__actions">
+                          <button className="settings-field__ghost-action" type="button" disabled={!candidateModels.length} onClick={selectAllCandidateModels}>全选</button>
+                          <button className="settings-field__ghost-action" type="button" disabled={!candidateModels.length} onClick={clearSelectedModels}>清空</button>
+                        </span>
                         <button
                           className="settings-field__action"
                           type="button"
@@ -794,7 +831,25 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
                           {editingChannel.lastTestStatus === 'testing' ? '获取中…' : '获取模型'}
                         </button>
                       </div>
-                      <textarea value={editingChannel.models.join('\n')} onChange={(event) => updateEditingChannelDraft({ models: splitLines(event.target.value) })} placeholder="每行一个模型，例如 gpt-4o-mini" />
+                      {candidateModels.length ? (
+                        <div className="settings-model-candidates" role="group" aria-label="可选模型列表">
+                          {candidateModels.map((model) => {
+                            const checked = editingChannel.models.includes(model);
+                            return (
+                              <label className="settings-model-candidate" key={model}>
+                                <input type="checkbox" checked={checked} onChange={(event) => toggleCandidateModel(model, event.target.checked)} />
+                                <span title={model}>{model}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <p className="settings-empty-hint">暂无模型，请点击获取模型，或手动输入模型名称。</p>
+                      )}
+                      <details className="settings-manual-models">
+                        <summary>手动添加模型（每行一个）</summary>
+                        <textarea value={editingChannel.models.join('\n')} onChange={(event) => updateManualModels(event.target.value)} placeholder="每行一个模型，例如 gpt-4o-mini" />
+                      </details>
                     </div>
                     <label className="settings-field settings-field--wide">
                       <span>额外 Headers（JSON，占位）</span>
