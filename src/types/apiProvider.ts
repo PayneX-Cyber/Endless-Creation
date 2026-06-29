@@ -18,7 +18,7 @@ export interface ApiConnectionTestResult {
 }
 
 export interface ApiImageGenerationRequest {
-  requestId?: string;
+  requestId: string;
   channelId?: string;
   channelLabel?: string;
   baseUrl: string;

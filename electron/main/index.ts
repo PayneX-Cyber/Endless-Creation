@@ -4,6 +4,7 @@ import path from 'node:path';
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 let mainWindow: BrowserWindow | null = null;
 const imageGenerationControllers = new Map<string, AbortController>();
+const timedOutImageGenerationRequests = new Set<string>();
 
 interface ApiProviderConfig {
   type: 'openai-compatible';
@@ -19,7 +20,7 @@ interface ApiConnectionTestResult {
 }
 
 interface ApiImageGenerationRequest {
-  requestId?: string;
+  requestId: string;
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -42,6 +43,11 @@ interface ApiImageGenerationResult {
   status?: number;
   message: string;
   images?: ApiGeneratedImage[];
+}
+
+interface ApiImageGenerationCancelResult {
+  ok: boolean;
+  message: string;
 }
 
 function createMainWindow(): void {
@@ -204,10 +210,10 @@ function isApiImageGenerationRequest(request: unknown): request is ApiImageGener
   if (!request || typeof request !== 'object') return false;
 
   const candidate = request as Record<string, unknown>;
-  return typeof candidate.baseUrl === 'string'
+  return typeof candidate.requestId === 'string'
+    && typeof candidate.baseUrl === 'string'
     && typeof candidate.apiKey === 'string'
     && typeof candidate.model === 'string'
-    && (candidate.requestId === undefined || typeof candidate.requestId === 'string')
     && typeof candidate.prompt === 'string'
     && typeof candidate.size === 'string'
     && typeof candidate.quality === 'string'
@@ -221,6 +227,7 @@ async function generateOpenAiCompatibleImage(request: unknown): Promise<ApiImage
     return { ok: false, message: '生图请求格式无效。' };
   }
 
+  const requestId = request.requestId.trim();
   const baseUrl = request.baseUrl.trim();
   const apiKey = request.apiKey.trim();
   const model = request.model.trim();
@@ -229,8 +236,8 @@ async function generateOpenAiCompatibleImage(request: unknown): Promise<ApiImage
   const size = request.size.trim();
   const quality = request.quality.trim();
   const count = normalizeImageCount(request.n ?? request.count);
-  const requestId = request.requestId?.trim();
 
+  if (!requestId) return { ok: false, message: '生图请求 ID 缺失。' };
   if (!baseUrl) return { ok: false, message: '请填写 Base URL。' };
   if (!apiKey) return { ok: false, message: '请填写 API Key。' };
   if (!model) return { ok: false, message: '请选择生图模型。' };
@@ -247,9 +254,14 @@ async function generateOpenAiCompatibleImage(request: unknown): Promise<ApiImage
     return { ok: false, message: 'Base URL 格式无效。' };
   }
 
+  imageGenerationControllers.get(requestId)?.abort();
+
   const controller = new AbortController();
-  if (requestId) imageGenerationControllers.set(requestId, controller);
-  const timeout = setTimeout(() => controller.abort(), 60_000);
+  imageGenerationControllers.set(requestId, controller);
+  const timeout = setTimeout(() => {
+    timedOutImageGenerationRequests.add(requestId);
+    controller.abort();
+  }, 60_000);
 
   try {
     const response = await fetch(generationUrl, {
@@ -304,8 +316,30 @@ async function generateOpenAiCompatibleImage(request: unknown): Promise<ApiImage
     };
   } finally {
     clearTimeout(timeout);
-    if (requestId) imageGenerationControllers.delete(requestId);
+    if (imageGenerationControllers.get(requestId) === controller) {
+      imageGenerationControllers.delete(requestId);
+    }
+    timedOutImageGenerationRequests.delete(requestId);
   }
+}
+
+function cancelOpenAiCompatibleImageGeneration(requestId: unknown): ApiImageGenerationCancelResult {
+  if (typeof requestId !== 'string' || !requestId.trim()) {
+    return { ok: false, message: '生图请求 ID 缺失。' };
+  }
+
+  const normalizedRequestId = requestId.trim();
+  const controller = imageGenerationControllers.get(normalizedRequestId);
+
+  if (!controller) {
+    return { ok: false, message: '未找到正在进行的生图请求。' };
+  }
+
+  controller.abort();
+  imageGenerationControllers.delete(normalizedRequestId);
+  timedOutImageGenerationRequests.delete(normalizedRequestId);
+
+  return { ok: true, message: '已取消生图请求。' };
 }
 
 function normalizeImageCount(count: number | undefined): number | null {

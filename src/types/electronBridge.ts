@@ -17,7 +17,7 @@ export interface EndlessCreationBridge {
   api: {
     testConnection(config: ApiProviderConfig): Promise<ApiConnectionTestResult>;
     generateImage(request: ApiImageGenerationRequest): Promise<ApiImageGenerationResult>;
-    cancelImageGeneration?(requestId: string): Promise<ApiImageGenerationCancelResult>;
+    cancelImageGeneration(requestId: string): Promise<ApiImageGenerationCancelResult>;
   };
   ai?: DesktopAiClient;
 }
