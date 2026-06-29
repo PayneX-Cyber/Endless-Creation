@@ -268,24 +268,40 @@ async function generateOpenAiCompatibleImage(request: unknown): Promise<ApiImage
   }, 60_000);
 
   try {
-    const response = await fetch(generationUrl, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: JSON.stringify({
+    let activeGenerationUrl = generationUrl;
+    let response = await sendImageGenerationRequest(activeGenerationUrl, apiKey, controller.signal, {
+      model,
+      prompt: buildImagePrompt(prompt, negativePrompt),
+      size,
+      quality,
+      n: count,
+      response_format: 'b64_json',
+    });
+    let parsed = await readImageGenerationResponse(response, apiKey);
+
+    if (shouldRetryWithV1(response)) {
+      activeGenerationUrl = new URL(`${baseUrl.replace(/\/+$/, '')}/v1/images/generations`);
+      response = await sendImageGenerationRequest(activeGenerationUrl, apiKey, controller.signal, {
         model,
         prompt: buildImagePrompt(prompt, negativePrompt),
         size,
         quality,
         n: count,
         response_format: 'b64_json',
-      }),
-      signal: controller.signal,
-    });
-    const parsed = await readImageGenerationResponse(response, apiKey);
+      });
+      parsed = await readImageGenerationResponse(response, apiKey);
+    }
+
+    if (!response.ok && shouldRetryWithoutResponseFormat(parsed.errorMessage)) {
+      response = await sendImageGenerationRequest(activeGenerationUrl, apiKey, controller.signal, {
+        model,
+        prompt: buildImagePrompt(prompt, negativePrompt),
+        size,
+        quality,
+        n: count,
+      });
+      parsed = await readImageGenerationResponse(response, apiKey);
+    }
 
     if (!response.ok) {
       return {
@@ -327,6 +343,32 @@ async function generateOpenAiCompatibleImage(request: unknown): Promise<ApiImage
     }
     timedOutImageGenerationRequests.delete(requestId);
   }
+}
+
+function sendImageGenerationRequest(
+  generationUrl: URL,
+  apiKey: string,
+  signal: AbortSignal,
+  body: Record<string, unknown>,
+): Promise<Response> {
+  return fetch(generationUrl, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(body),
+    signal,
+  });
+}
+
+function shouldRetryWithV1(response: Response): boolean {
+  return response.status === 404 || response.status === 405;
+}
+
+function shouldRetryWithoutResponseFormat(message?: string): boolean {
+  return /response_?format|unsupported|unknown parameter|invalid parameter|不支持|未知参数/i.test(message ?? '');
 }
 
 function cancelOpenAiCompatibleImageGeneration(requestId: unknown): ApiImageGenerationCancelResult {
