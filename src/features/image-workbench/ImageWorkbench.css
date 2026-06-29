@@ -54,7 +54,8 @@
 .image-studio__mention-menu { @apply absolute left-5 right-5 top-[calc(100%+8px)] z-40 grid max-h-56 gap-1 overflow-y-auto rounded-2xl border border-gray-100 bg-white p-2 shadow-xl; }
 .image-studio__mention-option { @apply grid min-h-10 grid-cols-[auto_minmax(0,1fr)] items-center gap-2 rounded-xl px-2 py-1.5 text-left text-sm font-bold text-slate-600 hover:bg-blue-50 hover:text-blue-600; }
 .image-studio__mention-option img,.image-studio__mention-option>span { @apply h-8 w-8 rounded-lg bg-blue-50 object-cover; }
-.image-studio__mention-option strong { @apply truncate; }
+.image-studio__mention-option strong { @apply inline-flex w-fit rounded-lg bg-blue-50 px-2 py-1 text-blue-600; }
+.image-studio__mention-option small { @apply min-w-0 truncate text-xs font-semibold text-slate-400; }
 .image-studio__mention-option--active { @apply bg-blue-50 text-blue-600; }
 .image-studio__count { @apply -mt-4 text-right text-xs font-semibold text-slate-400; }
 .image-studio__upload-zone { @apply flex items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 p-6 text-center transition; }
