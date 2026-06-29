@@ -87,6 +87,54 @@ function createMainWindow(): void {
   });
 }
 
+async function migrateLegacyElectronUserData(): Promise<void> {
+  const legacyDir = path.join(app.getPath('appData'), 'Electron');
+  const currentDir = app.getPath('userData');
+  if (legacyDir === currentDir) return;
+
+  await copyLegacyDirIfCurrentMissing(legacyDir, currentDir, 'Local Storage');
+  await copyLegacyDirIfCurrentMissing(legacyDir, currentDir, 'IndexedDB');
+  await copyLegacyDirIfCurrentMissing(legacyDir, currentDir, 'generated');
+}
+
+async function copyLegacyDirIfCurrentMissing(legacyRoot: string, currentRoot: string, name: string): Promise<void> {
+  const source = path.join(legacyRoot, name);
+  const target = path.join(currentRoot, name);
+  try {
+    const sourceStat = await fs.stat(source);
+    if (!sourceStat.isDirectory()) return;
+
+    const targetHasData = name === 'Local Storage' ? await hasMeaningfulLocalStorage(target) : await hasFiles(target);
+    if (targetHasData) return;
+
+    await fs.mkdir(currentRoot, { recursive: true });
+    await fs.cp(source, target, { recursive: true, force: true });
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return;
+    console.warn(`Failed to migrate legacy ${name}:`, error);
+  }
+}
+
+async function hasFiles(dir: string): Promise<boolean> {
+  try {
+    const entries = await fs.readdir(dir);
+    return entries.some((entry) => entry !== 'LOCK');
+  } catch {
+    return false;
+  }
+}
+
+async function hasMeaningfulLocalStorage(dir: string): Promise<boolean> {
+  try {
+    const levelDbDir = path.join(dir, 'leveldb');
+    const entries = await fs.readdir(levelDbDir);
+    const stats = await Promise.all(entries.map(async (entry) => fs.stat(path.join(levelDbDir, entry))));
+    return stats.some((stat) => stat.isFile() && stat.size > 1024);
+  } catch {
+    return false;
+  }
+}
+
 function registerIpcHandlers(): void {
   ipcMain.handle('app:get-version', () => app.getVersion());
   ipcMain.handle('app:get-platform', () => process.platform);
@@ -534,7 +582,8 @@ if (!gotSingleInstanceLock) {
     mainWindow.focus();
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    await migrateLegacyElectronUserData();
     registerIpcHandlers();
     createMainWindow();
 
