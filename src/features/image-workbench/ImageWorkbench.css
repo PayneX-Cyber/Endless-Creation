@@ -53,7 +53,7 @@
 .image-studio__prompt-input-wrap { @apply relative min-h-[120px]; }
 .image-studio__prompt-render { @apply pointer-events-none absolute inset-0 whitespace-pre-wrap break-words text-sm leading-6 text-slate-900; }
 .image-studio__prompt-render span { @apply text-sm leading-6 text-slate-900; }
-.image-studio__prompt-mention { @apply inline rounded-full bg-blue-100 px-2 py-0.5 text-sm font-black not-italic leading-6 text-blue-700; }
+.image-studio__prompt-mention { @apply inline rounded-full bg-blue-100 text-sm font-normal not-italic leading-6 text-blue-700; box-shadow: 0 0 0 2px rgb(219 234 254); }
 .image-studio__prompt-input { @apply relative z-10; }
 .image-studio__prompt-area .image-studio__prompt-input--masked { color: transparent; -webkit-text-fill-color: transparent; text-shadow: none; caret-color: #0f172a; }
 .image-studio__prompt-area--negative textarea { @apply min-h-16; }
