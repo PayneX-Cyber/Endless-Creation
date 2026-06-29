@@ -1055,7 +1055,7 @@
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   column-gap: 9px;
-  min-height: 38px;
+  min-height: 36px;
   padding: 7px 10px;
   border: 0;
   border-radius: 11px;
@@ -1072,26 +1072,14 @@
   background: rgba(100, 116, 139, 0.26);
 }
 
-.image-studio__model-option strong,
-.image-studio__model-option em {
+.image-studio__model-option strong {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.image-studio__model-option strong {
   color: #1f2937;
   font-size: 13px;
   font-weight: 820;
-}
-
-.image-studio__model-option em {
-  grid-column: 2;
-  color: #94a3b8;
-  font-size: 11px;
-  font-style: normal;
-  font-weight: 700;
 }
 
 .image-studio__model-option:hover,
