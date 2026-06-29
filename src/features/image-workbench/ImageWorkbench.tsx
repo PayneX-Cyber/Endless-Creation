@@ -45,7 +45,7 @@ const sizePresets: SizePreset[] = [
 ];
 let idSeed = 0;
 function createId(prefix: string) { idSeed += 1; return `${prefix}-${Date.now()}-${idSeed}`; }
-function getReferenceMentionLabel(index: number) { return `@?${Math.max(index, 0) + 1}`; }
+function getReferenceMentionLabel(index: number) { return `@\u56fe${Math.max(index, 0) + 1}`; }
 
 export function ImageWorkbench() {
   const [modelPreferences, setModelPreferences] = useState<ModelPreferences>(() => readLocalStorage(MODEL_PREFERENCES_STORAGE_KEY, {}));
