@@ -36,6 +36,9 @@ export interface ApiGeneratedImage {
   b64Json?: string;
   url?: string;
   revisedPrompt?: string;
+  localPath?: string;
+  fileName?: string;
+  mimeType?: string;
 }
 
 export interface ApiImageGenerationResult {
