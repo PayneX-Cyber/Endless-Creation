@@ -55,7 +55,8 @@
 .image-studio__prompt-area textarea { @apply min-h-[120px] w-full resize-none bg-transparent text-sm leading-6 text-slate-900 outline-none placeholder:text-slate-400; }
 .image-studio__prompt-area--negative textarea { @apply min-h-16; }
 .image-studio__count { @apply -mt-4 text-right text-xs font-semibold text-slate-400; }
-.image-studio__upload-zone { @apply flex items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 p-6 text-center; }
+.image-studio__upload-zone { @apply flex items-center justify-center gap-4 rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 p-6 text-center transition; }
+.image-studio__upload-zone--dragging { @apply border-blue-400 bg-blue-50; }
 .image-studio__file-input { @apply hidden; }
 .image-studio__upload-button { @apply inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-black text-blue-600 shadow-sm disabled:cursor-not-allowed disabled:opacity-50; }
 .image-studio__upload-button svg { @apply h-5 w-5; }
