@@ -299,18 +299,19 @@ function SizeField({ onChange, value }: { onChange: (value: string) => void; val
         <div className="image-studio__size-panel" role="dialog" aria-label="尺寸">
           <div className="image-studio__size-panel-head">
             <strong>尺寸</strong>
-            <button type="button" aria-label="关闭尺寸面板" onClick={() => setIsOpen(false)}>×</button>
+            <label className="image-studio__size-align"><input type="checkbox" checked={alignToSixteen} onChange={(event) => toggleAlignment(event.target.checked)} /><span>16倍数对齐</span></label>
           </div>
           <div className="image-studio__size-inputs">
             <label><span>W</span><input type="number" min={64} max={8192} value={width} onChange={(event) => updateWidth(event.target.value)} /></label>
             <button className="image-studio__size-swap" type="button" aria-label="互换宽高" onClick={swapSize}><SwapIcon /></button>
             <label><span>H</span><input type="number" min={64} max={8192} value={height} onChange={(event) => updateHeight(event.target.value)} /></label>
           </div>
-          <label className="image-studio__size-align"><input type="checkbox" checked={alignToSixteen} onChange={(event) => toggleAlignment(event.target.checked)} /><span>16倍数对齐</span></label>
+          <strong className="image-studio__size-section-title">宽高比</strong>
           <div className="image-studio__size-presets" aria-label="宽高比预设">
             {sizePresets.map((preset) => {
               const presetValue = preset.value ?? `${preset.width}×${preset.height}`;
-              return <button className={presetValue === value ? 'image-studio__size-preset image-studio__size-preset--active' : 'image-studio__size-preset'} key={preset.label} type="button" onClick={() => selectPreset(preset)}>{preset.label}</button>;
+              const ratioStyle = preset.width && preset.height ? { aspectRatio: `${preset.width} / ${preset.height}` } : undefined;
+              return <button className={presetValue === value ? 'image-studio__size-preset image-studio__size-preset--active' : 'image-studio__size-preset'} key={preset.label} type="button" onClick={() => selectPreset(preset)}>{ratioStyle ? <span className="image-studio__size-ratio" style={ratioStyle} aria-hidden="true" /> : <span className="image-studio__size-ratio image-studio__size-ratio--auto" aria-hidden="true" />}<span>{preset.label}</span></button>;
             })}
           </div>
         </div>
