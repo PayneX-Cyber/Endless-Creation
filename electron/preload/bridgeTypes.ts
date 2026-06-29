@@ -55,6 +55,7 @@ export interface EndlessCreationBridge {
   app: {
     getVersion(): Promise<string>;
     getPlatform(): Promise<string>;
+    openGeneratedImageLocation(localPath?: string): Promise<{ ok: boolean; message: string }>;
   };
   window: {
     minimize(): Promise<void>;

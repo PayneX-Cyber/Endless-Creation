@@ -5,6 +5,7 @@ const bridge: EndlessCreationBridge = {
   app: {
     getVersion: () => ipcRenderer.invoke('app:get-version'),
     getPlatform: () => ipcRenderer.invoke('app:get-platform'),
+    openGeneratedImageLocation: (localPath) => ipcRenderer.invoke('app:open-generated-image-location', localPath),
   },
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),

@@ -1,8 +1,9 @@
-import { app, BrowserWindow, clipboard, ipcMain } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, shell } from 'electron';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
+app.setName('Endless Creation');
 let mainWindow: BrowserWindow | null = null;
 const imageGenerationControllers = new Map<string, AbortController>();
 const timedOutImageGenerationRequests = new Set<string>();
@@ -89,6 +90,17 @@ function createMainWindow(): void {
 function registerIpcHandlers(): void {
   ipcMain.handle('app:get-version', () => app.getVersion());
   ipcMain.handle('app:get-platform', () => process.platform);
+  ipcMain.handle('app:open-generated-image-location', async (_event, localPath: unknown): Promise<{ ok: boolean; message: string }> => {
+    if (typeof localPath === 'string' && localPath.trim()) {
+      shell.showItemInFolder(localPath);
+      return { ok: true, message: '已打开图片所在文件夹。' };
+    }
+
+    const saveDir = getGeneratedImagesDir();
+    await fs.mkdir(saveDir, { recursive: true });
+    const errorMessage = await shell.openPath(saveDir);
+    return errorMessage ? { ok: false, message: `打开保存目录失败：${errorMessage}` } : { ok: true, message: '已打开图片保存目录。' };
+  });
 
   ipcMain.handle('window:minimize', (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize();
@@ -447,7 +459,7 @@ async function readImageGenerationResponse(
 }
 
 async function saveGeneratedImagesLocally(images: ApiGeneratedImage[]): Promise<ApiGeneratedImage[]> {
-  const saveDir = path.join(app.getPath('userData'), 'generated', 'images');
+  const saveDir = getGeneratedImagesDir();
 
   return Promise.all(images.map(async (image, index) => {
     if (!image.b64Json) return image;
@@ -469,6 +481,10 @@ async function saveGeneratedImagesLocally(images: ApiGeneratedImage[]): Promise<
       return image;
     }
   }));
+}
+
+function getGeneratedImagesDir(): string {
+  return path.join(app.getPath('userData'), 'generated', 'images');
 }
 
 function formatTimestamp(date: Date): string {

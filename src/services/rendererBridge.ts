@@ -23,6 +23,12 @@ export const rendererBridge = {
     return getElectronBridge()?.app.getPlatform() ?? Promise.resolve('web');
   },
 
+  async openGeneratedImageLocation(localPath?: string): Promise<{ ok: boolean; message: string }> {
+    const electronBridge = getElectronBridge();
+    if (!electronBridge) return { ok: false, message: '当前浏览器预览模式无法打开图片位置，请在 Electron 桌面端中重试。' };
+    return electronBridge.app.openGeneratedImageLocation(localPath);
+  },
+
   async minimizeWindow(): Promise<void> {
     await getElectronBridge()?.window.minimize();
   },
