@@ -1,8 +1,9 @@
-﻿import { app, BrowserWindow, clipboard, ipcMain } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain } from 'electron';
 import path from 'node:path';
 
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 let mainWindow: BrowserWindow | null = null;
+const imageGenerationControllers = new Map<string, AbortController>();
 
 interface ApiProviderConfig {
   type: 'openai-compatible';
@@ -18,6 +19,7 @@ interface ApiConnectionTestResult {
 }
 
 interface ApiImageGenerationRequest {
+  requestId?: string;
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -113,6 +115,21 @@ function registerIpcHandlers(): void {
   ipcMain.handle('api:generate-image', async (_event, request: unknown): Promise<ApiImageGenerationResult> => {
     return generateOpenAiCompatibleImage(request);
   });
+
+  ipcMain.handle('api:cancel-image-generation', (_event, requestId: unknown): { ok: boolean; message: string } => {
+    if (typeof requestId !== 'string' || !requestId.trim()) {
+      return { ok: false, message: '取消请求缺少 requestId。' };
+    }
+
+    const controller = imageGenerationControllers.get(requestId);
+    if (!controller) {
+      return { ok: false, message: '未找到正在执行的生图请求。' };
+    }
+
+    controller.abort();
+    imageGenerationControllers.delete(requestId);
+    return { ok: true, message: '已取消生图请求。' };
+  });
 }
 
 function isApiProviderConfig(config: unknown): config is ApiProviderConfig {
@@ -190,6 +207,7 @@ function isApiImageGenerationRequest(request: unknown): request is ApiImageGener
   return typeof candidate.baseUrl === 'string'
     && typeof candidate.apiKey === 'string'
     && typeof candidate.model === 'string'
+    && (candidate.requestId === undefined || typeof candidate.requestId === 'string')
     && typeof candidate.prompt === 'string'
     && typeof candidate.size === 'string'
     && typeof candidate.quality === 'string'
@@ -211,6 +229,7 @@ async function generateOpenAiCompatibleImage(request: unknown): Promise<ApiImage
   const size = request.size.trim();
   const quality = request.quality.trim();
   const count = normalizeImageCount(request.n ?? request.count);
+  const requestId = request.requestId?.trim();
 
   if (!baseUrl) return { ok: false, message: '请填写 Base URL。' };
   if (!apiKey) return { ok: false, message: '请填写 API Key。' };
@@ -229,6 +248,7 @@ async function generateOpenAiCompatibleImage(request: unknown): Promise<ApiImage
   }
 
   const controller = new AbortController();
+  if (requestId) imageGenerationControllers.set(requestId, controller);
   const timeout = setTimeout(() => controller.abort(), 60_000);
 
   try {
@@ -275,7 +295,7 @@ async function generateOpenAiCompatibleImage(request: unknown): Promise<ApiImage
     };
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      return { ok: false, message: '生图请求超时，请稍后重试或检查服务状态。' };
+      return { ok: false, message: controller.signal.aborted && requestId && !imageGenerationControllers.has(requestId) ? '生图请求已取消。' : '生图请求超时，请稍后重试或检查服务状态。' };
     }
 
     return {
@@ -284,6 +304,7 @@ async function generateOpenAiCompatibleImage(request: unknown): Promise<ApiImage
     };
   } finally {
     clearTimeout(timeout);
+    if (requestId) imageGenerationControllers.delete(requestId);
   }
 }
 

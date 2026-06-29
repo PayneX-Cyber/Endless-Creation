@@ -8,7 +8,7 @@ export interface AiServiceStatus {
 
 export const aiServiceStatus: AiServiceStatus = {
   connected: false,
-  provider: 'Mock AI Client',
+  provider: '本地模拟客户端',
   note: 'v0.2 使用异步 mock client 模拟生成任务，未来可替换为真实 AI API。',
 };
 
@@ -55,7 +55,7 @@ export async function createGenerationTask(
       ...baseTask,
       status,
       updatedAt,
-      errorMessage: 'Mock AI 暂时没有生成成功。请调整提示词后重试。',
+      errorMessage: '模拟生成暂时没有成功。请调整提示词后重试。',
     };
   }
 

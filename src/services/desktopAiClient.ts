@@ -107,10 +107,10 @@ async function createMockGenerationTask(
           progress: { percent: 100, stage: 'finalizing', message: 'Mock generation failed' },
           error: {
             code: 'MOCK_FAILED',
-            message: 'Mock AI 暂时没有生成成功。请调整提示词后重试。',
+            message: '模拟生成暂时没有成功。请调整提示词后重试。',
             retryable: true,
           },
-          errorMessage: 'Mock AI 暂时没有生成成功。请调整提示词后重试。',
+          errorMessage: '模拟生成暂时没有成功。请调整提示词后重试。',
         }
       : {
           ...task,

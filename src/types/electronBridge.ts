@@ -1,4 +1,4 @@
-import type { ApiConnectionTestResult, ApiImageGenerationRequest, ApiImageGenerationResult, ApiProviderConfig } from './apiProvider';
+import type { ApiConnectionTestResult, ApiImageGenerationCancelResult, ApiImageGenerationRequest, ApiImageGenerationResult, ApiProviderConfig } from './apiProvider';
 import type { DesktopAiClient } from './workspace';
 
 export interface EndlessCreationBridge {
@@ -17,6 +17,7 @@ export interface EndlessCreationBridge {
   api: {
     testConnection(config: ApiProviderConfig): Promise<ApiConnectionTestResult>;
     generateImage(request: ApiImageGenerationRequest): Promise<ApiImageGenerationResult>;
+    cancelImageGeneration?(requestId: string): Promise<ApiImageGenerationCancelResult>;
   };
   ai?: DesktopAiClient;
 }

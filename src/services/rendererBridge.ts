@@ -1,5 +1,6 @@
 import type {
   ApiConnectionTestResult,
+  ApiImageGenerationCancelResult,
   ApiImageGenerationRequest,
   ApiImageGenerationResult,
   ApiProviderConfig,
@@ -100,7 +101,7 @@ export const rendererBridge = {
     if (!electronBridge) {
       return {
         ok: false,
-        message: '??????????????? API??? Electron ?????????',
+        message: '当前浏览器预览模式无法测试 API 连接，请在 Electron 桌面端中重试。',
       };
     }
 
@@ -113,11 +114,24 @@ export const rendererBridge = {
     if (!electronBridge) {
       return {
         ok: false,
-        message: '????????????????? API??? Electron ???????',
+        message: '当前浏览器预览模式无法调用真实生图 API，请在 Electron 桌面端中重试。',
       };
     }
 
     return electronBridge.api.generateImage(request);
+  },
+
+  async cancelImageGeneration(requestId: string): Promise<ApiImageGenerationCancelResult> {
+    const electronBridge = getElectronBridge();
+
+    if (!electronBridge?.api.cancelImageGeneration) {
+      return {
+        ok: false,
+        message: '当前版本尚未接入远端取消，已停止等待，远端请求可能仍在执行。',
+      };
+    }
+
+    return electronBridge.api.cancelImageGeneration(requestId);
   },
 };
 

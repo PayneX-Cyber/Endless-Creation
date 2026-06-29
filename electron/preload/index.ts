@@ -1,4 +1,4 @@
-﻿import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer } from 'electron';
 import type { EndlessCreationBridge } from './bridgeTypes';
 
 const bridge: EndlessCreationBridge = {
@@ -17,6 +17,7 @@ const bridge: EndlessCreationBridge = {
   api: {
     testConnection: (config) => ipcRenderer.invoke('api:test-connection', config),
     generateImage: (request) => ipcRenderer.invoke('api:generate-image', request),
+    cancelImageGeneration: (requestId) => ipcRenderer.invoke('api:cancel-image-generation', requestId),
   },
 };
 

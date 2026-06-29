@@ -46,6 +46,7 @@ export function ImageWorkbench() {
   const timerRef = useRef<number | null>(null);
   const modelMenuRef = useRef<HTMLDivElement | null>(null);
   const generationRunRef = useRef(0);
+  const activeImageRequestIdRef = useRef<string | null>(null);
   const trimmedPrompt = promptText.trim();
   const imageModelOptions = useMemo(() => resolveImageModelOptions(modelPreferences, apiProviderStore), [apiProviderStore, modelPreferences]);
   const selectedImageModel = imageModelOptions.find((option) => option.value === config.modelId) ?? null;
@@ -85,22 +86,26 @@ export function ImageWorkbench() {
       setStatus('failed'); setErrorMessage(validationError); setFeedback(''); setHistory((current) => [failedItem, ...current].slice(0, 12)); return;
     }
 
+    activeImageRequestIdRef.current = request.id;
     setCurrentRequest(request); setStatus('generating'); setErrorMessage(''); setFeedback('正在调用真实生图 API…');
 
     try {
       const response = await rendererBridge.generateImage({
+        requestId: request.id,
         channelId: channel!.id,
         channelLabel: channel!.name?.trim() || '未命名渠道',
         baseUrl: channel!.baseUrl!,
         apiKey: channel!.apiKey!,
         model: decodedModel!.model,
         prompt: request.prompt,
+        negativePrompt: request.negativePrompt,
         size: normalizeImageSize(request.config.size),
         quality: normalizeImageQuality(request.config.quality),
         count: request.config.count,
       });
 
       if (generationRunRef.current !== runId) return;
+      activeImageRequestIdRef.current = null;
 
       if (!response.ok || !response.images?.length) {
         const message = response.message || '生图 API 未返回图片。';
@@ -113,13 +118,14 @@ export function ImageWorkbench() {
       setResults(nextResults); setSelectedResultId(nextResults[0]?.id ?? null); setStatus('succeeded'); setFeedback('真实生图完成，已写入历史。'); setErrorMessage(''); setHistory((current) => [historyItem, ...current].slice(0, 12));
     } catch (error) {
       if (generationRunRef.current !== runId) return;
+      activeImageRequestIdRef.current = null;
       const message = error instanceof Error ? error.message : '生图请求失败，请稍后重试。';
       const failedItem: GenerationHistoryItem = { id: createId('history'), request, status: 'failed', results: [], createdAt: new Date().toISOString(), durationMs: Math.round(performance.now() - startedAt), errorMessage: message };
       setStatus('failed'); setErrorMessage(message); setFeedback(''); setHistory((current) => [failedItem, ...current].slice(0, 12));
     }
   }, [apiProviderStore]);
   const handleGenerate = useCallback(() => { if (!canGenerate) { if (!trimmedPrompt) setErrorMessage('生成前需要填写提示词。'); else if (!selectedImageModel) setErrorMessage('请先在 API配置 / 模型偏好 中选择图片模型。'); else setErrorMessage('当前状态暂不能生成。'); return; } void runImageGeneration(createRequestSnapshot()); }, [canGenerate, createRequestSnapshot, runImageGeneration, selectedImageModel, trimmedPrompt]);
-  const handleCancel = useCallback(() => { if (status !== 'generating') return; generationRunRef.current += 1; clearGenerationTimer(); setStatus('cancelled'); setFeedback('已取消生成。'); setErrorMessage(''); }, [clearGenerationTimer, status]);
+  const handleCancel = useCallback(() => { if (status !== 'generating') return; const requestId = activeImageRequestIdRef.current; generationRunRef.current += 1; activeImageRequestIdRef.current = null; clearGenerationTimer(); setStatus('cancelled'); setFeedback('已停止等待，远端请求可能仍在执行。'); setErrorMessage(''); if (requestId) { void rendererBridge.cancelImageGeneration(requestId).then((result) => { setFeedback(result.ok ? result.message : '已停止等待，远端请求可能仍在执行。'); }).catch(() => { setFeedback('已停止等待，远端请求可能仍在执行。'); }); } }, [clearGenerationTimer, status]);
   useEffect(() => () => clearGenerationTimer(), [clearGenerationTimer]);
   useEffect(() => { function onKeyDown(event: KeyboardEvent) { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); handleGenerate(); } if (event.key === 'Escape') { if (status === 'generating') handleCancel(); if (previewResult) setPreviewResult(null); } } window.addEventListener('keydown', onKeyDown); return () => window.removeEventListener('keydown', onKeyDown); }, [handleCancel, handleGenerate, previewResult, status]);
 
@@ -128,7 +134,7 @@ export function ImageWorkbench() {
   function addMockReference(source: ReferenceImage['source'] = 'mock', result?: GenerationResult) { setReferences((current) => { if (current.length >= 4) { setFeedback('参考图最多添加 4 张。'); return current; } const nextIndex = current.length + 1; const item: ReferenceImage = { id: createId('ref'), name: source === 'result' ? `${result?.variantName ?? '结果'}参考图` : `参考图 ${nextIndex}`, source, previewLabel: source === 'result' ? (result?.variantName ?? `结果 ${nextIndex}`) : `参考图 ${nextIndex}`, palette: result?.palette ?? palettes[(nextIndex - 1) % palettes.length] }; setFeedback(`已添加${item.name}。`); return [...current, item]; }); if (status === 'idle') setStatus('editing'); }
   function removeReference(id: string) { setReferences((current) => current.filter((item) => item.id !== id)); setFeedback('已移除参考图。'); }
   async function copyText(text: string, success: string) { if (!text.trim()) { setFeedback('没有可复制的内容。'); return; } try { await rendererBridge.copyText(text); setFeedback(success); } catch { setFeedback('复制失败，请手动复制。'); } }
-  function handleQuickAction(action: string) { if (action === '清空') { setPromptText(''); setNegativePrompt(''); setStatus('idle'); setFeedback('提示词已清空。'); return; } if (action === '复制') { void copyText(promptText, '提示词已复制。'); return; } setFeedback(`${action} 是 mock 入口，暂未接入真实功能。`); }
+  function handleQuickAction(action: string) { if (action === '清空') { setPromptText(''); setNegativePrompt(''); setStatus('idle'); setFeedback('提示词已清空。'); return; } if (action === '复制') { void copyText(promptText, '提示词已复制。'); return; } setFeedback(`${action} 暂未接入真实功能。`); }
   async function copyResultConfig(result: GenerationResult) { if (!currentRequest) { setFeedback('暂无生成参数可复制。'); return; } await copyText(JSON.stringify({ resultId: result.id, prompt: currentRequest.prompt, negativePrompt: currentRequest.negativePrompt, config: currentRequest.config }, null, 2), '参数已复制。'); }
   function deleteResult(resultId: string) { setResults((current) => { const next = current.filter((item) => item.id !== resultId); if (selectedResultId === resultId) setSelectedResultId(next[0]?.id ?? null); if (next.length === 0 && status === 'succeeded') setStatus('idle'); return next; }); setFeedback('结果已删除。'); }
   function restoreHistory(item: GenerationHistoryItem) { clearGenerationTimer(); setPromptText(item.request.prompt); setNegativePrompt(item.request.negativePrompt); setReferences(item.request.references.map((ref) => ({ ...ref }))); setConfig({ ...item.request.config }); setCurrentRequest(item.request); setResults(item.results.map((result) => ({ ...result }))); setSelectedResultId(item.results[0]?.id ?? null); setStatus(item.status); setErrorMessage(item.errorMessage ?? ''); setFeedback('已从历史恢复。'); }
@@ -143,18 +149,18 @@ export function ImageWorkbench() {
         <div className="image-workbench__columns image-workbench__columns--merged">
           <section className="image-workbench__card image-workbench__card--composer image-workbench__card--image-studio">
 <div className="image-studio__params" aria-label="生图参数"><div className="image-studio__model-menu" ref={modelMenuRef}><button className="image-studio__field image-studio__field--select image-studio__model-trigger" type="button" disabled={imageModelOptions.length === 0} aria-haspopup="listbox" aria-expanded={isModelMenuOpen} onClick={() => { if (imageModelOptions.length) setModelMenuOpen((open) => !open); }}><span>图片模型</span><strong>{imageModelLabel}</strong><ChevronDownIcon /></button>{isModelMenuOpen && imageModelOptions.length ? <div className="image-studio__model-dropdown" role="listbox" aria-label="图片模型">{imageModelOptions.map((option) => { const selected = option.value === config.modelId; return <button className={selected ? 'image-studio__model-option image-studio__model-option--active' : 'image-studio__model-option'} type="button" role="option" aria-selected={selected} key={option.value} onClick={() => { updateConfig({ modelId: option.value }); setModelMenuOpen(false); }}><span aria-hidden="true" /><strong>{option.label}</strong></button>; })}</div> : null}</div><div className="image-studio__field"><span>尺寸</span><strong>{config.size}</strong></div><div className="image-studio__field image-studio__field--quality"><span>质量</span><div className="image-studio__quality-group" role="group" aria-label="质量">{qualityOptions.map((option) => <button aria-pressed={config.quality === option} className={config.quality === option ? 'image-studio__quality image-studio__quality--active' : 'image-studio__quality'} key={option} onClick={() => updateConfig({ quality: option })} type="button">{option}</button>)}</div></div><CompactNumber label="数量" value={config.count} min={1} max={4} onChange={(count) => updateConfig({ count })} /></div>
-            <div className="image-studio__status-strip"><label className="image-studio__save-option"><input checked={config.saveToProject} onChange={(event) => updateConfig({ saveToProject: event.target.checked })} type="checkbox" /><span aria-hidden="true" className="image-workbench__checkbox"><CheckIcon /></span><span>保存到本地项目</span></label><div className="image-studio__queue-inline"><span>队列</span><strong>{status === 'generating' ? 'Mock 任务执行中' : '暂无等待任务'}</strong></div></div>
+            <div className="image-studio__status-strip"><label className="image-studio__save-option"><input checked={config.saveToProject} onChange={(event) => updateConfig({ saveToProject: event.target.checked })} type="checkbox" /><span aria-hidden="true" className="image-workbench__checkbox"><CheckIcon /></span><span>保存到本地项目</span></label><div className="image-studio__queue-inline"><span>队列</span><strong>{status === 'generating' ? '真实 API 生成中' : '暂无等待任务'}</strong></div></div>
             <label className="image-studio__prompt-area"><span>提示词</span><textarea aria-invalid={Boolean(promptError)} aria-label="提示词" maxLength={4000} onChange={(event) => updatePrompt(event.target.value)} placeholder="描述画面主体、风格、构图、光线和用途" value={promptText} /></label><div className="image-studio__count" aria-live="polite">{promptText.length}/4000</div>{promptError && <div className="image-studio__hint image-studio__hint--error" role="alert">{promptError}</div>}
             <label className="image-studio__prompt-area image-studio__prompt-area--negative"><span>反向提示词</span><textarea aria-label="反向提示词" maxLength={1000} onChange={(event) => setNegativePrompt(event.target.value)} placeholder="不希望出现的元素，例如低清晰度、畸形、过曝" value={negativePrompt} /></label>
             <div className="image-studio__upload-zone"><button className="image-studio__upload-button" disabled={references.length >= 4} onClick={() => addMockReference()} type="button"><UploadIcon /><span>上传参考图</span></button><div><strong>可选上传参考图，支持图生图/重绘</strong><p>最多 4 张，每张 8MB；当前模型会走参考图生成通道。</p></div></div>
             <div className="image-studio__reference-list" aria-label="参考图列表">{references.length === 0 ? <span className="image-studio__empty-inline">暂无参考图。</span> : references.map((ref) => <div className={`image-studio__reference image-studio__reference--${ref.palette}`} key={ref.id}><span>{ref.previewLabel}</span><button aria-label={`移除${ref.name}`} onClick={() => removeReference(ref.id)} type="button">移除</button></div>)}</div>
             <div className="image-studio__actions" aria-label="快捷操作"><div className="image-studio__action-row">{quickActionsTop.map((action, index) => <button className={`image-studio__action ${index === 1 ? 'image-studio__action--warm' : ''}`} key={action} onClick={() => handleQuickAction(action)} type="button"><ActionIcon variant={index} /><span>{action}</span></button>)}</div><div className="image-studio__action-row image-studio__action-row--secondary">{quickActionsBottom.map((action, index) => <button className="image-studio__action image-studio__action--ghost" key={action} onClick={() => handleQuickAction(action)} type="button"><ActionIcon variant={index + 5} /><span>{action}</span></button>)}</div></div>
-            {status === 'generating' && <div className="image-studio__loading" aria-busy="true"><span /><p>Mock AI 正在分析提示词、参考图和参数。</p><button onClick={handleCancel} type="button">取消</button></div>}{(status === 'failed' || errorMessage) && <div className="image-studio__hint image-studio__hint--error" role="alert">{errorMessage || 'Mock AI 生成请求失败。请重试，或调整提示词与参数后再次生成。'}</div>}{status === 'cancelled' && <div className="image-studio__hint" role="status">已取消生成。</div>}{feedback && <div className="image-studio__hint" aria-live="polite">{feedback}</div>}
+            {status === 'generating' && <div className="image-studio__loading" aria-busy="true"><span /><p>真实 API 正在生成图片…</p><button onClick={handleCancel} type="button">取消</button></div>}{(status === 'failed' || errorMessage) && <div className="image-studio__hint image-studio__hint--error" role="alert">{errorMessage || '生图请求失败，请重试或检查配置。'}</div>}{status === 'cancelled' && <div className="image-studio__hint" role="status">已停止等待，远端请求可能仍在执行。</div>}{feedback && <div className="image-studio__hint" aria-live="polite">{feedback}</div>}
             <button className="image-workbench__generate image-studio__submit" disabled={!canGenerate} onClick={handleGenerate} type="button">{generateLabel}</button>
           </section>
           <section className="image-workbench__card image-workbench__card--results"><div className="image-workbench__card-head"><h2>结果画布</h2><span>网格 / 对比</span></div><ResultPanel currentRequest={currentRequest} onAddReference={(result) => addMockReference('result', result)} onCopyConfig={copyResultConfig} onDeleteResult={deleteResult} onPreview={setPreviewResult} onSelect={setSelectedResultId} results={results} selectedResultId={selectedResultId} status={status} /><HistoryPanel history={history} onDelete={deleteHistory} onRestore={restoreHistory} /><div className="image-workbench__status-card" aria-live="polite"><strong>生成状态：{statusLabel}</strong><span>{selectedResult ? `${selectedResult.variantName} · ${parameterSummary}` : '种子 / 尺寸 / 质量元数据与快捷操作'}</span></div></section>
         </div>
-        <footer className="image-workbench__statusbar">Mock 工作流：提示词 / 参数 / 参考图 / 结果 / 历史</footer>
+        <footer className="image-workbench__statusbar">工作流：提示词 / 参数 / 参考图 / 结果 / 历史</footer>
       </section>{previewResult && <PreviewModal onClose={() => setPreviewResult(null)} result={previewResult} />}
     </main>
   );

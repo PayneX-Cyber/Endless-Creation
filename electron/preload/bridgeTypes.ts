@@ -18,6 +18,7 @@ export interface ApiConnectionTestResult {
 }
 
 export interface ApiImageGenerationRequest {
+  requestId?: string;
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -42,6 +43,11 @@ export interface ApiImageGenerationResult {
   images?: ApiGeneratedImage[];
 }
 
+export interface ApiImageGenerationCancelResult {
+  ok: boolean;
+  message: string;
+}
+
 export interface EndlessCreationBridge {
   app: {
     getVersion(): Promise<string>;
@@ -58,6 +64,7 @@ export interface EndlessCreationBridge {
   api: {
     testConnection(config: ApiProviderConfig): Promise<ApiConnectionTestResult>;
     generateImage(request: ApiImageGenerationRequest): Promise<ApiImageGenerationResult>;
+    cancelImageGeneration(requestId: string): Promise<ApiImageGenerationCancelResult>;
   };
 }
 
