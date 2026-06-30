@@ -331,3 +331,87 @@ src/features/novel-creation/promptRegistry.ts
 - 更新日志管理
 - 源项目管理后台整体复制
 
+## 第二参考源：AI_NovelGenerator 核对记录
+
+参考源：`https://github.com/YILING0013/AI_NovelGenerator`
+
+核对分支：
+
+- `main`：`f9aefef`
+- `dev`：`9f8504f`
+
+结论：该项目可作为第二参考源，但只参考产品能力和流程设计，不迁移技术栈。
+
+### 可参考能力
+
+#### 任务模型路由
+
+该项目把不同任务分配给不同模型配置，例如：
+
+- 架构生成模型
+- 章节大纲模型
+- 草稿生成模型
+- 最终正文模型
+- 一致性审校模型
+
+Endless Creation 后续可在「模型偏好」中扩展小说创作任务路由，但不进入第一阶段。
+
+建议阶段：第二阶段之后。
+
+#### 章节大纲解析
+
+该项目包含 `chapter_directory_parser.py`，用于把 AI 生成的章节目录解析为结构化章节数据。
+
+Endless Creation 后续生成章节大纲时，应参考这种轻量解析方式，不必一开始引入数据库或复杂 schema。
+
+建议阶段：第二阶段。
+
+#### 轻量一致性检查
+
+该项目包含 `consistency_checker.py`，用小说设定、角色状态、前文摘要、未解决冲突和最新章节做一致性审校。
+
+这比完整 RAG 更轻，适合 Endless Creation 在第四阶段先做轻量审校，再考虑长上下文记忆。
+
+建议阶段：第四阶段。
+
+#### 本地知识库参考
+
+该项目支持本地文档参考和语义检索。Endless Creation 后续应优先和已有资产库打通，而不是直接迁移 ChromaDB 或 LangChain。
+
+建议阶段：第五或第六阶段。
+
+### 不迁移项
+
+以下内容不进入 Endless Creation 前期路线：
+
+- CustomTkinter UI
+- Python 运行时
+- ChromaDB
+- LangChain
+- MongoDB
+- FastAPI
+- Next.js
+- 代理设置
+- WebDAV
+
+### 对现有路线的影响
+
+第一阶段不变：
+
+```text
+小说创作页 + 本地小说项目 CRUD + 章节编辑器
+```
+
+第二阶段之后补充：
+
+- 任务模型路由
+- 章节大纲解析
+
+第四阶段补充：
+
+- 轻量一致性检查
+
+第五或第六阶段补充：
+
+- 本地知识库 / 资产库参考
+
