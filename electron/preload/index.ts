@@ -29,6 +29,13 @@ const bridge: EndlessCreationBridge = {
     generateImage: (request) => ipcRenderer.invoke('api:generate-image', request),
     cancelImageGeneration: (requestId) => ipcRenderer.invoke('api:cancel-image-generation', requestId),
   },
+  novel: {
+    listNovels: () => ipcRenderer.invoke('novel:list-novels'),
+    createNovel: (input) => ipcRenderer.invoke('novel:create-novel', input),
+    loadNovel: (id) => ipcRenderer.invoke('novel:load-novel', id),
+    saveNovel: (novel) => ipcRenderer.invoke('novel:save-novel', novel),
+    deleteNovel: (id) => ipcRenderer.invoke('novel:delete-novel', id),
+  },
 };
 
 contextBridge.exposeInMainWorld('endlessCreationBridge', bridge);

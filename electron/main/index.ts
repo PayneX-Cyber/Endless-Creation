@@ -9,6 +9,7 @@ app.setName('Endless Creation');
 let mainWindow: BrowserWindow | null = null;
 const imageGenerationControllers = new Map<string, AbortController>();
 const timedOutImageGenerationRequests = new Set<string>();
+const novelSaveQueues = new Map<string, Promise<unknown>>();
 
 interface ApiProviderConfig {
   type: 'openai-compatible';
@@ -64,6 +65,31 @@ interface ApiImageGenerationCancelResult {
   ok: boolean;
   message: string;
 }
+
+interface Chapter {
+  id: string;
+  title: string;
+  content: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Novel {
+  id: string;
+  title: string;
+  summary: string;
+  note: string;
+  chapters: Chapter[];
+  version: 1;
+  createdAt: string;
+  updatedAt: string;
+}
+
+type NovelSummary = Pick<Novel, 'id' | 'title' | 'summary' | 'createdAt' | 'updatedAt'> & {
+  chapterCount: number;
+  wordCount: number;
+};
 
 function createMainWindow(): void {
   mainWindow = new BrowserWindow({
@@ -341,6 +367,159 @@ async function readProjectAssetImageDataUrl(projectId: unknown, relativePath: un
   }
 }
 
+function getNovelsDir(): string {
+  return path.join(app.getPath('userData'), 'novels');
+}
+
+function safeNovelId(id: unknown): string | null {
+  if (typeof id !== 'string') return null;
+  const trimmed = id.trim();
+  return /^[a-zA-Z0-9._-]+$/.test(trimmed) ? trimmed : null;
+}
+
+function getNovelDir(id: string): string {
+  return path.join(getNovelsDir(), id);
+}
+
+function getNovelPath(id: string): string {
+  return path.join(getNovelDir(id), 'novel.json');
+}
+
+function countNovelWords(text: string): number {
+  return Array.from(text.replace(/\s+/g, '')).length;
+}
+
+function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<Novel>;
+  const id = safeNovelId(candidate.id) ?? fallbackId;
+  if (!id) return null;
+  const now = new Date().toISOString();
+  const chapters = Array.isArray(candidate.chapters) ? candidate.chapters.map((chapter, index): Chapter | null => {
+    if (!chapter || typeof chapter !== 'object') return null;
+    const item = chapter as Partial<Chapter>;
+    return {
+      id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : randomUUID(),
+      title: typeof item.title === 'string' ? item.title : '',
+      content: typeof item.content === 'string' ? item.content : '',
+      order: Number.isFinite(item.order) ? Number(item.order) : index,
+      createdAt: typeof item.createdAt === 'string' ? item.createdAt : now,
+      updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : now,
+    };
+  }).filter((chapter): chapter is Chapter => chapter !== null).sort((a, b) => a.order - b.order) : [];
+
+  return {
+    id,
+    title: typeof candidate.title === 'string' && candidate.title.trim() ? candidate.title : '\u672a\u547d\u540d\u5c0f\u8bf4',
+    summary: typeof candidate.summary === 'string' ? candidate.summary : '',
+    note: typeof candidate.note === 'string' ? candidate.note : '',
+    chapters,
+    version: 1,
+    createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : now,
+    updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : now,
+  };
+}
+
+function toNovelSummary(novel: Novel): NovelSummary {
+  return {
+    id: novel.id,
+    title: novel.title,
+    summary: novel.summary,
+    createdAt: novel.createdAt,
+    updatedAt: novel.updatedAt,
+    chapterCount: novel.chapters.length,
+    wordCount: novel.chapters.reduce((sum, chapter) => sum + countNovelWords(chapter.content), 0),
+  };
+}
+
+async function listNovels(): Promise<{ ok: boolean; message?: string; novels: NovelSummary[] }> {
+  try {
+    const entries = await fs.readdir(getNovelsDir(), { withFileTypes: true });
+    const novels = await Promise.all(entries.filter((entry) => entry.isDirectory()).map(async (entry) => {
+      try {
+        const raw = await fs.readFile(getNovelPath(entry.name), 'utf-8');
+        const novel = sanitizeNovel(JSON.parse(raw), entry.name);
+        return novel ? toNovelSummary(novel) : null;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.warn('Failed to list novel:', error);
+        return null;
+      }
+    }));
+    return { ok: true, novels: novels.filter((novel): novel is NovelSummary => novel !== null).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { ok: true, novels: [] };
+    return { ok: false, message: '\u52a0\u8f7d\u5c0f\u8bf4\u5217\u8868\u5931\u8d25\u3002', novels: [] };
+  }
+}
+
+async function readNovelFile(id: string): Promise<Novel> {
+  const raw = await fs.readFile(getNovelPath(id), 'utf-8');
+  const novel = sanitizeNovel(JSON.parse(raw), id);
+  if (!novel) throw new Error('\u5c0f\u8bf4\u6587\u4ef6\u635f\u574f\u3002');
+  return novel;
+}
+
+async function createNovel(input: unknown): Promise<{ ok: boolean; message: string; novel?: Novel }> {
+  const candidate = input && typeof input === 'object' ? input as { title?: unknown; summary?: unknown; note?: unknown } : {};
+  const now = new Date().toISOString();
+  const novel: Novel = {
+    id: `novel-${randomUUID()}`,
+    title: typeof candidate.title === 'string' && candidate.title.trim() ? candidate.title.trim() : '\u672a\u547d\u540d\u5c0f\u8bf4',
+    summary: typeof candidate.summary === 'string' ? candidate.summary : '',
+    note: typeof candidate.note === 'string' ? candidate.note : '',
+    chapters: [],
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+  };
+  return saveNovel(novel);
+}
+
+async function loadNovel(id: unknown): Promise<{ ok: boolean; message: string; novel?: Novel }> {
+  const novelId = safeNovelId(id);
+  if (!novelId) return { ok: false, message: '\u5c0f\u8bf4 ID \u65e0\u6548\u3002' };
+  try {
+    return { ok: true, message: '\u5c0f\u8bf4\u5df2\u52a0\u8f7d\u3002', novel: await readNovelFile(novelId) };
+  } catch (error) {
+    const message = (error as NodeJS.ErrnoException).code === 'ENOENT' ? '\u5c0f\u8bf4\u6587\u4ef6\u7f3a\u5931\u3002' : '\u5c0f\u8bf4\u6587\u4ef6\u635f\u574f\u3002';
+    return { ok: false, message };
+  }
+}
+
+async function saveNovel(value: unknown): Promise<{ ok: boolean; message: string; novel?: Novel }> {
+  const novel = sanitizeNovel(value);
+  if (!novel) return { ok: false, message: '\u5c0f\u8bf4\u6570\u636e\u65e0\u6548\u3002' };
+  novel.updatedAt = new Date().toISOString();
+  const previous = novelSaveQueues.get(novel.id) ?? Promise.resolve();
+  const next = previous.catch(() => undefined).then(async () => {
+    const novelDir = getNovelDir(novel.id);
+    const target = getNovelPath(novel.id);
+    const temp = path.join(novelDir, 'novel.json.tmp');
+    await fs.mkdir(novelDir, { recursive: true });
+    await fs.writeFile(temp, JSON.stringify(novel, null, 2), 'utf-8');
+    await fs.rename(temp, target);
+    return novel;
+  });
+  novelSaveQueues.set(novel.id, next.catch(() => undefined));
+  try {
+    return { ok: true, message: '\u5c0f\u8bf4\u5df2\u4fdd\u5b58\u3002', novel: await next };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : '\u4fdd\u5b58\u5c0f\u8bf4\u5931\u8d25\u3002' };
+  }
+}
+
+async function deleteNovel(id: unknown): Promise<{ ok: boolean; message: string }> {
+  const novelId = safeNovelId(id);
+  if (!novelId) return { ok: false, message: '\u5c0f\u8bf4 ID \u65e0\u6548\u3002' };
+  await novelSaveQueues.get(novelId)?.catch(() => undefined);
+  try {
+    await fs.rm(getNovelDir(novelId), { recursive: true, force: false });
+    return { ok: true, message: '\u5c0f\u8bf4\u5df2\u5220\u9664\u3002' };
+  } catch (error) {
+    return { ok: false, message: (error as NodeJS.ErrnoException).code === 'ENOENT' ? '\u5c0f\u8bf4\u4e0d\u5b58\u5728\u3002' : '\u5220\u9664\u5c0f\u8bf4\u5931\u8d25\u3002' };
+  }
+}
+
 function registerIpcHandlers(): void {
   ipcMain.handle('app:get-version', () => app.getVersion());
   ipcMain.handle('app:get-platform', () => process.platform);
@@ -363,6 +542,11 @@ function registerIpcHandlers(): void {
   ipcMain.handle('app:delete-project-asset-file', (_event, projectId: unknown, relativePath: unknown) => deleteProjectAssetFile(projectId, relativePath));
   ipcMain.handle('app:import-project-image-asset', (_event, projectId: unknown, input: unknown) => importProjectImageAsset(projectId, input));
   ipcMain.handle('app:read-project-asset-image-data-url', (_event, projectId: unknown, relativePath: unknown) => readProjectAssetImageDataUrl(projectId, relativePath));
+  ipcMain.handle('novel:list-novels', () => listNovels());
+  ipcMain.handle('novel:create-novel', (_event, input: unknown) => createNovel(input));
+  ipcMain.handle('novel:load-novel', (_event, id: unknown) => loadNovel(id));
+  ipcMain.handle('novel:save-novel', (_event, novel: unknown) => saveNovel(novel));
+  ipcMain.handle('novel:delete-novel', (_event, id: unknown) => deleteNovel(id));
   ipcMain.handle('app:select-generated-images-directory', async (_event, currentPath: unknown): Promise<{ ok: boolean; message: string; path?: string }> => {
     const options: OpenDialogOptions = {
       title: '选择图片保存位置',

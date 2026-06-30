@@ -53,6 +53,31 @@ export interface ApiImageGenerationCancelResult {
   message: string;
 }
 
+export interface Chapter {
+  id: string;
+  title: string;
+  content: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Novel {
+  id: string;
+  title: string;
+  summary: string;
+  note: string;
+  chapters: Chapter[];
+  version: 1;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type NovelSummary = Pick<Novel, 'id' | 'title' | 'summary' | 'createdAt' | 'updatedAt'> & {
+  chapterCount: number;
+  wordCount: number;
+};
+
 export interface EndlessCreationBridge {
   app: {
     getVersion(): Promise<string>;
@@ -80,6 +105,13 @@ export interface EndlessCreationBridge {
     testConnection(config: ApiProviderConfig): Promise<ApiConnectionTestResult>;
     generateImage(request: ApiImageGenerationRequest): Promise<ApiImageGenerationResult>;
     cancelImageGeneration(requestId: string): Promise<ApiImageGenerationCancelResult>;
+  };
+  novel: {
+    listNovels(): Promise<{ ok: boolean; message?: string; novels: NovelSummary[] }>;
+    createNovel(input: { title: string; summary?: string; note?: string }): Promise<{ ok: boolean; message: string; novel?: Novel }>;
+    loadNovel(id: string): Promise<{ ok: boolean; message: string; novel?: Novel }>;
+    saveNovel(novel: Novel): Promise<{ ok: boolean; message: string; novel?: Novel }>;
+    deleteNovel(id: string): Promise<{ ok: boolean; message: string }>;
   };
 }
 

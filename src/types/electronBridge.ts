@@ -1,5 +1,6 @@
 import type { ApiConnectionTestResult, ApiImageGenerationCancelResult, ApiImageGenerationRequest, ApiImageGenerationResult, ApiProviderConfig } from './apiProvider';
 import type { DesktopAiClient } from './workspace';
+import type { Novel, NovelListResult, NovelResult } from './novel';
 
 export interface EndlessCreationBridge {
   app: {
@@ -28,6 +29,13 @@ export interface EndlessCreationBridge {
     testConnection(config: ApiProviderConfig): Promise<ApiConnectionTestResult>;
     generateImage(request: ApiImageGenerationRequest): Promise<ApiImageGenerationResult>;
     cancelImageGeneration(requestId: string): Promise<ApiImageGenerationCancelResult>;
+  };
+  novel: {
+    listNovels(): Promise<NovelListResult>;
+    createNovel(input: { title: string; summary?: string; note?: string }): Promise<NovelResult>;
+    loadNovel(id: string): Promise<NovelResult>;
+    saveNovel(novel: Novel): Promise<NovelResult>;
+    deleteNovel(id: string): Promise<{ ok: boolean; message: string }>;
   };
   ai?: DesktopAiClient;
 }

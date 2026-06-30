@@ -5,9 +5,11 @@ import type {
   ApiImageGenerationResult,
   ApiProviderConfig,
 } from '../types/apiProvider';
+import type { Novel, NovelListResult, NovelResult } from '../types/novel';
 import type { ThemeMode } from '../types/workspace';
 
 const THEME_STORAGE_KEY = 'ec-theme';
+const WEB_NOVELS_STORAGE_KEY = 'endless-creation.novels';
 
 /**
  * Renderer boundary for browser/Electron-renderer capabilities.
@@ -191,6 +193,54 @@ export const rendererBridge = {
 
     return electronBridge.api.cancelImageGeneration(requestId);
   },
+
+  async listNovels(): Promise<NovelListResult> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) return electronBridge.novel.listNovels();
+    return { ok: true, novels: readWebNovels().map(toNovelSummary) };
+  },
+
+  async createNovel(input: { title: string; summary?: string; note?: string }): Promise<NovelResult> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) return electronBridge.novel.createNovel(input);
+    const now = new Date().toISOString();
+    const novel: Novel = {
+      id: createWebNovelId(),
+      title: input.title.trim() || '\u672a\u547d\u540d\u5c0f\u8bf4',
+      summary: input.summary?.trim() ?? '',
+      note: input.note?.trim() ?? '',
+      chapters: [],
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    writeWebNovels([novel, ...readWebNovels()]);
+    return { ok: true, message: 'web fallback', novel };
+  },
+
+  async loadNovel(id: string): Promise<NovelResult> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) return electronBridge.novel.loadNovel(id);
+    const novel = readWebNovels().find((item) => item.id === id);
+    return novel ? { ok: true, message: 'web fallback', novel } : { ok: false, message: '\u5c0f\u8bf4\u4e0d\u5b58\u5728\u3002' };
+  },
+
+  async saveNovel(novel: Novel): Promise<NovelResult> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) return electronBridge.novel.saveNovel(novel);
+    const novels = readWebNovels();
+    const index = novels.findIndex((item) => item.id === novel.id);
+    const next = index >= 0 ? novels.map((item) => item.id === novel.id ? novel : item) : [novel, ...novels];
+    writeWebNovels(next);
+    return { ok: true, message: 'web fallback', novel };
+  },
+
+  async deleteNovel(id: string): Promise<{ ok: boolean; message: string }> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) return electronBridge.novel.deleteNovel(id);
+    writeWebNovels(readWebNovels().filter((novel) => novel.id !== id));
+    return { ok: true, message: 'web fallback' };
+  },
 };
 
 function getElectronBridge() {
@@ -216,4 +266,46 @@ function writeWebProjectAssets(projectId: string, collection: unknown): void {
   } catch {
     // Ignore storage failures in restricted renderer contexts.
   }
+}
+
+function readWebNovels(): Novel[] {
+  try {
+    const raw = globalThis.localStorage?.getItem(WEB_NOVELS_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter(isNovel) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeWebNovels(novels: Novel[]): void {
+  try {
+    globalThis.localStorage?.setItem(WEB_NOVELS_STORAGE_KEY, JSON.stringify(novels));
+  } catch {
+    // Ignore storage failures in restricted renderer contexts.
+  }
+}
+
+function isNovel(value: unknown): value is Novel {
+  return Boolean(value && typeof value === 'object' && typeof (value as Novel).id === 'string' && typeof (value as Novel).title === 'string');
+}
+
+function toNovelSummary(novel: Novel) {
+  return {
+    id: novel.id,
+    title: novel.title,
+    summary: novel.summary,
+    createdAt: novel.createdAt,
+    updatedAt: novel.updatedAt,
+    chapterCount: novel.chapters.length,
+    wordCount: novel.chapters.reduce((sum, chapter) => sum + countWords(chapter.content), 0),
+  };
+}
+
+function countWords(text: string): number {
+  return Array.from(text.replace(/\s+/g, '')).length;
+}
+
+function createWebNovelId(): string {
+  return `novel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }

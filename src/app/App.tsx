@@ -4,6 +4,7 @@ import type { ThemeMode } from '../types/workspace';
 import { rendererBridge } from '../services/rendererBridge';
 import { AssetManagement } from '../features/asset-management';
 import { ImageWorkbench } from '../features/image-workbench';
+import { NovelCreation } from '../features/novel-creation';
 import { ProjectManagement } from '../features/project-management';
 import { CanvasWorkbench } from '../features/canvas-workbench';
 import { SettingsPage } from '../features/settings';
@@ -205,6 +206,8 @@ export function App() {
 
       {activeNavId === 'image-workbench' ? (
         <ImageWorkbench />
+      ) : activeNavId === 'novel' ? (
+        <NovelCreation />
       ) : activeNavId === 'assets' || activeNavId.startsWith('asset-') ? (
         <AssetManagement />
       ) : activeNavId === 'projects' && activeCanvasId ? (

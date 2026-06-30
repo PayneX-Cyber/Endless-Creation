@@ -788,6 +788,7 @@
 
 
 .app-shell > .image-workbench,
+.app-shell > .novel-creation,
 .app-shell > .canvas-workbench,
 .app-shell > .blank-workspace {
   min-width: 0;
@@ -818,6 +819,7 @@
   }
 
   .app-shell > .image-workbench,
+  .app-shell > .novel-creation,
   .app-shell > .canvas-workbench,
   .app-shell > .blank-workspace {
     min-height: 520px;
