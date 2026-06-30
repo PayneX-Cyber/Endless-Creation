@@ -1,4 +1,4 @@
-﻿# 小说创作模块复现方案
+# 小说创作模块复现方案
 
 日期：2026-06-30
 目标源项目：`C:\Users\x1176\Documents\Codex\2026-06-18\all666666all-ai-novel-novelforge-https-github`
@@ -217,3 +217,47 @@ interface Chapter {
 - 是否避免整包复制 NovelForge
 - 是否有独立可验收结果
 - 是否没有提前引入后续阶段复杂度
+
+## Prompt 管理策略
+
+NovelForge 后台包含大量可编辑提示词。Endless Creation 前期不迁移后台管理，但不能跳过提示词体系。
+
+第二阶段接入 AI 文本生成时，必须先实现本地内置 Prompt Registry：
+
+```text
+src/features/novel-creation/promptRegistry.ts
+```
+
+或等价的本地模块。
+
+优先内置以下 Prompt：
+
+- `concept`
+- `screenwriting`
+- `outline_generation`
+- `writing`
+- `evaluation`
+- `extraction`
+- `chapter_plan`
+- `optimize_dialogue`
+- `optimize_environment`
+- `optimize_psychology`
+- `optimize_rhythm`
+
+前期没有后台管理的影响：
+
+- 不能在 UI 中编辑提示词
+- 不能为不同用户配置不同提示词
+- 不能在线调试 Prompt
+- 不能管理 Prompt 版本
+
+但不影响核心链路跑通。
+
+后台提示词管理后置，稳定后再接入：
+
+```text
+设置页 → 小说创作 → 提示词管理
+```
+
+强约束：不得因为没有后台提示词管理而跳过 Prompt Registry，也不得提前迁移 NovelForge 管理后台。
+
