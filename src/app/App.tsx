@@ -10,9 +10,7 @@ import { SettingsPage } from '../features/settings';
 import {
   AddSquareIcon,
   BillingIcon,
-  BookIcon,
   ChevronDownIcon,
-  ChevronRightIcon,
   CollapseIcon,
   FolderIcon,
   HelpIcon,
@@ -23,7 +21,6 @@ import {
   PenBookIcon,
   ProjectIcon,
   PromptIcon,
-  SceneIcon,
   ScriptIcon,
   SettingsIcon,
   SunIcon,
@@ -41,13 +38,9 @@ type ActiveNavId =
   | 'image-workbench'
   | 'video-workbench'
   | 'prompts'
-  | 'assets'
-  | 'asset-role'
-  | 'asset-scene'
-  | 'asset-script'
-  | 'asset-novel';
+  | 'assets';
 
-type PrimaryNavId = Exclude<ActiveNavId, 'asset-role' | 'asset-scene' | 'asset-script' | 'asset-novel'>;
+type PrimaryNavId = ActiveNavId;
 
 const sidebarNavItems: Array<{ id: PrimaryNavId; Icon: SidebarIcon; label: string }> = [
   { id: 'home', Icon: HomeIcon, label: '首页' },
@@ -60,12 +53,6 @@ const sidebarNavItems: Array<{ id: PrimaryNavId; Icon: SidebarIcon; label: strin
   { id: 'assets', Icon: FolderIcon, label: '资产管理' },
 ];
 
-const assetItems: Array<{ id: ActiveNavId; Icon: SidebarIcon; label: string; count: number }> = [
-  { id: 'asset-role', Icon: UserIcon, label: '角色', count: 12 },
-  { id: 'asset-scene', Icon: SceneIcon, label: '场景', count: 8 },
-  { id: 'asset-script', Icon: ScriptIcon, label: '剧本', count: 5 },
-  { id: 'asset-novel', Icon: BookIcon, label: '小说', count: 3 },
-];
 
 const mockUser = { name: 'John Doe', email: 'john@example.com', initials: 'JD' };
 
@@ -74,12 +61,10 @@ export function App() {
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeNavId, setActiveNavId] = useState<ActiveNavId>('home');
   const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
-  const [isAssetMenuExpanded, setAssetMenuExpanded] = useState(true);
   const [isUserMenuOpen, setUserMenuOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const ThemeIcon = theme === 'dark' ? SunIcon : MoonIcon;
-  const AssetChevronIcon = isAssetMenuExpanded ? ChevronDownIcon : ChevronRightIcon;
   const isSidebarVisuallyCollapsed = isSidebarCollapsed;
 
   useEffect(() => {
@@ -132,54 +117,23 @@ export function App() {
 
         <nav className="canvasflow-nav" aria-label="Endless Creation 导航">
           {sidebarNavItems.map(({ Icon, ...item }) => {
-            const isAssetParent = item.id === 'assets';
             const isActive = activeNavId === item.id;
 
             return (
               <div className="canvasflow-nav__entry" key={item.id}>
                 <button
                   aria-current={isActive ? 'page' : undefined}
-                  aria-expanded={isAssetParent ? isAssetMenuExpanded : undefined}
                   aria-label={isSidebarVisuallyCollapsed ? item.label : undefined}
                   className={`canvasflow-nav__item ${isActive ? 'canvasflow-nav__item--active' : ''}`}
                   onClick={() => {
                     setActiveNavId(item.id);
                     if (item.id !== 'projects') setActiveCanvasId(null);
-                    if (isAssetParent) {
-                      setAssetMenuExpanded((current) => !current);
-                    }
                   }}
                   type="button"
                 >
                   <span className="canvasflow-nav__icon" aria-hidden="true"><Icon /></span>
                   <span className="canvasflow-nav__label">{item.label}</span>
-                  {isAssetParent && (
-                    <span className="canvasflow-nav__chevron" aria-hidden="true"><AssetChevronIcon /></span>
-                  )}
                 </button>
-
-                {isAssetParent && isAssetMenuExpanded && (
-                  <div className="canvasflow-subnav">
-                    {assetItems.map(({ Icon: AssetIcon, ...assetItem }) => (
-                      <button
-                        aria-current={activeNavId === assetItem.id ? 'page' : undefined}
-                        aria-label={isSidebarVisuallyCollapsed ? assetItem.label : undefined}
-                        className={`canvasflow-subnav__item ${activeNavId === assetItem.id ? 'canvasflow-subnav__item--active' : ''}`}
-                        key={assetItem.id}
-                        onClick={() => {
-                          setActiveNavId(assetItem.id);
-                          setActiveCanvasId(null);
-                          setAssetMenuExpanded(true);
-                        }}
-                        type="button"
-                      >
-                        <span className="canvasflow-nav__icon" aria-hidden="true"><AssetIcon /></span>
-                        <span className="canvasflow-nav__label">{assetItem.label}</span>
-                        <span className="canvasflow-badge" aria-label={`${assetItem.label} ${assetItem.count} 个`}>{assetItem.count}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             );
           })}
