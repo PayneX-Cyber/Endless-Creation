@@ -144,9 +144,40 @@ async function hasMeaningfulLocalStorage(dir: string): Promise<boolean> {
   }
 }
 
+
+function getImageGenerationHistoryPath(): string {
+  return path.join(app.getPath('userData'), 'image-generation-history.json');
+}
+
+async function loadImageGenerationHistory(): Promise<{ ok: boolean; items: unknown[] }> {
+  try {
+    const raw = await fs.readFile(getImageGenerationHistoryPath(), 'utf-8');
+    const parsed = JSON.parse(raw) as { items?: unknown };
+    return { ok: true, items: Array.isArray(parsed.items) ? parsed.items.slice(0, 20) : [] };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.warn('Failed to load image generation history:', error);
+    return { ok: true, items: [] };
+  }
+}
+
+async function saveImageGenerationHistory(items: unknown): Promise<{ ok: boolean; message: string }> {
+  try {
+    const nextItems = Array.isArray(items) ? items.slice(0, 20) : [];
+    const historyPath = getImageGenerationHistoryPath();
+    await fs.mkdir(path.dirname(historyPath), { recursive: true });
+    await fs.writeFile(historyPath, JSON.stringify({ version: 1, items: nextItems }, null, 2), 'utf-8');
+    return { ok: true, message: '生成历史已保存。' };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '未知错误';
+    return { ok: false, message: `保存生成历史失败：${message}` };
+  }
+}
+
 function registerIpcHandlers(): void {
   ipcMain.handle('app:get-version', () => app.getVersion());
   ipcMain.handle('app:get-platform', () => process.platform);
+  ipcMain.handle('app:load-image-generation-history', () => loadImageGenerationHistory());
+  ipcMain.handle('app:save-image-generation-history', (_event, items: unknown) => saveImageGenerationHistory(items));
   ipcMain.handle('app:open-generated-image-location', async (_event, localPath: unknown): Promise<{ ok: boolean; message: string }> => {
     if (typeof localPath === 'string' && localPath.trim()) {
       shell.showItemInFolder(localPath);

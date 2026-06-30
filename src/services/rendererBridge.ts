@@ -23,6 +23,15 @@ export const rendererBridge = {
     return getElectronBridge()?.app.getPlatform() ?? Promise.resolve('web');
   },
 
+
+  async loadImageGenerationHistory(): Promise<{ ok: boolean; items: unknown[] }> {
+    return getElectronBridge()?.app.loadImageGenerationHistory() ?? Promise.resolve({ ok: true, items: [] });
+  },
+
+  async saveImageGenerationHistory(items: unknown[]): Promise<{ ok: boolean; message: string }> {
+    return getElectronBridge()?.app.saveImageGenerationHistory(items) ?? Promise.resolve({ ok: true, message: 'web fallback' });
+  },
+
   async openGeneratedImageLocation(localPath?: string): Promise<{ ok: boolean; message: string }> {
     const electronBridge = getElectronBridge();
     if (!electronBridge) return { ok: false, message: '当前浏览器预览模式无法打开图片位置，请在 Electron 桌面端中重试。' };

@@ -84,6 +84,14 @@ export function ImageWorkbench() {
   const parameterSummary = `${imageModelLabel} · ${config.size} · ${config.quality} · ${config.count} 张`;
   const mentionedReferences = useMemo(() => references.filter((ref) => mentionedReferenceIds.includes(ref.id)), [mentionedReferenceIds, references]);
 
+  useEffect(() => {
+    let active = true;
+    void rendererBridge.loadImageGenerationHistory().then((result) => {
+      if (active && result.ok) setHistory(sanitizeHistoryItems(result.items));
+    });
+    return () => { active = false; };
+  }, []);
+
   const refreshModelStores = useCallback(() => {
     setModelPreferences(readLocalStorage(MODEL_PREFERENCES_STORAGE_KEY, {}));
     setApiProviderStore(readLocalStorage(API_PROVIDER_STORAGE_KEY, {}));
@@ -143,7 +151,7 @@ export function ImageWorkbench() {
 
     if (validationError) {
       const failedItem: GenerationHistoryItem = { id: createId('history'), request, status: 'failed', results: [], createdAt: new Date().toISOString(), durationMs: 0, errorMessage: validationError };
-      setStatus('failed'); setErrorMessage(validationError); setFeedback(''); setHistory((current) => [failedItem, ...current].slice(0, 12)); return;
+      setStatus('failed'); setErrorMessage(validationError); setFeedback(''); prependHistoryItem(failedItem); return;
     }
 
     let referenceImages: { id: string; name?: string; dataUrl: string }[] | undefined;
@@ -153,7 +161,7 @@ export function ImageWorkbench() {
     } catch (error) {
       const message = error instanceof Error ? error.message : '参考图转换失败，请重新上传后再试。';
       const failedItem: GenerationHistoryItem = { id: createId('history'), request, status: 'failed', results: [], createdAt: new Date().toISOString(), durationMs: Math.round(performance.now() - startedAt), errorMessage: message };
-      setStatus('failed'); setErrorMessage(message); setFeedback(''); setHistory((current) => [failedItem, ...current].slice(0, 12)); return;
+      setStatus('failed'); setErrorMessage(message); setFeedback(''); prependHistoryItem(failedItem); return;
     }
 
     activeImageRequestIdRef.current = request.id;
@@ -182,18 +190,18 @@ export function ImageWorkbench() {
       if (!response.ok || !response.images?.length) {
         const message = response.message || '生图 API 未返回图片。';
         const failedItem: GenerationHistoryItem = { id: createId('history'), request, status: 'failed', results: [], createdAt: new Date().toISOString(), durationMs: Math.round(performance.now() - startedAt), errorMessage: message };
-        setStatus('failed'); setErrorMessage(message); setFeedback(''); setHistory((current) => [failedItem, ...current].slice(0, 12)); return;
+        setStatus('failed'); setErrorMessage(message); setFeedback(''); prependHistoryItem(failedItem); return;
       }
 
       const nextResults: GenerationResult[] = response.images.map((image, index) => ({ id: createId('result'), requestId: request.id, variantName: `变体 ${index + 1}`, status: 'succeeded', palette: palettes[index % palettes.length], imageUrl: image.b64Json ? `data:image/png;base64,${image.b64Json}` : image.url, revisedPrompt: image.revisedPrompt, localPath: image.localPath, fileName: image.fileName, mimeType: image.mimeType }));
       const historyItem: GenerationHistoryItem = { id: createId('history'), request, status: 'succeeded', results: nextResults, createdAt: new Date().toISOString(), durationMs: Math.round(performance.now() - startedAt) };
-      setResults(nextResults); setSelectedResultId(nextResults[0]?.id ?? null); setStatus('succeeded'); setFeedback('真实生图完成，已写入历史。'); setErrorMessage(''); setHistory((current) => [historyItem, ...current].slice(0, 12));
+      setResults(nextResults); setSelectedResultId(nextResults[0]?.id ?? null); setStatus('succeeded'); setFeedback('真实生图完成，已写入历史。'); setErrorMessage(''); prependHistoryItem(historyItem);
     } catch (error) {
       if (generationRunRef.current !== runId) return;
       activeImageRequestIdRef.current = null;
       const message = error instanceof Error ? error.message : '生图请求失败，请稍后重试。';
       const failedItem: GenerationHistoryItem = { id: createId('history'), request, status: 'failed', results: [], createdAt: new Date().toISOString(), durationMs: Math.round(performance.now() - startedAt), errorMessage: message };
-      setStatus('failed'); setErrorMessage(message); setFeedback(''); setHistory((current) => [failedItem, ...current].slice(0, 12));
+      setStatus('failed'); setErrorMessage(message); setFeedback(''); prependHistoryItem(failedItem);
     }
   }, [apiProviderStore]);
   const handleGenerate = useCallback(() => { if (!canGenerate) { if (!trimmedPrompt) setErrorMessage('生成前需要填写提示词。'); else if (!selectedImageModel) setErrorMessage('请先在 API配置 / 模型偏好 中选择图片模型。'); else setErrorMessage('当前状态暂不能生成。'); return; } void runImageGeneration(createRequestSnapshot()); }, [canGenerate, createRequestSnapshot, runImageGeneration, selectedImageModel, trimmedPrompt]);
@@ -214,13 +222,15 @@ export function ImageWorkbench() {
   function handleReferenceDrop(event: DragEvent<HTMLDivElement>) { event.preventDefault(); setReferenceDragging(false); uploadReferenceImages(event.dataTransfer.files); }
   function removeReference(id: string) { setReferences((current) => { const target = current.find((item) => item.id === id); if (target?.source === 'upload' && target.previewUrl) { URL.revokeObjectURL(target.previewUrl); uploadObjectUrlsRef.current = uploadObjectUrlsRef.current.filter((url) => url !== target.previewUrl); } return current.filter((item) => item.id !== id); }); setFeedback('已移除参考图。'); }
   async function copyText(text: string, success: string) { if (!text.trim()) { setFeedback('没有可复制的内容。'); return; } try { await rendererBridge.copyText(text); setFeedback(success); } catch { setFeedback('复制失败，请手动复制。'); } }
+  function persistHistory(nextItems: GenerationHistoryItem[]) { const sanitized = sanitizeHistoryItems(nextItems); setHistory(sanitized); void rendererBridge.saveImageGenerationHistory(sanitized); }
+  function prependHistoryItem(item: GenerationHistoryItem) { setHistory((current) => { const sanitized = sanitizeHistoryItems([item, ...current]); void rendererBridge.saveImageGenerationHistory(sanitized); return sanitized; }); }
   function handleQuickAction(action: string) { if (action === '清空') { setPromptText(''); setNegativePrompt(''); setStatus('idle'); setFeedback('提示词已清空。'); return; } if (action === '复制') { void copyText(promptText, '提示词已复制。'); return; } setFeedback(`${action} 暂未接入真实功能。`); }
   async function chooseSaveDirectory() { const result = await rendererBridge.selectGeneratedImagesDirectory(config.saveDirectory); if (result.ok && result.path) { updateConfig({ saveDirectory: result.path }); writeLocalStorage(IMAGE_SAVE_DIRECTORY_STORAGE_KEY, result.path); } setFeedback(result.message); }
   async function copyResultConfig(result: GenerationResult) { if (!currentRequest) { setFeedback('暂无生成参数可复制。'); return; } await copyText(JSON.stringify({ resultId: result.id, prompt: currentRequest.prompt, negativePrompt: currentRequest.negativePrompt, config: currentRequest.config, localPath: result.localPath, fileName: result.fileName, mimeType: result.mimeType }, null, 2), '参数已复制。'); }
   async function openResultLocation(result: GenerationResult) { const response = await rendererBridge.openGeneratedImageLocation(result.localPath); setFeedback(response.message); }
   function deleteResult(resultId: string) { setResults((current) => { const next = current.filter((item) => item.id !== resultId); if (selectedResultId === resultId) setSelectedResultId(next[0]?.id ?? null); if (next.length === 0 && status === 'succeeded') setStatus('idle'); return next; }); setFeedback('结果已删除。'); }
   function restoreHistory(item: GenerationHistoryItem) { clearGenerationTimer(); setPromptText(item.request.prompt); setNegativePrompt(item.request.negativePrompt); setReferences(item.request.references.map((ref) => ({ ...ref }))); setConfig({ ...item.request.config }); setCurrentRequest(item.request); setResults(item.results.map((result) => ({ ...result }))); setSelectedResultId(item.results[0]?.id ?? null); setStatus(item.status); setErrorMessage(item.errorMessage ?? ''); setFeedback('已从历史恢复。'); }
-  function deleteHistory(id: string) { setHistory((current) => current.filter((item) => item.id !== id)); setFeedback('历史记录已删除。'); }
+  function deleteHistory(id: string) { persistHistory(history.filter((item) => item.id !== id)); setFeedback('历史记录已删除。'); }
   const generateLabel = useMemo(() => { if (!trimmedPrompt) return '生成图片'; if (status === 'generating') return '正在生成…'; if (status === 'succeeded') return '再次生成'; if (status === 'failed') return '重试生成'; if (status === 'cancelled') return '重新生成'; return `生成 ${config.count} 张图片`; }, [config.count, status, trimmedPrompt]);
   const promptError = !trimmedPrompt && status !== 'idle' ? '生成前需要填写提示词。' : '';
 
@@ -251,6 +261,33 @@ export function ImageWorkbench() {
 
 function CompactNumber({ disabled = false, hint, label, max, min, onChange, suffix = '', value }: { disabled?: boolean; hint?: string; label: string; max: number; min: number; onChange: (value: number) => void; suffix?: string; value: number }) { return <div className={`image-studio__field ${disabled ? 'image-studio__field--disabled' : ''}`}><span>{label}</span><div className="image-studio__stepper"><button disabled={disabled || value <= min} onClick={() => onChange(Math.max(min, value - 1))} type="button">-</button><strong>{value}{suffix}</strong><button disabled={disabled || value >= max} onClick={() => onChange(Math.min(max, value + 1))} type="button">+</button></div>{hint && <small>{hint}</small>}</div>; }
 
+
+
+function sanitizeHistoryItems(items: unknown): GenerationHistoryItem[] {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => sanitizeHistoryItem(item)).filter((item): item is GenerationHistoryItem => item !== null).slice(0, 20);
+}
+
+function sanitizeHistoryItem(item: unknown): GenerationHistoryItem | null {
+  if (!item || typeof item !== 'object') return null;
+  const candidate = item as GenerationHistoryItem;
+  if (!candidate.id || !candidate.request || typeof candidate.request !== 'object' || !candidate.createdAt) return null;
+  const requestReferences = Array.isArray(candidate.request.references) ? candidate.request.references : [];
+  const results = Array.isArray(candidate.results) ? candidate.results : [];
+  return {
+    id: String(candidate.id),
+    request: {
+      ...candidate.request,
+      references: requestReferences.map((reference) => ({ id: reference.id, name: reference.name, source: reference.source, previewLabel: reference.previewLabel, palette: reference.palette, size: reference.size })),
+      config: { ...candidate.request.config },
+    },
+    status: candidate.status,
+    results: results.map((result) => ({ id: result.id, requestId: result.requestId, variantName: result.variantName, status: result.status, palette: result.palette, revisedPrompt: result.revisedPrompt, localPath: result.localPath, fileName: result.fileName, mimeType: result.mimeType, imageUrl: result.imageUrl?.startsWith('data:') ? undefined : result.imageUrl })),
+    createdAt: candidate.createdAt,
+    durationMs: candidate.durationMs,
+    errorMessage: candidate.errorMessage,
+  };
+}
 
 async function referenceToImagePayload(reference: ReferenceImage): Promise<{ id: string; name?: string; dataUrl: string }> {
   if (!reference.previewUrl) throw new Error(`${reference.name || '参考图'} 缺少可上传的图片数据。`);
