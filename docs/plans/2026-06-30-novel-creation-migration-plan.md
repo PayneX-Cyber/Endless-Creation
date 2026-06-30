@@ -261,3 +261,73 @@ src/features/novel-creation/promptRegistry.ts
 
 强约束：不得因为没有后台提示词管理而跳过 Prompt Registry，也不得提前迁移 NovelForge 管理后台。
 
+## GitHub 最新仓库核对记录
+
+核对源：`https://github.com/all666666all/AI-novel---NovelForge--`
+核对提交：`77ce263`
+
+本方案主线仍然成立：不迁移 Vue/FastAPI 技术栈，只在 Endless Creation 的 Electron + React 架构中复现产品能力。
+
+### 后续能力登记
+
+以下能力在源项目中存在，但不进入第一阶段。
+
+#### 补充 Prompt 清单
+
+除第二阶段优先 Prompt 外，后续还需要登记并按阶段迁移：
+
+- `character_dna_guide`
+- `constitution_check`
+- `editor_review`
+- `faction_context`
+- `foreshadowing_reminder`
+- `import_analysis`
+- `rewrite_guardrails`
+- `six_dimension_review`
+- `writer_persona`
+- `writing_v2`
+
+#### 小说导入
+
+源项目支持 `/novels/import`。Endless Creation 后续可做本地小说文件导入，但不放入第一阶段。
+
+建议阶段：第三或第四阶段。
+
+#### 封面能力
+
+源项目支持封面生成和封面上传。Endless Creation 后续应优先复用已有生图工作台和资产库能力，不单独复制源项目封面实现。
+
+建议阶段：第五阶段，与资产库联动。
+
+#### 写作人格 / 阵营 / 宪章检查
+
+源项目包含 `writer_persona`、`faction`、`constitution` 相关模型、服务和 Prompt。这些属于长篇一致性增强，不进入 MVP。
+
+建议阶段：第四或第五阶段。
+
+#### 高级审稿能力
+
+源项目包含：
+
+- 六维审稿
+- 一致性检查
+- 编辑审阅
+- 改写护栏
+- 读者模拟
+- 自我批判
+
+这些统一归入第四阶段「评估与优化」，不得提前塞进第一阶段。
+
+### 明确不迁移项
+
+以下能力不作为 Endless Creation 小说创作模块的前期目标：
+
+- FastAPI 后端
+- SQLAlchemy / MySQL
+- Docker 部署
+- JWT 登录
+- 用户管理
+- 请求限额
+- 更新日志管理
+- 源项目管理后台整体复制
+
