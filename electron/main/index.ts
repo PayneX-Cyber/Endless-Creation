@@ -182,14 +182,42 @@ function getImageMimeType(filePath: string): string | null {
   return null;
 }
 
+function isPathInsideRoot(targetPath: string, rootPath: string): boolean {
+  const target = path.resolve(targetPath);
+  const root = path.resolve(rootPath);
+  return target === root || target.startsWith(root + path.sep);
+}
+
+async function getAllowedGeneratedImageRoots(): Promise<string[]> {
+  const roots = new Set<string>([getGeneratedImagesDir()]);
+  try {
+    const raw = await fs.readFile(getImageGenerationHistoryPath(), 'utf-8');
+    const parsed = JSON.parse(raw) as { items?: Array<{ results?: Array<{ localPath?: unknown }> }> };
+    if (Array.isArray(parsed.items)) {
+      for (const item of parsed.items) {
+        if (!Array.isArray(item?.results)) continue;
+        for (const result of item.results) {
+          if (typeof result.localPath === 'string' && result.localPath.trim()) roots.add(path.dirname(result.localPath));
+        }
+      }
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.warn('Failed to read history image roots:', error);
+  }
+  return Array.from(roots);
+}
+
 async function readGeneratedImageDataUrl(localPath: unknown): Promise<{ ok: boolean; message: string; dataUrl?: string }> {
   if (typeof localPath !== 'string' || !localPath.trim()) return { ok: false, message: '图片路径缺失。' };
-  const mimeType = getImageMimeType(localPath);
+  const targetPath = path.resolve(localPath);
+  const mimeType = getImageMimeType(targetPath);
   if (!mimeType) return { ok: false, message: '仅支持读取 PNG/JPEG/WebP 图片。' };
+  const allowedRoots = await getAllowedGeneratedImageRoots();
+  if (!allowedRoots.some((root) => isPathInsideRoot(targetPath, root))) return { ok: false, message: '图片路径不在允许读取范围内。' };
   try {
-    const stat = await fs.stat(localPath);
+    const stat = await fs.stat(targetPath);
     if (!stat.isFile()) return { ok: false, message: '图片路径不是文件。' };
-    const buffer = await fs.readFile(localPath);
+    const buffer = await fs.readFile(targetPath);
     return { ok: true, message: '图片已读取。', dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}` };
   } catch {
     return { ok: false, message: '读取本地图片失败。' };
