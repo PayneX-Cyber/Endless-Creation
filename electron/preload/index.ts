@@ -13,6 +13,8 @@ const bridge: EndlessCreationBridge = {
     loadProjectAssets: (projectId) => ipcRenderer.invoke('app:load-project-assets', projectId),
     saveProjectAssets: (projectId, collection) => ipcRenderer.invoke('app:save-project-assets', projectId, collection),
     deleteProjectAssetFile: (projectId, relativePath) => ipcRenderer.invoke('app:delete-project-asset-file', projectId, relativePath),
+    importProjectImageAsset: (projectId, input) => ipcRenderer.invoke('app:import-project-image-asset', projectId, input),
+    readProjectAssetImageDataUrl: (projectId, relativePath) => ipcRenderer.invoke('app:read-project-asset-image-data-url', projectId, relativePath),
   },
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),

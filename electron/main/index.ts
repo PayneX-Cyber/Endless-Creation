@@ -1,5 +1,6 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
 import type { OpenDialogOptions } from 'electron';
+import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
@@ -276,6 +277,70 @@ async function deleteProjectAssetFile(projectId: unknown, relativePath: unknown)
   }
 }
 
+function imageExtensionFromMime(mimeType: string): string | null {
+  if (mimeType === 'image/png') return 'png';
+  if (mimeType === 'image/jpeg') return 'jpg';
+  if (mimeType === 'image/webp') return 'webp';
+  return null;
+}
+
+function parseAssetImageDataUrl(dataUrl: unknown): { mimeType: string; buffer: Buffer } | null {
+  if (typeof dataUrl !== 'string') return null;
+  const match = /^data:(image\/(?:png|jpeg|webp));base64,(.+)$/i.exec(dataUrl);
+  if (!match?.[1] || !match[2]) return null;
+  const buffer = Buffer.from(match[2], 'base64');
+  return buffer.length ? { mimeType: match[1].toLowerCase(), buffer } : null;
+}
+
+function safeOriginalFileName(fileName: unknown): string {
+  const name = typeof fileName === 'string' ? path.basename(fileName).replace(/[\u0000-\u001f<>:"/\\|?*]+/g, '-').trim() : '';
+  return name || 'image';
+}
+
+async function importProjectImageAsset(projectId: unknown, input: unknown): Promise<{ ok: boolean; message: string; assetData?: { fileName: string; relativePath: string; mimeType: string; bytes: number } }> {
+  const candidate = input && typeof input === 'object' ? input as { fileName?: unknown; dataUrl?: unknown } : {};
+  const parsed = parseAssetImageDataUrl(candidate.dataUrl);
+  if (!parsed) return { ok: false, message: '\u4ec5\u652f\u6301\u5bfc\u5165 PNG/JPEG/WebP \u56fe\u7247\u3002' };
+  if (parsed.buffer.byteLength > 10 * 1024 * 1024) return { ok: false, message: '\u56fe\u7247\u4e0d\u80fd\u8d85\u8fc7 10MB\u3002' };
+
+  const ext = imageExtensionFromMime(parsed.mimeType);
+  if (!ext) return { ok: false, message: '\u4ec5\u652f\u6301\u5bfc\u5165 PNG/JPEG/WebP \u56fe\u7247\u3002' };
+
+  const imagesDir = path.join(getProjectAssetsDir(projectId), 'assets', 'images');
+  const id = randomUUID();
+  const relativePath = path.join('assets', 'images', `${id}.${ext}`).replaceAll(path.sep, '/');
+  const target = path.join(imagesDir, `${id}.${ext}`);
+  const temp = path.join(imagesDir, `${id}.tmp`);
+
+  try {
+    await fs.mkdir(imagesDir, { recursive: true });
+    await fs.writeFile(temp, parsed.buffer);
+    await fs.rename(temp, target);
+    return { ok: true, message: '\u56fe\u7247\u8d44\u4ea7\u5df2\u5bfc\u5165\u3002', assetData: { fileName: safeOriginalFileName(candidate.fileName), relativePath, mimeType: parsed.mimeType, bytes: parsed.buffer.byteLength } };
+  } catch (error) {
+    await fs.unlink(temp).catch(() => undefined);
+    const message = error instanceof Error ? error.message : '\u672a\u77e5\u9519\u8bef';
+    return { ok: false, message: `\u5bfc\u5165\u56fe\u7247\u8d44\u4ea7\u5931\u8d25\uff1a${message}` };
+  }
+}
+
+async function readProjectAssetImageDataUrl(projectId: unknown, relativePath: unknown): Promise<{ ok: boolean; message: string; dataUrl?: string }> {
+  if (typeof relativePath !== 'string' || !relativePath.trim()) return { ok: false, message: '\u56fe\u7247\u8def\u5f84\u7f3a\u5931\u3002' };
+  const root = getProjectAssetsDir(projectId);
+  const target = path.resolve(root, relativePath);
+  if (!isPathInsideRoot(target, root)) return { ok: false, message: '\u56fe\u7247\u8def\u5f84\u4e0d\u5728\u9879\u76ee\u76ee\u5f55\u5185\u3002' };
+  const mimeType = getImageMimeType(target);
+  if (!mimeType) return { ok: false, message: '\u4ec5\u652f\u6301\u8bfb\u53d6 PNG/JPEG/WebP \u56fe\u7247\u3002' };
+  try {
+    const stat = await fs.stat(target);
+    if (!stat.isFile()) return { ok: false, message: '\u56fe\u7247\u8def\u5f84\u4e0d\u662f\u6587\u4ef6\u3002' };
+    const buffer = await fs.readFile(target);
+    return { ok: true, message: '\u56fe\u7247\u5df2\u8bfb\u53d6\u3002', dataUrl: `data:${mimeType};base64,${buffer.toString('base64')}` };
+  } catch {
+    return { ok: false, message: '\u8d44\u4ea7\u6587\u4ef6\u4e22\u5931\uff0c\u65e0\u6cd5\u4f7f\u7528' };
+  }
+}
+
 function registerIpcHandlers(): void {
   ipcMain.handle('app:get-version', () => app.getVersion());
   ipcMain.handle('app:get-platform', () => process.platform);
@@ -296,6 +361,8 @@ function registerIpcHandlers(): void {
   ipcMain.handle('app:load-project-assets', (_event, projectId: unknown) => loadProjectAssets(projectId));
   ipcMain.handle('app:save-project-assets', (_event, projectId: unknown, collection: unknown) => saveProjectAssets(projectId, collection));
   ipcMain.handle('app:delete-project-asset-file', (_event, projectId: unknown, relativePath: unknown) => deleteProjectAssetFile(projectId, relativePath));
+  ipcMain.handle('app:import-project-image-asset', (_event, projectId: unknown, input: unknown) => importProjectImageAsset(projectId, input));
+  ipcMain.handle('app:read-project-asset-image-data-url', (_event, projectId: unknown, relativePath: unknown) => readProjectAssetImageDataUrl(projectId, relativePath));
   ipcMain.handle('app:select-generated-images-directory', async (_event, currentPath: unknown): Promise<{ ok: boolean; message: string; path?: string }> => {
     const options: OpenDialogOptions = {
       title: '选择图片保存位置',

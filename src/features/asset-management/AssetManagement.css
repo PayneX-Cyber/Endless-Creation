@@ -9,10 +9,20 @@
 }
 
 .asset-management * { box-sizing: border-box; }
-.asset-management__header { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
+.asset-management__header { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 24px; }
 .asset-management__header p { margin: 0 0 10px; color: #4b83ff; font-size: 13px; font-weight: 850; letter-spacing: .12em; text-transform: uppercase; }
 .asset-management__header h1 { margin: 0; color: #172033; font-size: clamp(32px, 4vw, 44px); font-weight: 850; letter-spacing: -.055em; line-height: 1; }
 .asset-management__header span { display: block; margin-top: 14px; color: #64748b; font-size: 15px; font-weight: 650; line-height: 1.7; }
+.asset-management__header-actions { display: flex; gap: 10px; }
+.asset-management__header-actions button { min-height: 42px; border: 1px solid #4b83ff; border-radius: 999px; padding: 0 16px; color: #fff; background: #4b83ff; font: inherit; font-size: 14px; font-weight: 850; cursor: pointer; box-shadow: 0 12px 28px rgba(75,131,255,.22); }
+.asset-management__file-input { display: none; }
+.asset-preview-modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px; background: rgba(15,23,42,.32); backdrop-filter: blur(8px); }
+.asset-preview-modal>div { display: grid; width: min(820px, 92vw); gap: 12px; border-radius: 24px; background: #fff; padding: 18px; color: #172033; box-shadow: 0 24px 60px rgba(15,23,42,.24); }
+.asset-preview-modal button { justify-self: end; border: 0; border-radius: 12px; background: #eef4fb; padding: 8px 12px; color: #334155; font: inherit; font-weight: 850; cursor: pointer; }
+.asset-preview-modal img { max-height: 72vh; width: 100%; border-radius: 18px; object-fit: contain; background: #f8fafc; }
+.asset-preview-modal strong { text-align: center; font-size: 16px; font-weight: 850; }
+.asset-preview-modal span { text-align: center; color: #64748b; font-size: 13px; font-weight: 700; }
+
 .asset-management__panel { border: 1px solid #dfe7f2; border-radius: 22px; background: rgba(255,255,255,.92); box-shadow: 0 18px 46px rgba(30,41,59,.08); }
 .asset-management__form { display: grid; gap: 14px; margin-bottom: 18px; padding: 20px; }
 .asset-management__panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -21,10 +31,13 @@
 .asset-management__form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .asset-management label { display: grid; gap: 8px; color: #475569; font-size: 13px; font-weight: 800; }
 .asset-management input,
+.asset-management select,
 .asset-management textarea { width: 100%; border: 1px solid #d7e1ef; border-radius: 14px; outline: none; background: #f8fafc; color: #172033; font: inherit; font-size: 14px; font-weight: 600; }
-.asset-management input { height: 42px; padding: 0 13px; }
+.asset-management input,
+.asset-management select { height: 42px; padding: 0 13px; }
 .asset-management textarea { min-height: 112px; resize: vertical; padding: 12px 13px; line-height: 1.6; }
 .asset-management input:focus,
+.asset-management select:focus,
 .asset-management textarea:focus { border-color: #8db4ff; box-shadow: 0 0 0 3px rgba(75,131,255,.14); background: #fff; }
 .asset-management__form-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .asset-management__form-actions button,
@@ -36,7 +49,9 @@
 .asset-management__empty { display: grid; gap: 6px; padding: 42px 20px; text-align: center; color: #8a98ab; font-size: 14px; font-weight: 700; }
 .asset-management__empty strong { color: #334155; font-size: 18px; }
 .asset-management__list { display: grid; gap: 12px; padding: 14px; }
-.asset-card { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 18px; align-items: start; border-radius: 18px; background: #f8fafc; padding: 16px; }
+.asset-card { display: grid; grid-template-columns: 96px minmax(0,1fr) auto; gap: 18px; align-items: start; border-radius: 18px; background: #f8fafc; padding: 16px; }
+.asset-card__preview { display: grid; width: 96px; height: 72px; place-items: center; overflow: hidden; border-radius: 14px; background: rgba(75,131,255,.1); color: #4b83ff; font-size: 13px; font-weight: 850; }
+.asset-card__preview img { width: 100%; height: 100%; object-fit: cover; }
 .asset-card__main { min-width: 0; }
 .asset-card__kind { display: inline-flex; margin-bottom: 8px; border-radius: 999px; padding: 5px 9px; background: rgba(75,131,255,.12); color: #1f4fb8; font-size: 12px; font-weight: 850; }
 .asset-card__kind--image { background: rgba(139,92,246,.12); color: #6d28d9; }
@@ -44,8 +59,9 @@
 .asset-card p { display: -webkit-box; margin: 8px 0 0; overflow: hidden; color: #64748b; font-size: 14px; font-weight: 600; line-height: 1.6; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .asset-card__meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .asset-card__meta span { border-radius: 999px; background: #eef4fb; padding: 4px 8px; color: #64748b; font-size: 12px; font-weight: 800; }
-.asset-card__actions { display: flex; gap: 8px; }
-.asset-card__actions button:hover { border-color: #9fc0ff; color: #1f4fb8; }
+.asset-card__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.asset-card__actions button:hover:not(:disabled) { border-color: #9fc0ff; color: #1f4fb8; }
+.asset-card__actions button:disabled { cursor: not-allowed; opacity: .45; }
 .asset-card__actions button:last-child:hover { border-color: rgba(239,68,68,.36); color: #dc2626; background: rgba(239,68,68,.08); }
 
 .app-shell[data-theme='dark'] .asset-management { color: #edf2fa; background: linear-gradient(180deg, #111822 0%, #0f131a 100%); }
@@ -58,12 +74,14 @@
 .app-shell[data-theme='dark'] .asset-management__panel,
 .app-shell[data-theme='dark'] .asset-card,
 .app-shell[data-theme='dark'] .asset-management input,
+.app-shell[data-theme='dark'] .asset-management select,
 .app-shell[data-theme='dark'] .asset-management textarea,
 .app-shell[data-theme='dark'] .asset-card__actions button { border-color: rgba(238,243,251,.12); background: rgba(23,29,39,.9); color: #eef3fb; }
 .app-shell[data-theme='dark'] .asset-card__meta span { background: rgba(238,243,251,.08); color: #9aa8bb; }
 
 @media (max-width: 760px) {
   .asset-management { padding: 24px 16px; }
+  .asset-management__header { align-items: flex-start; flex-direction: column; }
   .asset-management__form-grid,
   .asset-card { grid-template-columns: 1fr; }
   .asset-card__actions { justify-content: flex-start; }

@@ -65,6 +65,8 @@ export interface EndlessCreationBridge {
     loadProjectAssets(projectId: string): Promise<{ ok: boolean; message: string; collection?: unknown }>;
     saveProjectAssets(projectId: string, collection: unknown): Promise<{ ok: boolean; message: string }>;
     deleteProjectAssetFile(projectId: string, relativePath: string): Promise<{ ok: boolean; message: string }>;
+    importProjectImageAsset(projectId: string, input: { fileName: string; mimeType: string; dataUrl: string }): Promise<{ ok: boolean; message: string; assetData?: { fileName: string; relativePath: string; mimeType: string; bytes: number } }>;
+    readProjectAssetImageDataUrl(projectId: string, relativePath: string): Promise<{ ok: boolean; message: string; dataUrl?: string }>;
   };
   window: {
     minimize(): Promise<void>;

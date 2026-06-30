@@ -1,5 +1,5 @@
 import { rendererBridge } from './rendererBridge';
-import type { AssetPatch, ProjectAsset, ProjectAssetCollection, TextAsset, TextAssetInput } from '../types/projectAssets';
+import type { AssetPatch, ImageAsset, ProjectAsset, ProjectAssetCollection, TextAsset, TextAssetInput } from '../types/projectAssets';
 
 const queues = new Map<string, Promise<unknown>>();
 
@@ -26,6 +26,36 @@ export const projectAssetService = {
       return { assets: [asset, ...assets], result: asset };
     });
   },
+
+  async importImageAsset(projectId: string, file: File): Promise<ImageAsset> {
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw new Error('\u4ec5\u652f\u6301\u5bfc\u5165 PNG/JPEG/WebP \u56fe\u7247\u3002');
+    if (file.size > 10 * 1024 * 1024) throw new Error('\u56fe\u7247\u4e0d\u80fd\u8d85\u8fc7 10MB\u3002');
+    const dataUrl = await fileToDataUrl(file);
+    return mutate(projectId, async (assets) => {
+      const imported = await rendererBridge.importProjectImageAsset(projectId, { fileName: file.name, mimeType: file.type, dataUrl });
+      if (!imported.ok || !imported.assetData) throw new Error(imported.message);
+      const now = new Date().toISOString();
+      const asset: ImageAsset = {
+        id: createAssetId(),
+        kind: 'image',
+        title: titleFromFileName(imported.assetData.fileName),
+        tags: [],
+        source: 'manual',
+        status: 'ready',
+        createdAt: now,
+        updatedAt: now,
+        data: imported.assetData,
+      };
+      return { assets: [asset, ...assets], result: asset };
+    });
+  },
+
+  async readImageAssetDataUrl(projectId: string, asset: ImageAsset): Promise<string> {
+    const result = await rendererBridge.readProjectAssetImageDataUrl(projectId, asset.data.relativePath);
+    if (!result.ok || !result.dataUrl) throw new Error(result.message);
+    return result.dataUrl;
+  },
+
 
   async updateAsset(projectId: string, assetId: string, patch: AssetPatch): Promise<ProjectAsset> {
     return mutate(projectId, (assets) => {
@@ -140,6 +170,19 @@ function assetSearchText(asset: ProjectAsset): string {
   if (asset.kind === 'text') fields.push(asset.data.content);
   if (asset.kind === 'image') fields.push(asset.data.fileName);
   return fields.filter(Boolean).join(' ').toLowerCase();
+}
+
+function titleFromFileName(fileName: string): string {
+  return fileName.replace(/\.[^.]+$/, '').trim() || '\u672a\u547d\u540d\u56fe\u7247';
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('\u56fe\u7247\u8f6c\u6362\u5931\u8d25\u3002'));
+    reader.onerror = () => reject(reader.error ?? new Error('\u56fe\u7247\u8f6c\u6362\u5931\u8d25\u3002'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function createAssetId(): string {

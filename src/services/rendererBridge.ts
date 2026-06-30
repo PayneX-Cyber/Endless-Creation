@@ -68,6 +68,19 @@ export const rendererBridge = {
   },
 
 
+  async importProjectImageAsset(projectId: string, input: { fileName: string; mimeType: string; dataUrl: string }): Promise<{ ok: boolean; message: string; assetData?: { fileName: string; relativePath: string; mimeType: string; bytes: number } }> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) return electronBridge.app.importProjectImageAsset(projectId, input);
+    return { ok: false, message: '\u5f53\u524d\u6d4f\u89c8\u5668\u9884\u89c8\u6a21\u5f0f\u65e0\u6cd5\u5bfc\u5165\u672c\u5730\u56fe\u7247\uff0c\u8bf7\u5728 Electron \u684c\u9762\u7aef\u4e2d\u91cd\u8bd5\u3002' };
+  },
+
+  async readProjectAssetImageDataUrl(projectId: string, relativePath: string): Promise<{ ok: boolean; message: string; dataUrl?: string }> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) return electronBridge.app.readProjectAssetImageDataUrl(projectId, relativePath);
+    return { ok: false, message: '\u5f53\u524d\u6d4f\u89c8\u5668\u9884\u89c8\u6a21\u5f0f\u65e0\u6cd5\u8bfb\u53d6\u672c\u5730\u56fe\u7247\uff0c\u8bf7\u5728 Electron \u684c\u9762\u7aef\u4e2d\u91cd\u8bd5\u3002' };
+  },
+
+
   async minimizeWindow(): Promise<void> {
     await getElectronBridge()?.window.minimize();
   },
