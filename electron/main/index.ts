@@ -9,6 +9,8 @@ app.setName('Endless Creation');
 let mainWindow: BrowserWindow | null = null;
 const imageGenerationControllers = new Map<string, AbortController>();
 const timedOutImageGenerationRequests = new Set<string>();
+const textGenerationControllers = new Map<string, AbortController>();
+const timedOutTextGenerationRequests = new Set<string>();
 const novelSaveQueues = new Map<string, Promise<unknown>>();
 
 interface ApiProviderConfig {
@@ -64,6 +66,23 @@ interface ApiImageGenerationResult {
 interface ApiImageGenerationCancelResult {
   ok: boolean;
   message: string;
+}
+
+interface ApiTextGenerationRequest {
+  requestId: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  messages: Array<{ role: 'system' | 'user'; content: string }>;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+interface ApiTextGenerationResult {
+  ok: boolean;
+  status?: number;
+  message: string;
+  text?: string;
 }
 
 interface Chapter {
@@ -609,6 +628,18 @@ function registerIpcHandlers(): void {
     imageGenerationControllers.delete(requestId);
     return { ok: true, message: '已取消生图请求。' };
   });
+  ipcMain.handle('api:generate-text', async (_event, request: unknown): Promise<ApiTextGenerationResult> => {
+    return generateOpenAiCompatibleText(request);
+  });
+  ipcMain.handle('api:cancel-text-generation', (_event, requestId: unknown): { ok: boolean; message: string } => {
+    if (typeof requestId !== 'string' || !requestId.trim()) return { ok: false, message: '取消请求缺少 requestId。' };
+    const controller = textGenerationControllers.get(requestId);
+    if (!controller) return { ok: false, message: '未找到正在执行的文本生成请求。' };
+    controller.abort();
+    textGenerationControllers.delete(requestId);
+    timedOutTextGenerationRequests.delete(requestId);
+    return { ok: true, message: '已取消文本生成请求。' };
+  });
 }
 
 function isApiProviderConfig(config: unknown): config is ApiProviderConfig {
@@ -703,6 +734,86 @@ function isApiImageGenerationRequest(request: unknown): request is ApiImageGener
     && (candidate.count === undefined || typeof candidate.count === 'number')
     && (candidate.n === undefined || typeof candidate.n === 'number')
     && (candidate.referenceImages === undefined || (Array.isArray(candidate.referenceImages) && candidate.referenceImages.every(isApiImageReferenceImage)));
+}
+
+function isApiTextGenerationRequest(request: unknown): request is ApiTextGenerationRequest {
+  if (!request || typeof request !== 'object') return false;
+  const candidate = request as Record<string, unknown>;
+  return typeof candidate.requestId === 'string'
+    && typeof candidate.baseUrl === 'string'
+    && typeof candidate.apiKey === 'string'
+    && typeof candidate.model === 'string'
+    && Array.isArray(candidate.messages)
+    && candidate.messages.every((message) => {
+      if (!message || typeof message !== 'object') return false;
+      const item = message as Record<string, unknown>;
+      return (item.role === 'system' || item.role === 'user') && typeof item.content === 'string';
+    })
+    && (candidate.temperature === undefined || typeof candidate.temperature === 'number')
+    && (candidate.maxTokens === undefined || typeof candidate.maxTokens === 'number');
+}
+
+async function generateOpenAiCompatibleText(request: unknown): Promise<ApiTextGenerationResult> {
+  if (!isApiTextGenerationRequest(request)) return { ok: false, message: '文本生成请求格式无效。' };
+
+  const requestId = request.requestId.trim();
+  const baseUrl = request.baseUrl.trim();
+  const apiKey = request.apiKey.trim();
+  const model = request.model.trim();
+  const messages = request.messages.map((message) => ({ role: message.role, content: message.content.trim() })).filter((message) => message.content);
+
+  if (!requestId) return { ok: false, message: '文本生成请求 ID 缺失。' };
+  if (!baseUrl) return { ok: false, message: '请填写 Base URL。' };
+  if (!apiKey) return { ok: false, message: '请填写 API Key。' };
+  if (!model) return { ok: false, message: '请选择文本模型。' };
+  if (!messages.length) return { ok: false, message: '请输入文本生成上下文。' };
+
+  let url: URL;
+  try {
+    url = new URL(`${baseUrl.replace(/\/+$/, '')}/chat/completions`);
+  } catch {
+    return { ok: false, message: 'Base URL 格式无效。' };
+  }
+
+  textGenerationControllers.get(requestId)?.abort();
+  const controller = new AbortController();
+  textGenerationControllers.set(requestId, controller);
+  const timeout = setTimeout(() => {
+    timedOutTextGenerationRequests.add(requestId);
+    controller.abort();
+  }, 60_000);
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature: Number.isFinite(request.temperature) ? request.temperature : 0.8,
+        max_tokens: Number.isFinite(request.maxTokens) ? request.maxTokens : 700,
+      }),
+      signal: controller.signal,
+    });
+    const parsed = await readTextGenerationResponse(response, apiKey);
+
+    if (!response.ok) return { ok: false, status: response.status, message: parsed.errorMessage ?? `文本生成失败：HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}。` };
+    if (!parsed.text) return { ok: false, status: response.status, message: '文本生成接口返回了空结果。' };
+    return { ok: true, status: response.status, message: '文本生成完成。', text: parsed.text };
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      return { ok: false, message: timedOutTextGenerationRequests.has(requestId) ? '文本生成请求超时，请稍后重试或检查服务状态。' : '文本生成请求已取消。' };
+    }
+    return { ok: false, message: error instanceof Error ? `文本生成失败：${redactSecret(error.message, apiKey)}` : '文本生成失败：未知错误。' };
+  } finally {
+    clearTimeout(timeout);
+    if (textGenerationControllers.get(requestId) === controller) textGenerationControllers.delete(requestId);
+    timedOutTextGenerationRequests.delete(requestId);
+  }
 }
 
 async function generateOpenAiCompatibleImage(request: unknown): Promise<ApiImageGenerationResult> {
@@ -981,6 +1092,25 @@ async function readImageGenerationResponse(
   return { images, errorMessage };
 }
 
+async function readTextGenerationResponse(response: Response, apiKey: string): Promise<{ text?: string; errorMessage?: string }> {
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) return { errorMessage: '文本生成接口返回了非 JSON 响应。' };
+
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    return { errorMessage: '文本生成接口返回了无效 JSON。' };
+  }
+
+  const errorMessage = readTextProviderErrorMessage(body, apiKey);
+  const choices = (body as { choices?: unknown }).choices;
+  if (!Array.isArray(choices)) return { errorMessage };
+  const first = choices[0] as { message?: { content?: unknown }; text?: unknown } | undefined;
+  const text = typeof first?.message?.content === 'string' ? first.message.content : typeof first?.text === 'string' ? first.text : '';
+  return { text: text.trim(), errorMessage };
+}
+
 async function saveGeneratedImagesLocally(images: ApiGeneratedImage[], saveDirectory?: string): Promise<ApiGeneratedImage[]> {
   const saveDir = saveDirectory?.trim() || getGeneratedImagesDir();
 
@@ -1024,6 +1154,16 @@ function readProviderErrorMessage(body: unknown, apiKey: string): string | undef
   const message = (error as { message?: unknown }).message;
   return typeof message === 'string' && message.trim()
     ? `生图失败：${redactSecret(message.trim(), apiKey)}`
+    : undefined;
+}
+
+function readTextProviderErrorMessage(body: unknown, apiKey: string): string | undefined {
+  if (!body || typeof body !== 'object') return undefined;
+  const error = (body as { error?: unknown }).error;
+  if (!error || typeof error !== 'object') return undefined;
+  const message = (error as { message?: unknown }).message;
+  return typeof message === 'string' && message.trim()
+    ? `文本生成失败：${redactSecret(message.trim(), apiKey)}`
     : undefined;
 }
 

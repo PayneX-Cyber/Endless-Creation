@@ -28,6 +28,8 @@ const bridge: EndlessCreationBridge = {
     testConnection: (config) => ipcRenderer.invoke('api:test-connection', config),
     generateImage: (request) => ipcRenderer.invoke('api:generate-image', request),
     cancelImageGeneration: (requestId) => ipcRenderer.invoke('api:cancel-image-generation', requestId),
+    generateText: (request) => ipcRenderer.invoke('api:generate-text', request),
+    cancelTextGeneration: (requestId) => ipcRenderer.invoke('api:cancel-text-generation', requestId),
   },
   novel: {
     listNovels: () => ipcRenderer.invoke('novel:list-novels'),

@@ -54,3 +54,27 @@ export interface ApiImageGenerationCancelResult {
   ok: boolean;
   message: string;
 }
+
+export interface ApiTextGenerationRequest {
+  requestId: string;
+  channelId?: string;
+  channelLabel?: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  messages: Array<{ role: 'system' | 'user'; content: string }>;
+  temperature?: number;
+  maxTokens?: number;
+}
+
+export interface ApiTextGenerationResult {
+  ok: boolean;
+  status?: number;
+  message: string;
+  text?: string;
+}
+
+export interface ApiTextGenerationCancelResult {
+  ok: boolean;
+  message: string;
+}

@@ -4,6 +4,9 @@ import type {
   ApiImageGenerationRequest,
   ApiImageGenerationResult,
   ApiProviderConfig,
+  ApiTextGenerationCancelResult,
+  ApiTextGenerationRequest,
+  ApiTextGenerationResult,
 } from '../types/apiProvider';
 import type { Novel, NovelListResult, NovelResult } from '../types/novel';
 import type { ThemeMode } from '../types/workspace';
@@ -192,6 +195,18 @@ export const rendererBridge = {
     }
 
     return electronBridge.api.cancelImageGeneration(requestId);
+  },
+
+  async generateText(request: ApiTextGenerationRequest): Promise<ApiTextGenerationResult> {
+    const electronBridge = getElectronBridge();
+    if (!electronBridge) return { ok: false, message: '\u5f53\u524d\u6d4f\u89c8\u5668\u9884\u89c8\u6a21\u5f0f\u65e0\u6cd5\u8c03\u7528\u6587\u672c\u751f\u6210 API\uff0c\u8bf7\u5728 Electron \u684c\u9762\u7aef\u4e2d\u91cd\u8bd5\u3002' };
+    return electronBridge.api.generateText(request);
+  },
+
+  async cancelTextGeneration(requestId: string): Promise<ApiTextGenerationCancelResult> {
+    const electronBridge = getElectronBridge();
+    if (!electronBridge?.api.cancelTextGeneration) return { ok: false, message: '\u5f53\u524d\u7248\u672c\u5c1a\u672a\u63a5\u5165\u6587\u672c\u751f\u6210\u53d6\u6d88\u3002' };
+    return electronBridge.api.cancelTextGeneration(requestId);
   },
 
   async listNovels(): Promise<NovelListResult> {

@@ -1,12 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, Novel, NovelSummary } from '../../types/novel';
+import { buildContinueChapterPrompt } from './novelPrompts';
 import './NovelCreation.css';
 
 type SaveStatus = 'saved' | 'dirty' | 'saving' | 'failed';
+type TextGenerationStatus = 'idle' | 'generating' | 'failed';
 type NovelForm = { title: string; summary: string; note: string };
+interface ModelPreferences { textModel?: string; textModels?: string[]; }
+interface ApiProviderChannel { id: string; name?: string; baseUrl?: string; apiKey?: string; apiFormat?: string; enabled?: boolean; models?: string[]; }
+interface ApiProviderStore { channels?: ApiProviderChannel[]; activeChannelId?: string; }
 
 const emptyForm: NovelForm = { title: '', summary: '', note: '' };
+const MODEL_PREFERENCES_STORAGE_KEY = 'endless-creation.model-preferences';
+const API_PROVIDER_STORAGE_KEY = 'endless-creation.api-provider-config';
 
 export function NovelCreation() {
   const [summaries, setSummaries] = useState<NovelSummary[]>([]);
@@ -17,18 +25,47 @@ export function NovelCreation() {
   const [isLoading, setLoading] = useState(true);
   const [modalMode, setModalMode] = useState<'create' | 'edit' | null>(null);
   const [form, setForm] = useState<NovelForm>(emptyForm);
+  const [modelPreferences, setModelPreferences] = useState<ModelPreferences>(() => readLocalStorage(MODEL_PREFERENCES_STORAGE_KEY, {}));
+  const [apiProviderStore, setApiProviderStore] = useState<ApiProviderStore>(() => readLocalStorage(API_PROVIDER_STORAGE_KEY, {}));
+  const [textGenerationStatus, setTextGenerationStatus] = useState<TextGenerationStatus>('idle');
+  const [textGenerationError, setTextGenerationError] = useState('');
+  const [aiDraft, setAiDraft] = useState('');
   const chapterTitleRef = useRef<HTMLInputElement | null>(null);
+  const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const revisionRef = useRef(0);
   const latestNovelRef = useRef<Novel | null>(null);
   const latestSaveStatusRef = useRef<SaveStatus>('saved');
+  const activeTextRequestIdRef = useRef<string | null>(null);
+  const textGenerationRunRef = useRef(0);
 
   const chapters = useMemo(() => [...(currentNovel?.chapters ?? [])].sort((a, b) => a.order - b.order), [currentNovel]);
   const activeChapter = chapters.find((chapter) => chapter.id === activeChapterId) ?? null;
   const currentChapterWords = countWords(activeChapter?.content ?? '');
   const totalWords = chapters.reduce((sum, chapter) => sum + countWords(chapter.content), 0);
+  const selectedTextModel = useMemo(() => resolveTextModel(modelPreferences, apiProviderStore), [apiProviderStore, modelPreferences]);
 
   useEffect(() => {
     void loadSummaries();
+  }, []);
+
+  useEffect(() => {
+    function refreshModelStores() {
+      setModelPreferences(readLocalStorage(MODEL_PREFERENCES_STORAGE_KEY, {}));
+      setApiProviderStore(readLocalStorage(API_PROVIDER_STORAGE_KEY, {}));
+    }
+
+    function refreshOnVisibilityChange() {
+      if (!document.hidden) refreshModelStores();
+    }
+
+    window.addEventListener('focus', refreshModelStores);
+    document.addEventListener('visibilitychange', refreshOnVisibilityChange);
+    window.addEventListener('endless-creation:model-preferences-updated', refreshModelStores);
+    return () => {
+      window.removeEventListener('focus', refreshModelStores);
+      document.removeEventListener('visibilitychange', refreshOnVisibilityChange);
+      window.removeEventListener('endless-creation:model-preferences-updated', refreshModelStores);
+    };
   }, []);
 
   useEffect(() => {
@@ -180,6 +217,87 @@ export function NovelCreation() {
     if (activeChapterId === chapterId) setActiveChapterId(chapters.find((chapter) => chapter.id !== chapterId)?.id ?? null);
   }
 
+  async function continueChapterWithTextGeneration() {
+    if (!currentNovel || !activeChapter) return;
+    if (!selectedTextModel) {
+      setTextGenerationError('请先在 API配置 / 模型偏好 中配置可用文本模型。');
+      return;
+    }
+    if (selectedTextModel.channel.enabled === false) {
+      setTextGenerationError('当前 API 渠道已禁用，请在 API配置 中启用后重试。');
+      return;
+    }
+    if (!selectedTextModel.channel.baseUrl?.trim() || !selectedTextModel.channel.apiKey?.trim()) {
+      setTextGenerationError('当前 API 渠道缺少 Base URL 或 API Key，请先完成 API配置。');
+      return;
+    }
+    if (selectedTextModel.channel.apiFormat && selectedTextModel.channel.apiFormat !== 'openai') {
+      setTextGenerationError('当前仅支持 OpenAI-compatible 文本模型。');
+      return;
+    }
+
+    const requestId = createId('text-request');
+    const runId = textGenerationRunRef.current + 1;
+    textGenerationRunRef.current = runId;
+    activeTextRequestIdRef.current = requestId;
+    setTextGenerationStatus('generating');
+    setTextGenerationError('');
+    setAiDraft('');
+
+    const result = await rendererBridge.generateText({
+      requestId,
+      channelId: selectedTextModel.channel.id,
+      channelLabel: selectedTextModel.channel.name,
+      baseUrl: selectedTextModel.channel.baseUrl,
+      apiKey: selectedTextModel.channel.apiKey,
+      model: selectedTextModel.model,
+      messages: buildContinueChapterPrompt(currentNovel, activeChapter),
+      temperature: 0.8,
+      maxTokens: 700,
+    });
+
+    if (textGenerationRunRef.current !== runId) return;
+    activeTextRequestIdRef.current = null;
+    if (!result.ok || !result.text) {
+      setTextGenerationStatus('failed');
+      setTextGenerationError(result.message || '续写失败，请稍后重试。');
+      return;
+    }
+    setTextGenerationStatus('idle');
+    setAiDraft(result.text);
+  }
+
+  function cancelTextGeneration() {
+    const requestId = activeTextRequestIdRef.current;
+    textGenerationRunRef.current += 1;
+    activeTextRequestIdRef.current = null;
+    setTextGenerationStatus('idle');
+    if (requestId) void rendererBridge.cancelTextGeneration(requestId);
+  }
+
+  async function copyAiDraft() {
+    if (!aiDraft) return;
+    await rendererBridge.copyText(aiDraft);
+  }
+
+  function insertAiDraft() {
+    if (!activeChapter || !aiDraft) return;
+    const target = editorRef.current;
+    const content = activeChapter.content;
+    const cursor = target && document.activeElement === target ? target.selectionStart : content.length;
+    const prefix = content.slice(0, cursor);
+    const suffix = content.slice(cursor);
+    const spacer = prefix && !prefix.endsWith('\n') ? '\n\n' : '';
+    const inserted = `${spacer}${aiDraft}`;
+    updateChapter({ content: `${prefix}${inserted}${suffix}` });
+    setAiDraft('');
+    window.setTimeout(() => {
+      target?.focus();
+      const nextCursor = cursor + inserted.length;
+      target?.setSelectionRange(nextCursor, nextCursor);
+    }, 0);
+  }
+
   return (
     <main className="novel-creation" aria-label="小说创作">
       <section className="novel-creation__list">
@@ -219,9 +337,10 @@ export function NovelCreation() {
           <>
             <header>
               <input ref={chapterTitleRef} value={activeChapter.title} onChange={(event) => updateChapter({ title: event.target.value })} placeholder="未命名章节" />
-              <div className="editor-stats"><span>{saveStatusLabel(saveStatus)}</span><span>当前章 {currentChapterWords} 字</span><span>全书 {totalWords} 字</span><span>{formatTime(activeChapter.updatedAt)}</span>{saveStatus === 'failed' && <button onClick={() => void saveCurrentNovel()} type="button">重试</button>}</div>
+              <div className="editor-stats"><span>{saveStatusLabel(saveStatus)}</span><span>当前章 {currentChapterWords} 字</span><span>全书 {totalWords} 字</span><span>{formatTime(activeChapter.updatedAt)}</span><button disabled={textGenerationStatus === 'generating'} onClick={() => void continueChapterWithTextGeneration()} type="button">{textGenerationStatus === 'generating' ? '生成中' : 'AI 续写'}</button>{textGenerationStatus === 'generating' && <button onClick={cancelTextGeneration} type="button">取消</button>}{saveStatus === 'failed' && <button onClick={() => void saveCurrentNovel()} type="button">重试</button>}</div>
             </header>
-            <textarea value={activeChapter.content} onChange={(event) => updateChapter({ content: event.target.value })} placeholder="开始写正文…" />
+            <textarea ref={editorRef} value={activeChapter.content} onChange={(event) => updateChapter({ content: event.target.value })} placeholder="开始写正文…" />
+            {(aiDraft || textGenerationError) && <div className="novel-ai-draft">{textGenerationError ? <p>{textGenerationError}</p> : <><strong>续写草稿</strong><p>{aiDraft}</p><div><button onClick={insertAiDraft} type="button">插入正文</button><button onClick={() => void copyAiDraft()} type="button">复制</button><button onClick={() => setAiDraft('')} type="button">放弃</button></div></>}</div>}
             <button className="chapter-delete" onClick={() => deleteChapter(activeChapter.id)} type="button">删除章节</button>
           </>
         ) : currentNovel ? <EmptyState title="无章节" text="在中间栏新建章节后开始写作。" /> : <EmptyState title="小说工作台" text="本地保存，选择小说后进入章节编辑。" />}
@@ -254,4 +373,34 @@ function saveStatusLabel(status: SaveStatus): string {
   if (status === 'saving') return '保存中';
   if (status === 'failed') return '保存失败';
   return '已保存';
+}
+
+function resolveTextModel(modelPreferences: ModelPreferences, apiProviderStore: ApiProviderStore): { channel: ApiProviderChannel; model: string } | null {
+  const channels = apiProviderStore.channels ?? [];
+  const preferred = modelPreferences.textModel || modelPreferences.textModels?.[0] || '';
+  const decoded = decodeChannelModel(preferred);
+  if (decoded) {
+    const channel = channels.find((item) => item.id === decoded.channelId);
+    return channel ? { channel, model: decoded.model } : null;
+  }
+  const channel = channels.find((item) => item.models?.includes(preferred)) ?? channels.find((item) => item.id === apiProviderStore.activeChannelId) ?? channels[0];
+  const model = preferred || channel?.models?.[0] || '';
+  return channel && model ? { channel, model } : null;
+}
+
+function decodeChannelModel(value: string) {
+  const separatorIndex = value.indexOf('::');
+  if (separatorIndex <= 0) return null;
+  const channelId = value.slice(0, separatorIndex);
+  const model = value.slice(separatorIndex + 2);
+  return channelId && model ? { channelId, model } : null;
+}
+
+function readLocalStorage<T>(key: string, fallback: T): T {
+  try {
+    const rawValue = window.localStorage.getItem(key);
+    return rawValue ? JSON.parse(rawValue) as T : fallback;
+  } catch {
+    return fallback;
+  }
 }
