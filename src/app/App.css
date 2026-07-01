@@ -66,8 +66,8 @@
 
 .canvasflow-brand__mark {
   display: grid;
-  width: 30px;
-  height: 30px;
+  width: 42px;
+  height: 42px;
   place-items: center;
   flex: 0 0 auto;
   color: var(--brand-cyan);
@@ -75,10 +75,10 @@
 }
 
 .canvasflow-brand__mark img {
-  width: 30px;
-  height: 30px;
+  width: 42px;
+  height: 42px;
   display: block;
-  border-radius: 8px;
+  border-radius: 12px;
   object-fit: cover;
 }
 
