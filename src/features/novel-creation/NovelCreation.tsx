@@ -2,11 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, Novel, NovelSummary } from '../../types/novel';
-import { buildContinueChapterPrompt } from './novelPrompts';
+import { buildContinueChapterPrompt, buildPolishChapterPrompt, buildRewriteChapterPrompt } from './novelPrompts';
 import './NovelCreation.css';
 
 type SaveStatus = 'saved' | 'dirty' | 'saving' | 'failed';
 type TextGenerationStatus = 'idle' | 'generating' | 'failed';
+type AiDraftAction = 'continue' | 'polish' | 'rewrite';
 type NovelForm = { title: string; summary: string; note: string };
 interface ModelPreferences { textModel?: string; textModels?: string[]; }
 interface ApiProviderChannel { id: string; name?: string; baseUrl?: string; apiKey?: string; apiFormat?: string; enabled?: boolean; models?: string[]; }
@@ -30,6 +31,7 @@ export function NovelCreation() {
   const [textGenerationStatus, setTextGenerationStatus] = useState<TextGenerationStatus>('idle');
   const [textGenerationError, setTextGenerationError] = useState('');
   const [aiDraft, setAiDraft] = useState('');
+  const [aiDraftAction, setAiDraftAction] = useState<AiDraftAction>('continue');
   const chapterTitleRef = useRef<HTMLInputElement | null>(null);
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const revisionRef = useRef(0);
@@ -217,22 +219,28 @@ export function NovelCreation() {
     if (activeChapterId === chapterId) setActiveChapterId(chapters.find((chapter) => chapter.id !== chapterId)?.id ?? null);
   }
 
-  async function continueChapterWithTextGeneration() {
+  async function generateChapterDraft(action: AiDraftAction) {
     if (!currentNovel || !activeChapter) return;
     if (!selectedTextModel) {
-      setTextGenerationError('请先在 API配置 / 模型偏好 中配置可用文本模型。');
+      setTextGenerationError('\u8bf7\u5148\u5728 API\u914d\u7f6e / \u6a21\u578b\u504f\u597d \u4e2d\u914d\u7f6e\u53ef\u7528\u6587\u672c\u6a21\u578b\u3002');
       return;
     }
     if (selectedTextModel.channel.enabled === false) {
-      setTextGenerationError('当前 API 渠道已禁用，请在 API配置 中启用后重试。');
+      setTextGenerationError('\u5f53\u524d API \u6e20\u9053\u5df2\u7981\u7528\uff0c\u8bf7\u5728 API\u914d\u7f6e \u4e2d\u542f\u7528\u540e\u91cd\u8bd5\u3002');
       return;
     }
     if (!selectedTextModel.channel.baseUrl?.trim() || !selectedTextModel.channel.apiKey?.trim()) {
-      setTextGenerationError('当前 API 渠道缺少 Base URL 或 API Key，请先完成 API配置。');
+      setTextGenerationError('\u5f53\u524d API \u6e20\u9053\u7f3a\u5c11 Base URL \u6216 API Key\uff0c\u8bf7\u5148\u5b8c\u6210 API\u914d\u7f6e\u3002');
       return;
     }
     if (selectedTextModel.channel.apiFormat && selectedTextModel.channel.apiFormat !== 'openai') {
-      setTextGenerationError('当前仅支持 OpenAI-compatible 文本模型。');
+      setTextGenerationError('\u5f53\u524d\u4ec5\u652f\u6301 OpenAI-compatible \u6587\u672c\u6a21\u578b\u3002');
+      return;
+    }
+
+    const editText = getSelectedChapterText() || activeChapter.content;
+    if (action !== 'continue' && !editText.trim()) {
+      setTextGenerationError('\u8bf7\u5148\u8f93\u5165\u6b63\u6587\u3002');
       return;
     }
 
@@ -243,6 +251,13 @@ export function NovelCreation() {
     setTextGenerationStatus('generating');
     setTextGenerationError('');
     setAiDraft('');
+    setAiDraftAction(action);
+
+    const messages = action === 'polish'
+      ? buildPolishChapterPrompt(currentNovel, activeChapter, editText)
+      : action === 'rewrite'
+        ? buildRewriteChapterPrompt(currentNovel, activeChapter, editText)
+        : buildContinueChapterPrompt(currentNovel, activeChapter);
 
     const result = await rendererBridge.generateText({
       requestId,
@@ -251,20 +266,28 @@ export function NovelCreation() {
       baseUrl: selectedTextModel.channel.baseUrl,
       apiKey: selectedTextModel.channel.apiKey,
       model: selectedTextModel.model,
-      messages: buildContinueChapterPrompt(currentNovel, activeChapter),
-      temperature: 0.8,
-      maxTokens: 700,
+      messages,
+      temperature: action === 'rewrite' ? 0.85 : 0.75,
+      maxTokens: action === 'continue' ? 700 : 1200,
     });
 
     if (textGenerationRunRef.current !== runId) return;
     activeTextRequestIdRef.current = null;
     if (!result.ok || !result.text) {
       setTextGenerationStatus('failed');
-      setTextGenerationError(result.message || '续写失败，请稍后重试。');
+      setTextGenerationError(result.message || `${aiActionLabel(action)}\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002`);
       return;
     }
     setTextGenerationStatus('idle');
     setAiDraft(result.text);
+  }
+
+  function getSelectedChapterText() {
+    const target = editorRef.current;
+    if (!target || !activeChapter) return '';
+    const start = target.selectionStart;
+    const end = target.selectionEnd;
+    return end > start ? activeChapter.content.slice(start, end) : '';
   }
 
   function cancelTextGeneration() {
@@ -337,10 +360,10 @@ export function NovelCreation() {
           <>
             <header>
               <input ref={chapterTitleRef} value={activeChapter.title} onChange={(event) => updateChapter({ title: event.target.value })} placeholder="未命名章节" />
-              <div className="editor-stats"><span>{saveStatusLabel(saveStatus)}</span><span>当前章 {currentChapterWords} 字</span><span>全书 {totalWords} 字</span><span>{formatTime(activeChapter.updatedAt)}</span><button disabled={textGenerationStatus === 'generating'} onClick={() => void continueChapterWithTextGeneration()} type="button">{textGenerationStatus === 'generating' ? '生成中' : 'AI 续写'}</button>{textGenerationStatus === 'generating' && <button onClick={cancelTextGeneration} type="button">取消</button>}{saveStatus === 'failed' && <button onClick={() => void saveCurrentNovel()} type="button">重试</button>}</div>
+              <div className="editor-stats"><span>{saveStatusLabel(saveStatus)}</span><span>{'\u5f53\u524d\u7ae0'} {currentChapterWords} {'\u5b57'}</span><span>{'\u5168\u4e66'} {totalWords} {'\u5b57'}</span><span>{formatTime(activeChapter.updatedAt)}</span><button disabled={textGenerationStatus === 'generating'} onClick={() => void generateChapterDraft('continue')} type="button">{textGenerationStatus === 'generating' ? '\u751f\u6210\u4e2d' : 'AI \u7eed\u5199'}</button><button disabled={textGenerationStatus === 'generating'} onClick={() => void generateChapterDraft('polish')} type="button">{'AI \u6da6\u8272'}</button><button disabled={textGenerationStatus === 'generating'} onClick={() => void generateChapterDraft('rewrite')} type="button">{'AI \u6539\u5199'}</button>{textGenerationStatus === 'generating' && <button onClick={cancelTextGeneration} type="button">{'\u53d6\u6d88'}</button>}{saveStatus === 'failed' && <button onClick={() => void saveCurrentNovel()} type="button">{'\u91cd\u8bd5'}</button>}</div>
             </header>
             <textarea ref={editorRef} value={activeChapter.content} onChange={(event) => updateChapter({ content: event.target.value })} placeholder="开始写正文…" />
-            {(aiDraft || textGenerationError) && <div className="novel-ai-draft">{textGenerationError ? <p>{textGenerationError}</p> : <><strong>续写草稿</strong><p>{aiDraft}</p><div><button onClick={insertAiDraft} type="button">插入正文</button><button onClick={() => void copyAiDraft()} type="button">复制</button><button onClick={() => setAiDraft('')} type="button">放弃</button></div></>}</div>}
+            {(aiDraft || textGenerationError) && <div className="novel-ai-draft">{textGenerationError ? <p>{textGenerationError}</p> : <><strong>{aiDraftTitle(aiDraftAction)}</strong><p>{aiDraft}</p><div><button onClick={insertAiDraft} type="button">插入正文</button><button onClick={() => void copyAiDraft()} type="button">复制</button><button onClick={() => setAiDraft('')} type="button">放弃</button></div></>}</div>}
             <button className="chapter-delete" onClick={() => deleteChapter(activeChapter.id)} type="button">删除章节</button>
           </>
         ) : currentNovel ? <EmptyState title="无章节" text="在中间栏新建章节后开始写作。" /> : <EmptyState title="小说工作台" text="本地保存，选择小说后进入章节编辑。" />}
@@ -349,6 +372,16 @@ export function NovelCreation() {
       {modalMode && <div className="novel-modal" role="dialog" aria-modal="true" aria-label={modalMode === 'create' ? '新建小说' : '编辑小说信息'} onClick={() => setModalMode(null)}><div onClick={(event) => event.stopPropagation()}><h2>{modalMode === 'create' ? '新建小说' : '编辑小说信息'}</h2><label>标题<input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></label><label>简介<textarea value={form.summary} onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))} /></label><label>备注<input value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} /></label><footer><button onClick={() => setModalMode(null)} type="button">取消</button><button onClick={() => void submitNovelForm()} type="button">保存</button></footer></div></div>}
     </main>
   );
+}
+
+function aiActionLabel(action: AiDraftAction): string {
+  if (action === 'polish') return '\u6da6\u8272';
+  if (action === 'rewrite') return '\u6539\u5199';
+  return '\u7eed\u5199';
+}
+
+function aiDraftTitle(action: AiDraftAction): string {
+  return `${aiActionLabel(action)}\u8349\u7a3f`;
 }
 
 function EmptyState({ title, text }: { title: string; text?: string }) {
