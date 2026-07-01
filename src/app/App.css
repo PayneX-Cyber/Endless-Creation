@@ -41,7 +41,7 @@
 
 .canvasflow-sidebar {
   display: grid;
-  grid-template-rows: 86px minmax(0, 1fr) auto;
+  grid-template-rows: 92px minmax(0, 1fr) auto;
   width: 248px;
   height: 100vh;
   min-height: 0;
@@ -58,29 +58,29 @@
 .canvasflow-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  height: 86px;
-  padding: 0 16px;
+  gap: 10px;
+  height: 92px;
+  padding: 0 10px 0 16px;
   border-bottom: 1px solid var(--sidebar-border);
 }
 
 .canvasflow-brand__mark {
   display: grid;
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   place-items: center;
   flex: 0 0 auto;
   color: var(--brand-cyan);
-  border-radius: 14px;
+  border-radius: 13px;
   background: rgba(255, 255, 255, 0.72);
   box-shadow: 0 8px 18px rgba(24, 126, 255, 0.18), 0 2px 6px rgba(15, 23, 42, 0.08);
 }
 
 .canvasflow-brand__mark img {
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   display: block;
-  border-radius: 12px;
+  border-radius: 11px;
   object-fit: cover;
   filter: drop-shadow(0 4px 7px rgba(38, 132, 255, 0.22));
 }
@@ -99,10 +99,10 @@
   display: grid;
   gap: 0;
   font-family: "Segoe Print", "Comic Sans MS", "Bradley Hand ITC", cursive;
-  font-size: 21px;
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: 0.01em;
-  line-height: 0.92;
+  line-height: 0.9;
   text-overflow: ellipsis;
   white-space: nowrap;
   -webkit-background-clip: text;
@@ -110,7 +110,7 @@
 }
 
 .canvasflow-brand__name span:last-child {
-  margin-left: 32px;
+  margin-left: 26px;
 }
 
 .app-shell[data-theme='light'] .canvasflow-brand__name {
