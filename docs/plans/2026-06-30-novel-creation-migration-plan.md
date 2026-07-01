@@ -90,7 +90,7 @@ userData/novels/
 链路：
 
 ```text
-文本生成 Bridge + 复用模型偏好 → 最小端到端 AI 调用 → Prompt Registry → 第一个小说 AI 场景
+文本生成 Bridge + 复用模型偏好 → 最小端到端 AI 调用 → 当前章节 AI 续写 → 草稿预览 → 用户手动插入
 ```
 
 需要新增最小文本生成桥接：
@@ -107,14 +107,37 @@ Electron Main 调用 OpenAI-compatible：
 
 复用现有 API 配置、模型偏好、渠道配置，不另做小说专用 API 设置。
 
-可参考迁移的 Prompt：
+第一刀范围：
+
+- 只做当前章节 `AI 续写`
+- 新增 `generateText` / `cancelTextGeneration`
+- Electron Main 调用 OpenAI-compatible `/chat/completions`
+- 结果进入草稿预览，不自动覆盖正文
+- 用户点击“插入正文”后才写回章节
+- 支持生成中、取消、失败提示和 60 秒超时
+
+明确边界：
+
+- API Key 传递与现有生图链路一致：renderer 组装 request，经 IPC 传 main，由 main 请求 provider；第二阶段不单独重做更严密钥模型。
+- 续写上下文只取当前章节末尾内容，不跨章拼接；章节不足 1500 字按实际内容传。跨章上下文、长上下文记忆后置。
+- 暂不做润色、改写、扩写独立功能、生成整章草稿、Prompt Registry UI、世界观、角色卡、大纲、RAG、资产库联动、streaming、多候选和版本历史。
+
+第一刀 Prompt 放代码内常量，位置：
+
+```text
+src/features/novel-creation/novelPrompts.ts
+```
+
+只保留一个模板函数：`buildContinueChapterPrompt(...)`。
+
+后续可参考迁移的 Prompt：
 
 - `backend/prompts/concept.md`
 - `backend/prompts/outline_generation.md`
 - `backend/prompts/writing.md`
 - `backend/prompts/screenwriting.md`
 
-第二阶段第一个 AI 闭环建议只做“根据章节提示生成章节草稿”，不一次性实现完整“灵感 → 蓝图 → 大纲 → 正文”链路。
+第二阶段第一个 AI 闭环只做“当前章节续写”，不一次性实现完整“灵感 → 蓝图 → 大纲 → 正文”链路。
 
 ### 第三阶段：多版本章节生成
 
@@ -316,15 +339,19 @@ Web fallback：无 Electron bridge 时用 `localStorage` 存 `endless-creation.n
 
 NovelForge 后台包含大量可编辑提示词。Endless Creation 前期不迁移后台管理，但不能跳过提示词体系。
 
-第二阶段接入 AI 文本生成时，必须先打通文本生成 Bridge 并复用现有模型偏好，再实现本地内置 Prompt Registry：
+第二阶段接入 AI 文本生成时，必须先打通文本生成 Bridge 并复用现有模型偏好。第一刀只使用代码内单函数 Prompt，不实现 Prompt Registry：
+
+```text
+src/features/novel-creation/novelPrompts.ts
+```
+
+Prompt Registry 在续写链路实机跑通后再作为增量加入：
 
 ```text
 src/features/novel-creation/promptRegistry.ts
 ```
 
-或等价的本地模块。
-
-第一版优先内置以下 Prompt：
+后续优先登记以下 Prompt：
 
 - `concept`
 - `outline_generation`
@@ -356,7 +383,7 @@ src/features/novel-creation/promptRegistry.ts
 设置页 → 小说创作 → 提示词管理
 ```
 
-强约束：不得因为没有后台提示词管理而跳过 Prompt Registry，也不得在文本生成 Bridge 打通前堆不可验证的 Prompt 模板；不得提前迁移 NovelForge 管理后台。
+强约束：不得因为没有后台提示词管理而跳过提示词体系；但在当前章节续写真实跑通前，不得提前实现 Prompt Registry 或堆不可验证的 Prompt 模板；不得提前迁移 NovelForge 管理后台。
 
 ## GitHub 最新仓库核对记录
 
