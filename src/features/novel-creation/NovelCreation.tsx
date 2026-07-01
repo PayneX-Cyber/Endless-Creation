@@ -19,6 +19,8 @@ export function NovelCreation() {
   const [form, setForm] = useState<NovelForm>(emptyForm);
   const chapterTitleRef = useRef<HTMLInputElement | null>(null);
   const revisionRef = useRef(0);
+  const latestNovelRef = useRef<Novel | null>(null);
+  const latestSaveStatusRef = useRef<SaveStatus>('saved');
 
   const chapters = useMemo(() => [...(currentNovel?.chapters ?? [])].sort((a, b) => a.order - b.order), [currentNovel]);
   const activeChapter = chapters.find((chapter) => chapter.id === activeChapterId) ?? null;
@@ -30,10 +32,38 @@ export function NovelCreation() {
   }, []);
 
   useEffect(() => {
+    latestNovelRef.current = currentNovel;
+  }, [currentNovel]);
+
+  useEffect(() => {
+    latestSaveStatusRef.current = saveStatus;
+  }, [saveStatus]);
+
+  useEffect(() => {
     if (!currentNovel || saveStatus !== 'dirty') return;
     const handle = window.setTimeout(() => { void saveCurrentNovel(); }, 600);
     return () => window.clearTimeout(handle);
   }, [currentNovel, saveStatus]);
+
+  useEffect(() => {
+    function flushLatestNovel() {
+      const latestNovel = latestNovelRef.current;
+      if (!latestNovel || latestSaveStatusRef.current === 'saved') return;
+      void novelService.saveNovel(latestNovel);
+    }
+
+    function flushOnVisibilityChange() {
+      if (document.visibilityState === 'hidden') flushLatestNovel();
+    }
+
+    window.addEventListener('beforeunload', flushLatestNovel);
+    document.addEventListener('visibilitychange', flushOnVisibilityChange);
+    return () => {
+      flushLatestNovel();
+      window.removeEventListener('beforeunload', flushLatestNovel);
+      document.removeEventListener('visibilitychange', flushOnVisibilityChange);
+    };
+  }, []);
 
   async function loadSummaries() {
     setLoading(true);
