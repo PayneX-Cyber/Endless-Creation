@@ -269,7 +269,7 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
         };
       }),
     };
-    setApiStore(nextStore);
+    persistApiStore(nextStore, true);
   }
 
   function addChannel() {
@@ -313,18 +313,29 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
     setShowApiKey(false);
   }
 
+  function persistEditingChannelDraft(nextDraft: ModelChannel) {
+    const channelToSave = { ...nextDraft, models: uniqueModels(nextDraft.models) };
+    const nextStore = {
+      ...apiStore,
+      activeChannelId: channelToSave.id,
+      channels: apiStore.channels.map((channel) => channel.id === channelToSave.id ? channelToSave : channel),
+    };
+    syncModelPreferencesWithChannels(nextStore.channels);
+    persistApiStore(nextStore, true);
+  }
+
   function updateEditingChannelDraft(patch: Partial<ModelChannel>) {
-    setEditingChannelDraft((current) => {
-      if (!current) return current;
-      const apiFormat = patch.apiFormat ?? current.apiFormat;
-      const shouldResetBaseUrl = patch.apiFormat && patch.apiFormat !== current.apiFormat;
-      return {
-        ...current,
-        ...patch,
-        apiFormat,
-        baseUrl: shouldResetBaseUrl ? defaultBaseUrlForApiFormat(apiFormat) : patch.baseUrl ?? current.baseUrl,
-      };
-    });
+    if (!editingChannelDraft) return;
+    const apiFormat = patch.apiFormat ?? editingChannelDraft.apiFormat;
+    const shouldResetBaseUrl = patch.apiFormat && patch.apiFormat !== editingChannelDraft.apiFormat;
+    const nextDraft = {
+      ...editingChannelDraft,
+      ...patch,
+      apiFormat,
+      baseUrl: shouldResetBaseUrl ? defaultBaseUrlForApiFormat(apiFormat) : patch.baseUrl ?? editingChannelDraft.baseUrl,
+    };
+    setEditingChannelDraft(nextDraft);
+    persistEditingChannelDraft(nextDraft);
   }
 
   function saveEditingChannel() {
@@ -359,23 +370,21 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
   }
 
   function toggleCandidateModel(model: string, checked: boolean) {
-    setEditingChannelDraft((current) => {
-      if (!current) return current;
-      const models = checked
-        ? uniqueModels([...current.models, model])
-        : current.models.filter((item) => item !== model);
-      return { ...current, models };
-    });
+    if (!editingChannelDraft) return;
+    const models = checked
+      ? uniqueModels([...editingChannelDraft.models, model])
+      : editingChannelDraft.models.filter((item) => item !== model);
+    updateEditingChannelDraft({ models });
   }
 
   function selectAllCandidateModels() {
     if (!editingChannelDraft) return;
-    setEditingChannelDraft({ ...editingChannelDraft, models: uniqueModels(candidateModels) });
+    updateEditingChannelDraft({ models: uniqueModels(candidateModels) });
   }
 
   function clearSelectedModels() {
     if (!editingChannelDraft) return;
-    setEditingChannelDraft({ ...editingChannelDraft, models: [] });
+    updateEditingChannelDraft({ models: [] });
   }
 
   function updateManualModels(value: string) {
@@ -435,12 +444,16 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
     notifyModelPreferencesUpdated();
   }
 
-  function saveModelPreferences() {
-    const nextPreferences = normalizeModelPreferencesForOptions(modelPreferences, allModelOptions);
-    setModelPreferences(nextPreferences);
-    writeStorage(MODEL_PREFERENCES_STORAGE_KEY, nextPreferences);
+  function persistModelPreferences(nextPreferences: ModelPreferences, quiet = false) {
+    const normalized = normalizeModelPreferencesForOptions(nextPreferences, allModelOptions);
+    setModelPreferences(normalized);
+    writeStorage(MODEL_PREFERENCES_STORAGE_KEY, normalized);
     notifyModelPreferencesUpdated();
-    setFeedback('模型偏好已保存。');
+    if (!quiet) setFeedback('\u6a21\u578b\u504f\u597d\u5df2\u81ea\u52a8\u4fdd\u5b58\u3002');
+  }
+
+  function saveModelPreferences() {
+    persistModelPreferences(modelPreferences);
   }
 
   function saveGenerationPreferences() {
@@ -741,7 +754,7 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
                         <h2>模型偏好</h2>
                         <p>默认模型可从所有渠道已拉取的模型中选择，也可以手动输入。</p>
                       </div>
-                      <button className="settings-page__primary" type="button" onClick={saveModelPreferences}>保存模型偏好</button>
+                      <button className="settings-page__primary" type="button" onClick={saveModelPreferences}>{'\u7acb\u5373\u4fdd\u5b58\u4e00\u6b21'}</button>
                     </div>
                     <article className="settings-card">
                       <div className="settings-model-card-intro">
@@ -749,16 +762,16 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
                         <p>可选项决定各处下拉框展示哪些模型；同名模型会以括号里的渠道名区分。</p>
                       </div>
                       <div className="settings-model-option-grid">
-                        <ModelOptionGroup dropdownId="option:image" title="生图模型可选项" values={imageModelValues} options={allModelOptions.filter((option) => option.capability === 'image')} isOpen={openModelPreferenceDropdown === 'option:image'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:image' : null)} onChange={(imageModels) => setModelPreferences((current) => ({ ...current, imageModels, modelOptionsInitialized: true }))} />
-                        <ModelOptionGroup dropdownId="option:video" title="视频模型可选项" values={videoModelValues} options={allModelOptions.filter((option) => option.capability === 'video')} isOpen={openModelPreferenceDropdown === 'option:video'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:video' : null)} onChange={(videoModels) => setModelPreferences((current) => ({ ...current, videoModels, modelOptionsInitialized: true }))} />
-                        <ModelOptionGroup dropdownId="option:text" title="文本模型可选项" values={textModelValues} options={allModelOptions.filter((option) => option.capability === 'text')} isOpen={openModelPreferenceDropdown === 'option:text'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:text' : null)} onChange={(textModels) => setModelPreferences((current) => ({ ...current, textModels, modelOptionsInitialized: true }))} />
-                        <ModelOptionGroup dropdownId="option:audio" title="音频模型可选项" values={audioModelValues} options={allModelOptions.filter((option) => option.capability === 'audio')} isOpen={openModelPreferenceDropdown === 'option:audio'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:audio' : null)} onChange={(audioModels) => setModelPreferences((current) => ({ ...current, audioModels, modelOptionsInitialized: true }))} />
+                        <ModelOptionGroup dropdownId="option:image" title="生图模型可选项" values={imageModelValues} options={allModelOptions.filter((option) => option.capability === 'image')} isOpen={openModelPreferenceDropdown === 'option:image'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:image' : null)} onChange={(imageModels) => persistModelPreferences({ ...modelPreferences, imageModels, modelOptionsInitialized: true }, true)} />
+                        <ModelOptionGroup dropdownId="option:video" title="视频模型可选项" values={videoModelValues} options={allModelOptions.filter((option) => option.capability === 'video')} isOpen={openModelPreferenceDropdown === 'option:video'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:video' : null)} onChange={(videoModels) => persistModelPreferences({ ...modelPreferences, videoModels, modelOptionsInitialized: true }, true)} />
+                        <ModelOptionGroup dropdownId="option:text" title="文本模型可选项" values={textModelValues} options={allModelOptions.filter((option) => option.capability === 'text')} isOpen={openModelPreferenceDropdown === 'option:text'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:text' : null)} onChange={(textModels) => persistModelPreferences({ ...modelPreferences, textModels, modelOptionsInitialized: true }, true)} />
+                        <ModelOptionGroup dropdownId="option:audio" title="音频模型可选项" values={audioModelValues} options={allModelOptions.filter((option) => option.capability === 'audio')} isOpen={openModelPreferenceDropdown === 'option:audio'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'option:audio' : null)} onChange={(audioModels) => persistModelPreferences({ ...modelPreferences, audioModels, modelOptionsInitialized: true }, true)} />
                       </div>
                       <div className="settings-model-default-grid">
-                        <ModelField dropdownId="default:image" label="默认生图模型" value={normalizeSingleModelValue(modelPreferences.imageModel, allModelOptions)} options={optionsByValues(imageModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:image'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:image' : null)} onChange={(imageModel) => setModelPreferences((current) => ({ ...current, imageModel }))} />
-                        <ModelField dropdownId="default:video" label="默认视频模型" value={normalizeSingleModelValue(modelPreferences.videoModel, allModelOptions)} options={optionsByValues(videoModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:video'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:video' : null)} onChange={(videoModel) => setModelPreferences((current) => ({ ...current, videoModel }))} />
-                        <ModelField dropdownId="default:text" label="默认文本模型" value={normalizeSingleModelValue(modelPreferences.textModel, allModelOptions)} options={optionsByValues(textModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:text'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:text' : null)} onChange={(textModel) => setModelPreferences((current) => ({ ...current, textModel }))} />
-                        <ModelField dropdownId="default:audio" label="默认音频模型" value={normalizeSingleModelValue(modelPreferences.audioModel, allModelOptions)} options={optionsByValues(audioModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:audio'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:audio' : null)} onChange={(audioModel) => setModelPreferences((current) => ({ ...current, audioModel }))} />
+                        <ModelField dropdownId="default:image" label="默认生图模型" value={normalizeSingleModelValue(modelPreferences.imageModel, allModelOptions)} options={optionsByValues(imageModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:image'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:image' : null)} onChange={(imageModel) => persistModelPreferences({ ...modelPreferences, imageModel }, true)} />
+                        <ModelField dropdownId="default:video" label="默认视频模型" value={normalizeSingleModelValue(modelPreferences.videoModel, allModelOptions)} options={optionsByValues(videoModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:video'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:video' : null)} onChange={(videoModel) => persistModelPreferences({ ...modelPreferences, videoModel }, true)} />
+                        <ModelField dropdownId="default:text" label="默认文本模型" value={normalizeSingleModelValue(modelPreferences.textModel, allModelOptions)} options={optionsByValues(textModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:text'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:text' : null)} onChange={(textModel) => persistModelPreferences({ ...modelPreferences, textModel }, true)} />
+                        <ModelField dropdownId="default:audio" label="默认音频模型" value={normalizeSingleModelValue(modelPreferences.audioModel, allModelOptions)} options={optionsByValues(audioModelValues, allModelOptions)} isOpen={openModelPreferenceDropdown === 'default:audio'} onOpenChange={(open) => setOpenModelPreferenceDropdown(open ? 'default:audio' : null)} onChange={(audioModel) => persistModelPreferences({ ...modelPreferences, audioModel }, true)} />
                       </div>
                     </article>
                   </section>
@@ -950,7 +963,7 @@ export function SettingsPage({ theme, onThemeChange, onClose }: SettingsPageProp
                 <div className="settings-submodal__footer">
                   <button className="settings-page__secondary" type="button" onClick={closeChannelEditor}>取消</button>
                   <button className="settings-page__secondary" type="button" disabled={editingChannel.lastTestStatus === 'testing'} onClick={testEditingChannel}>{editingChannel.lastTestStatus === 'testing' ? '测试中…' : '测试连接'}</button>
-                  <button className="settings-page__primary" type="button" onClick={saveEditingChannel}>保存</button>
+                  <button className="settings-page__primary" type="button" onClick={saveEditingChannel}>{'\u5b8c\u6210'}</button>
                 </div>
               </article>
             </div>
