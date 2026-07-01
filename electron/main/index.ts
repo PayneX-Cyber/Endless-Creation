@@ -1168,7 +1168,10 @@ function readTextProviderErrorMessage(body: unknown, apiKey: string): string | u
 }
 
 function redactSecret(message: string, secret: string): string {
-  return secret ? message.replaceAll(secret, '[redacted]') : message;
+  let redacted = secret ? message.replaceAll(secret, '[redacted]') : message;
+  redacted = redacted.replace(/\bAuthorization\s*:?\s*Bearer\s+[^\s,;}]+/gi, '[redacted]');
+  redacted = redacted.replace(/\bBearer\s+[^\s,;}]+/gi, '[redacted]');
+  return redacted.replace(/\b(Authorization|Bearer)\b/gi, '[redacted]');
 }
 
 async function readModelIds(response: Response): Promise<string[]> {
