@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, Novel, NovelSummary } from '../../types/novel';
-import { buildContinueChapterPrompt, buildExpandChapterPrompt, buildPolishChapterPrompt, buildRewriteChapterPrompt } from './novelPrompts';
+import { buildContinueChapterPrompt, buildPolishChapterPrompt, buildRewriteChapterPrompt } from './novelPrompts';
 import './NovelCreation.css';
 
 type SaveStatus = 'saved' | 'dirty' | 'saving' | 'failed';
 type TextGenerationStatus = 'idle' | 'generating' | 'failed';
-type AiDraftAction = 'continue' | 'polish' | 'rewrite' | 'expand';
+type AiDraftAction = 'continue' | 'polish' | 'rewrite';
 type AiDraftSource = { type: 'insert' } | { type: 'chapter'; chapterId: string } | { type: 'selection'; chapterId: string; start: number; end: number };
 type NovelForm = { title: string; summary: string; note: string };
 interface ModelPreferences { textModel?: string; textModels?: string[]; }
@@ -262,9 +262,7 @@ export function NovelCreation() {
       ? buildPolishChapterPrompt(currentNovel, activeChapter, editText)
       : action === 'rewrite'
         ? buildRewriteChapterPrompt(currentNovel, activeChapter, editText)
-        : action === 'expand'
-          ? buildExpandChapterPrompt(currentNovel, activeChapter, editText)
-          : buildContinueChapterPrompt(currentNovel, activeChapter);
+        : buildContinueChapterPrompt(currentNovel, activeChapter);
 
     const result = await rendererBridge.generateText({
       requestId,
@@ -274,8 +272,8 @@ export function NovelCreation() {
       apiKey: selectedTextModel.channel.apiKey,
       model: selectedTextModel.model,
       messages,
-      temperature: action === 'rewrite' ? 0.85 : action === 'expand' ? 0.8 : 0.75,
-      maxTokens: action === 'continue' ? 700 : action === 'expand' ? 1400 : 1200,
+      temperature: action === 'rewrite' ? 0.85 : 0.75,
+      maxTokens: action === 'continue' ? 700 : 1200,
     });
 
     if (textGenerationRunRef.current !== runId) return;
@@ -387,7 +385,7 @@ export function NovelCreation() {
           <>
             <header>
               <input ref={chapterTitleRef} value={activeChapter.title} onChange={(event) => updateChapter({ title: event.target.value })} placeholder="未命名章节" />
-              <div className="editor-stats"><span>{saveStatusLabel(saveStatus)}</span><span>{'\u5f53\u524d\u7ae0'} {currentChapterWords} {'\u5b57'}</span><span>{'\u5168\u4e66'} {totalWords} {'\u5b57'}</span><span>{formatTime(activeChapter.updatedAt)}</span><button disabled={textGenerationStatus === 'generating'} onClick={() => void generateChapterDraft('continue')} type="button">{textGenerationStatus === 'generating' ? '\u751f\u6210\u4e2d' : 'AI \u7eed\u5199'}</button><button disabled={textGenerationStatus === 'generating'} onClick={() => void generateChapterDraft('polish')} type="button">{'AI \u6da6\u8272'}</button><button disabled={textGenerationStatus === 'generating'} onClick={() => void generateChapterDraft('rewrite')} type="button">{'AI \u6539\u5199'}</button><button disabled={textGenerationStatus === 'generating'} onClick={() => void generateChapterDraft('expand')} type="button">{'AI \u6269\u5199'}</button>{textGenerationStatus === 'generating' && <button onClick={cancelTextGeneration} type="button">{'\u53d6\u6d88'}</button>}{saveStatus === 'failed' && <button onClick={() => void saveCurrentNovel()} type="button">{'\u91cd\u8bd5'}</button>}</div>
+              <div className="editor-stats"><span>{saveStatusLabel(saveStatus)}</span><span>{'\u5f53\u524d\u7ae0'} {currentChapterWords} {'\u5b57'}</span><span>{'\u5168\u4e66'} {totalWords} {'\u5b57'}</span><span>{formatTime(activeChapter.updatedAt)}</span><button disabled={textGenerationStatus === 'generating'} onClick={() => void generateChapterDraft('continue')} type="button">{textGenerationStatus === 'generating' ? '\u751f\u6210\u4e2d' : 'AI \u7eed\u5199'}</button><button disabled={textGenerationStatus === 'generating'} onClick={() => void generateChapterDraft('polish')} type="button">{'AI \u6da6\u8272'}</button><button disabled={textGenerationStatus === 'generating'} onClick={() => void generateChapterDraft('rewrite')} type="button">{'AI \u6539\u5199'}</button>{textGenerationStatus === 'generating' && <button onClick={cancelTextGeneration} type="button">{'\u53d6\u6d88'}</button>}{saveStatus === 'failed' && <button onClick={() => void saveCurrentNovel()} type="button">{'\u91cd\u8bd5'}</button>}</div>
             </header>
             <textarea ref={editorRef} value={activeChapter.content} onChange={(event) => updateChapter({ content: event.target.value })} placeholder="开始写正文…" />
             {(aiDraft || textGenerationError) && <div className="novel-ai-draft">{textGenerationError ? <p>{textGenerationError}</p> : <><strong>{aiDraftTitle(aiDraftAction)}</strong><p>{aiDraft}</p><div>{aiDraftAction !== 'continue' && <button onClick={replaceAiDraftSource} type="button">{'\u66ff\u6362\u539f\u6587'}</button>}<button onClick={insertAiDraft} type="button">{'\u63d2\u5165\u6b63\u6587'}</button><button onClick={() => void copyAiDraft()} type="button">{'\u590d\u5236'}</button><button onClick={() => setAiDraft('')} type="button">{'\u653e\u5f03'}</button></div></>}</div>}
@@ -404,7 +402,6 @@ export function NovelCreation() {
 function aiActionLabel(action: AiDraftAction): string {
   if (action === 'polish') return '\u6da6\u8272';
   if (action === 'rewrite') return '\u6539\u5199';
-  if (action === 'expand') return '\u6269\u5199';
   return '\u7eed\u5199';
 }
 
