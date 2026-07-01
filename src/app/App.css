@@ -71,7 +71,9 @@
   place-items: center;
   flex: 0 0 auto;
   color: var(--brand-cyan);
-  box-shadow: 0 0 18px rgba(91, 140, 255, 0.16);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 8px 18px rgba(24, 126, 255, 0.18), 0 2px 6px rgba(15, 23, 42, 0.08);
 }
 
 .canvasflow-brand__mark img {
@@ -80,10 +82,11 @@
   display: block;
   border-radius: 12px;
   object-fit: cover;
+  filter: drop-shadow(0 4px 7px rgba(38, 132, 255, 0.22));
 }
 
 .app-shell[data-theme='light'] .canvasflow-brand__mark {
-  box-shadow: none;
+  box-shadow: 0 8px 18px rgba(24, 126, 255, 0.18), 0 2px 6px rgba(15, 23, 42, 0.08);
 }
 
 .canvasflow-brand__name {
