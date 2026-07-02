@@ -22,6 +22,7 @@ const emptyForm: NovelForm = { title: '', summary: '', note: '' };
 const MODEL_PREFERENCES_STORAGE_KEY = 'endless-creation.model-preferences';
 const API_PROVIDER_STORAGE_KEY = 'endless-creation.api-provider-config';
 const INSPIRATION_STAGES = ['灵感收集', '故事核心', '角色冲突', '蓝图确认'];
+const MAX_CHAT_TURNS = 8;
 
 export function NovelCreation() {
   const [summaries, setSummaries] = useState<NovelSummary[]>([]);
@@ -52,6 +53,7 @@ export function NovelCreation() {
   const [inspirationBusy, setInspirationBusy] = useState<InspirationBusy>('idle');
   const [inspirationError, setInspirationError] = useState('');
   const [inspirationBlueprintDraft, setInspirationBlueprintDraft] = useState('');
+  const [inspirationIdeaDraft, setInspirationIdeaDraft] = useState('');
   const [inspirationOutlineDraft, setInspirationOutlineDraft] = useState('');
   const [blueprintConfirmed, setBlueprintConfirmed] = useState(false);
   const chapterTitleRef = useRef<HTMLInputElement | null>(null);
@@ -564,6 +566,7 @@ export function NovelCreation() {
     setChatMessages([{ id: createId('chat'), role: 'ai', text: INSPIRATION_OPENING_MESSAGE }]);
     setChatInput('');
     setInspirationError('');
+    setInspirationIdeaDraft('');
     setInspirationBlueprintDraft('');
     setInspirationOutlineDraft('');
     setBlueprintConfirmed(false);
@@ -614,7 +617,7 @@ export function NovelCreation() {
 
   async function sendInspirationMessage() {
     const text = chatInput.trim();
-    if (!text || inspirationBusy !== 'idle') return;
+    if (!text || inspirationBusy !== 'idle' || chatUserTurns >= MAX_CHAT_TURNS) return;
     const nextMessages: ChatBubble[] = [...chatMessages, { id: createId('chat'), role: 'user', text }];
     setChatMessages(nextMessages);
     setChatInput('');
@@ -639,8 +642,10 @@ export function NovelCreation() {
       setInspirationError('先和文思聊聊你的灵感，再生成蓝图。');
       return;
     }
+    const fromChat = view === 'inspirationChat';
     const text = await generateInspirationText('blueprint', buildBlueprintFromConversationPrompt(chatMessages));
     if (text === null) return;
+    if (fromChat || !inspirationIdeaDraft.trim()) setInspirationIdeaDraft(collectInspirationIdea());
     setInspirationBlueprintDraft(text);
     setBlueprintConfirmed(false);
     setView('inspirationBlueprint');
@@ -648,7 +653,7 @@ export function NovelCreation() {
 
   async function confirmInspirationBlueprint() {
     if (!inspirationBlueprintDraft.trim()) return;
-    const idea = collectInspirationIdea();
+    const idea = inspirationIdeaDraft.trim() ? inspirationIdeaDraft : collectInspirationIdea();
     const blueprint = inspirationBlueprintDraft;
     const now = new Date().toISOString();
     if (currentNovel) {
@@ -671,7 +676,7 @@ export function NovelCreation() {
 
   async function generateInspirationOutline() {
     if (!currentNovel || inspirationBusy !== 'idle') return;
-    const text = await generateInspirationText('outline', buildOutlinePrompt({ ...currentNovel, idea: collectInspirationIdea(), blueprint: inspirationBlueprintDraft }));
+    const text = await generateInspirationText('outline', buildOutlinePrompt({ ...currentNovel, blueprint: inspirationBlueprintDraft }));
     if (text === null) return;
     setInspirationOutlineDraft(text);
     setView('inspirationOutline');
@@ -755,23 +760,26 @@ export function NovelCreation() {
             <div className="novel-chat__actions">
               <button className="novel-flow__primary novel-flow__primary--compact" disabled={inspirationBusy !== 'idle' || !chatUserTurns} onClick={() => void generateInspirationBlueprint()} type="button">{inspirationBusy === 'blueprint' ? '生成蓝图中…' : '生成蓝图'}</button>
               <button className="novel-flow__ghost" disabled={inspirationBusy !== 'idle'} onClick={() => chatInputRef.current?.focus()} type="button">继续对话</button>
-              {chatUserTurns >= 4 && inspirationBusy === 'idle' && <span className="novel-chat__ready">文思觉得灵感差不多了，可以生成蓝图</span>}
+              {(chatUserTurns >= 4) && inspirationBusy === 'idle' && <span className="novel-chat__ready">{chatUserTurns >= MAX_CHAT_TURNS ? '已达 8 轮对话上限，让文思为你生成蓝图吧' : '文思觉得灵感差不多了，可以生成蓝图'}</span>}
             </div>
             <div className="novel-chat__input">
-              <textarea ref={chatInputRef} value={chatInput} onChange={(event) => setChatInput(event.target.value)} onKeyDown={handleChatKeyDown} placeholder="告诉文思你的故事灵感、角色、冲突或世界设定..." rows={2} />
-              <button disabled={!chatInput.trim() || inspirationBusy !== 'idle'} onClick={() => void sendInspirationMessage()} type="button">发送</button>
+              <textarea ref={chatInputRef} disabled={chatUserTurns >= MAX_CHAT_TURNS} value={chatInput} onChange={(event) => setChatInput(event.target.value)} onKeyDown={handleChatKeyDown} placeholder={chatUserTurns >= MAX_CHAT_TURNS ? '对话已达上限，点击「生成蓝图」继续' : '告诉文思你的故事灵感、角色、冲突或世界设定...'} rows={2} />
+              <button disabled={!chatInput.trim() || inspirationBusy !== 'idle' || chatUserTurns >= MAX_CHAT_TURNS} onClick={() => void sendInspirationMessage()} type="button">发送</button>
             </div>
           </footer>
         </section>
       )}
       {view === 'inspirationBlueprint' && (
-        <section className="novel-preview" aria-label="蓝图预览">
+        <section className="novel-preview novel-preview--blueprint" aria-label="蓝图预览">
           <header className="novel-preview__head">
             <p className="novel-intro__eyebrow">灵感模式</p>
             <h2>作品蓝图</h2>
             <span>{blueprintConfirmed ? '蓝图已保存，可以继续生成章节大纲。' : '检查并润色文思为你整理的蓝图，确认后写入小说。'}</span>
           </header>
-          <textarea className="novel-preview__editor" value={inspirationBlueprintDraft} onChange={(event) => { setInspirationBlueprintDraft(event.target.value); setBlueprintConfirmed(false); }} placeholder="作品蓝图…" />
+          <label className="novel-preview__label" htmlFor="inspiration-idea">创意概要</label>
+          <textarea className="novel-preview__editor novel-preview__editor--idea" id="inspiration-idea" value={inspirationIdeaDraft} onChange={(event) => { setInspirationIdeaDraft(event.target.value); setBlueprintConfirmed(false); }} placeholder="这本书最初的点子，会随蓝图一起写入小说…" />
+          <label className="novel-preview__label" htmlFor="inspiration-blueprint">作品蓝图</label>
+          <textarea className="novel-preview__editor" id="inspiration-blueprint" value={inspirationBlueprintDraft} onChange={(event) => { setInspirationBlueprintDraft(event.target.value); setBlueprintConfirmed(false); }} placeholder="作品蓝图…" />
           {inspirationError && <p className="novel-flow__error">{inspirationError}</p>}
           <footer className="novel-preview__actions">
             {blueprintConfirmed ? (
