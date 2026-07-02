@@ -86,6 +86,7 @@ interface Chapter {
   id: string;
   title: string;
   content: string;
+  outline?: string;
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -96,8 +97,10 @@ interface Novel {
   title: string;
   summary: string;
   note: string;
+  idea?: string;
+  blueprint?: string;
   chapters: Chapter[];
-  version: 1;
+  version: 2;
   createdAt: string;
   updatedAt: string;
 }
@@ -431,6 +434,7 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
       id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : randomUUID(),
       title: typeof item.title === 'string' ? item.title : '',
       content: typeof item.content === 'string' ? item.content : '',
+      outline: typeof item.outline === 'string' ? item.outline : undefined,
       order: Number.isFinite(item.order) ? Number(item.order) : index,
       createdAt: typeof item.createdAt === 'string' ? item.createdAt : now,
       updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : now,
@@ -442,8 +446,10 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
     title: typeof candidate.title === 'string' && candidate.title.trim() ? candidate.title : '\u672a\u547d\u540d\u5c0f\u8bf4',
     summary: typeof candidate.summary === 'string' ? candidate.summary : '',
     note: typeof candidate.note === 'string' ? candidate.note : '',
+    idea: typeof candidate.idea === 'string' ? candidate.idea : undefined,
+    blueprint: typeof candidate.blueprint === 'string' ? candidate.blueprint : undefined,
     chapters,
-    version: 1,
+    version: 2,
     createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : now,
     updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : now,
   };
@@ -497,7 +503,7 @@ async function createNovel(input: unknown): Promise<{ ok: boolean; message: stri
     summary: typeof candidate.summary === 'string' ? candidate.summary : '',
     note: typeof candidate.note === 'string' ? candidate.note : '',
     chapters: [],
-    version: 1,
+    version: 2,
     createdAt: now,
     updatedAt: now,
   };
