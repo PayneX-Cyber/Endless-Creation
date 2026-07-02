@@ -24,6 +24,7 @@ export interface Novel {
 export type NovelSummary = Pick<Novel, 'id' | 'title' | 'summary' | 'createdAt' | 'updatedAt'> & {
   chapterCount: number;
   wordCount: number;
+  filledChapterCount: number;
 };
 
 export type NovelResult = { ok: boolean; message: string; novel?: Novel };

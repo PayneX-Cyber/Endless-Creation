@@ -108,6 +108,7 @@ interface Novel {
 type NovelSummary = Pick<Novel, 'id' | 'title' | 'summary' | 'createdAt' | 'updatedAt'> & {
   chapterCount: number;
   wordCount: number;
+  filledChapterCount: number;
 };
 
 function createMainWindow(): void {
@@ -464,6 +465,7 @@ function toNovelSummary(novel: Novel): NovelSummary {
     updatedAt: novel.updatedAt,
     chapterCount: novel.chapters.length,
     wordCount: novel.chapters.reduce((sum, chapter) => sum + countNovelWords(chapter.content), 0),
+    filledChapterCount: novel.chapters.filter((chapter) => chapter.content.trim() !== '').length,
   };
 }
 

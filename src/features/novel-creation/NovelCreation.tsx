@@ -10,7 +10,8 @@ type TextGenerationStatus = 'idle' | 'generating' | 'failed';
 type AiDraftAction = 'continue' | 'polish' | 'rewrite' | 'outline';
 type AiDraftSource = { type: 'insert' } | { type: 'chapter'; chapterId: string } | { type: 'selection'; chapterId: string; start: number; end: number; text: string } | { type: 'outline'; chapterId: string; content: string; updatedAt: string };
 type WizardStep = 'idea' | 'blueprint' | 'outline';
-type NovelView = 'creationCenter' | 'inspirationIntro' | 'inspirationPreparing' | 'inspirationChat' | 'inspirationBlueprint' | 'inspirationOutline' | 'workbench';
+type NovelView = 'creationCenter' | 'projectList' | 'projectView' | 'inspirationIntro' | 'inspirationPreparing' | 'inspirationChat' | 'inspirationBlueprint' | 'inspirationOutline' | 'workbench';
+type ProjectViewTab = 'overview' | 'outline' | 'chapters';
 type InspirationBusy = 'idle' | 'chat' | 'blueprint' | 'outline';
 type ChatBubble = InspirationChatMessage & { id: string };
 type NovelForm = { title: string; summary: string; note: string };
@@ -48,6 +49,7 @@ export function NovelCreation() {
   const [wizardError, setWizardError] = useState('');
   const [wizardNotice, setWizardNotice] = useState('');
   const [view, setView] = useState<NovelView>('creationCenter');
+  const [projectViewTab, setProjectViewTab] = useState<ProjectViewTab>('overview');
   const [chatMessages, setChatMessages] = useState<ChatBubble[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [inspirationBusy, setInspirationBusy] = useState<InspirationBusy>('idle');
@@ -162,19 +164,32 @@ export function NovelCreation() {
     setSummaries(result.novels);
   }
 
-  async function openNovel(id: string) {
+  async function openNovel(id: string): Promise<boolean> {
     if (currentNovel && saveStatus !== 'saved') await novelService.saveNovel(currentNovel);
     const result = await novelService.loadNovel(id);
     if (!result.ok || !result.novel) {
       setFeedback(result.message || '小说文件损坏。');
       setCurrentNovel(null);
       setActiveChapterId(null);
-      return;
+      return false;
     }
     setCurrentNovel(result.novel);
     setActiveChapterId(result.novel.chapters[0]?.id ?? null);
     setSaveStatus('saved');
     setFeedback('');
+    return true;
+  }
+
+  async function openProjectView(id: string) {
+    if (!await openNovel(id)) return;
+    setProjectViewTab('overview');
+    setView('projectView');
+  }
+
+  async function openProjectWorkbench(id: string, chapterId?: string) {
+    if (!await openNovel(id)) return;
+    if (chapterId) setActiveChapterId(chapterId);
+    setView('workbench');
   }
 
   function updateNovel(update: (novel: Novel) => Novel) {
@@ -248,11 +263,15 @@ export function NovelCreation() {
 
   function updateChapter(patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline'>>) {
     if (!activeChapter) return;
+    updateChapterById(activeChapter.id, patch);
+  }
+
+  function updateChapterById(chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline'>>) {
     const now = new Date().toISOString();
     updateNovel((novel) => ({
       ...novel,
       updatedAt: now,
-      chapters: novel.chapters.map((chapter) => chapter.id === activeChapter.id ? { ...chapter, ...patch, updatedAt: now } : chapter),
+      chapters: novel.chapters.map((chapter) => chapter.id === chapterId ? { ...chapter, ...patch, updatedAt: now } : chapter),
     }));
   }
 
@@ -702,6 +721,27 @@ export function NovelCreation() {
     setView('workbench');
   }
 
+  function startNewProject() {
+    setForm(emptyForm);
+    setModalMode('create');
+  }
+
+  function projectProgress(summary: NovelSummary): number {
+    return summary.chapterCount ? Math.round((summary.filledChapterCount / summary.chapterCount) * 100) : 0;
+  }
+
+  function projectStatus(summary: NovelSummary): string {
+    return summary.filledChapterCount > 0 ? '连载中' : '蓝图';
+  }
+
+  function projectSummary(novel: Novel): string {
+    return novel.blueprint?.trim() || novel.summary.trim() || novel.idea?.trim() || '';
+  }
+
+  function updateProjectField(field: 'blueprint' | 'summary' | 'idea', value: string) {
+    updateNovel((novel) => ({ ...novel, [field]: value, updatedAt: new Date().toISOString() }));
+  }
+
   return (
     <main className={view === 'workbench' ? 'novel-creation' : 'novel-creation novel-creation--flow'} aria-label="小说创作">
       {view === 'creationCenter' && (
@@ -721,8 +761,103 @@ export function NovelCreation() {
               <h2>小说工作台</h2>
               <p>查看、编辑和管理本地小说与章节。</p>
               <span className="novel-center__meta">{summaries.length ? `最近编辑：《${summaries[0].title}》` : '暂无本地小说'}</span>
-              <button className="novel-flow__primary" onClick={() => setView('workbench')} type="button">进入工作台</button>
+              <button className="novel-flow__primary" onClick={() => setView('projectList')} type="button">我的小说项目</button>
             </article>
+          </div>
+        </section>
+      )}
+      {view === 'projectList' && (
+        <section className="novel-projects" aria-label="我的小说项目">
+          <header className="novel-projects__head">
+            <div>
+              <p>Novel Studio</p>
+              <h1>我的小说项目</h1>
+            </div>
+            <button className="novel-flow__ghost" onClick={openCreationCenter} type="button">返回</button>
+          </header>
+          {isLoading ? <EmptyState title="正在加载小说…" /> : summaries.length ? (
+            <div className="novel-project-grid">
+              {summaries.map((novel) => {
+                const progress = projectProgress(novel);
+                return (
+                  <article className="novel-project-card" key={novel.id}>
+                    <div className="novel-project-card__top">
+                      <span>{projectStatus(novel)}</span>
+                      <small>{formatTime(novel.updatedAt)}</small>
+                    </div>
+                    <h2>{novel.title}</h2>
+                    <p>{novel.chapterCount} 章 · {novel.wordCount} 字</p>
+                    <div className="novel-project-progress" aria-label={`完成度 ${progress}%`}><span style={{ width: `${progress}%` }} /></div>
+                    <footer>
+                      <button className="novel-flow__ghost" onClick={() => void openProjectView(novel.id)} type="button">查看</button>
+                      <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void openProjectWorkbench(novel.id)} type="button">创作</button>
+                    </footer>
+                  </article>
+                );
+              })}
+            </div>
+          ) : <EmptyState title="暂无小说项目" text="创建一个新项目后，它会显示在这里。" />}
+          <button className="novel-project-create" onClick={startNewProject} type="button">
+            <strong>创建新项目</strong>
+            <span>从一个标题开始，后续再补蓝图、章节大纲和正文。</span>
+          </button>
+        </section>
+      )}
+      {view === 'projectView' && currentNovel && (
+        <section className="novel-project-view" aria-label="项目查看">
+          <header className="novel-project-view__bar">
+            <div>
+              <h1>{currentNovel.title}</h1>
+              <span>最近更新 {formatTime(currentNovel.updatedAt)}</span>
+            </div>
+            <nav>
+              <button className="novel-flow__ghost" onClick={() => setView('projectList')} type="button">返回列表</button>
+              <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void openProjectWorkbench(currentNovel.id, activeChapterId ?? undefined)} type="button">开始创作</button>
+            </nav>
+          </header>
+          <div className="novel-project-view__body">
+            <aside className="novel-project-nav">
+              {(['overview', 'outline', 'chapters'] as ProjectViewTab[]).map((tab) => (
+                <button className={projectViewTab === tab ? 'novel-project-nav__item novel-project-nav__item--active' : 'novel-project-nav__item'} key={tab} onClick={() => setProjectViewTab(tab)} type="button">
+                  {projectTabLabel(tab)}
+                </button>
+              ))}
+            </aside>
+            <section className="novel-project-panel">
+              {projectViewTab === 'overview' && (
+                <>
+                  <div className="novel-project-panel__head"><h2>项目概览</h2><button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void openProjectWorkbench(currentNovel.id)} type="button">开始创作</button></div>
+                  <label>核心摘要<textarea value={projectSummary(currentNovel)} onChange={(event) => updateProjectField('blueprint', event.target.value)} placeholder="写下这本小说的核心设定、主线冲突和整体梗概。" /></label>
+                  <label>简介<textarea value={currentNovel.summary} onChange={(event) => updateProjectField('summary', event.target.value)} placeholder="一句话介绍这本小说。" /></label>
+                  <label>创意源<textarea value={currentNovel.idea ?? ''} onChange={(event) => updateProjectField('idea', event.target.value)} placeholder="最初的灵感、主题或想表达的情绪。" /></label>
+                </>
+              )}
+              {projectViewTab === 'outline' && (
+                <>
+                  <div className="novel-project-panel__head"><h2>章节大纲</h2><button className="novel-flow__primary novel-flow__primary--compact" onClick={addChapter} type="button">新增章节</button></div>
+                  {chapters.length ? <div className="novel-outline-list">{chapters.map((chapter, index) => (
+                    <article className="novel-outline-card" key={chapter.id}>
+                      <span>第 {index + 1} 章</span>
+                      <input value={chapter.title} onChange={(event) => updateChapterById(chapter.id, { title: event.target.value })} placeholder="未命名章节" />
+                      <textarea value={chapter.outline ?? ''} onChange={(event) => updateChapterById(chapter.id, { outline: event.target.value })} placeholder="本章故事结构规划…" />
+                    </article>
+                  ))}</div> : <EmptyState title="暂无章节大纲" text="新增章节后，可以在这里补充每章的故事规划。" />}
+                </>
+              )}
+              {projectViewTab === 'chapters' && (
+                <>
+                  <div className="novel-project-panel__head"><h2>章节内容</h2><button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void openProjectWorkbench(currentNovel.id)} type="button">开始创作</button></div>
+                  {chapters.length ? <div className="novel-content-list">{chapters.map((chapter, index) => (
+                    <button className="novel-content-card" key={chapter.id} onClick={() => void openProjectWorkbench(currentNovel.id, chapter.id)} type="button">
+                      <strong>第 {index + 1} 章 · {chapter.title || '未命名章节'}</strong>
+                      <span>{countWords(chapter.content)} 字</span>
+                      <p>{chapter.outline?.trim() || '暂无章节大纲'}</p>
+                      <small>{chapter.content.trim() ? chapter.content.trim().slice(0, 120) : '暂无正文'}</small>
+                    </button>
+                  ))}</div> : <EmptyState title="暂无章节内容" text="新增章节后，可以进入编辑器开始写正文。" />}
+                </>
+              )}
+            </section>
           </div>
         </section>
       )}
@@ -921,8 +1056,15 @@ export function NovelCreation() {
       )}
         </>
       )}
+      {view !== 'workbench' && modalMode && <div className="novel-modal" role="dialog" aria-modal="true" aria-label={modalMode === 'create' ? '新建小说' : '编辑小说信息'} onClick={() => setModalMode(null)}><div onClick={(event) => event.stopPropagation()}><h2>{modalMode === 'create' ? '新建小说' : '编辑小说信息'}</h2><label>标题<input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></label><label>简介<textarea value={form.summary} onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))} /></label><label>备注<input value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} /></label><footer><button onClick={() => setModalMode(null)} type="button">取消</button><button onClick={() => void submitNovelForm()} type="button">保存</button></footer></div></div>}
     </main>
   );
+}
+
+function projectTabLabel(tab: ProjectViewTab): string {
+  if (tab === 'outline') return '章节大纲';
+  if (tab === 'chapters') return '章节内容';
+  return '项目概览';
 }
 
 function wizardStepLabel(step: WizardStep): string {

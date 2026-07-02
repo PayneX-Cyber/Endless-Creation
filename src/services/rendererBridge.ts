@@ -323,6 +323,7 @@ function toNovelSummary(novel: Novel) {
     updatedAt: novel.updatedAt,
     chapterCount: novel.chapters.length,
     wordCount: novel.chapters.reduce((sum, chapter) => sum + countWords(chapter.content), 0),
+    filledChapterCount: novel.chapters.filter((chapter) => chapter.content.trim() !== '').length,
   };
 }
 
