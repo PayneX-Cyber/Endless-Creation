@@ -548,6 +548,19 @@ export function NovelCreation() {
     setView('creationCenter');
   }
 
+  function hasUnsettledInspirationContent() {
+    return chatUserTurns > 0
+      || Boolean(chatInput.trim())
+      || Boolean(inspirationIdeaDraft.trim())
+      || Boolean(inspirationBlueprintDraft.trim())
+      || Boolean(inspirationOutlineDraft.trim());
+  }
+
+  function closeInspirationFlow() {
+    if (hasUnsettledInspirationContent() && !window.confirm('关闭后本次灵感对话不会保存，确定关闭吗？')) return;
+    openCreationCenter();
+  }
+
   function startInspirationIntro() {
     setInspirationError('');
     setView('inspirationIntro');
@@ -745,7 +758,7 @@ export function NovelCreation() {
             </div>
             <div className="novel-chat__bar-side novel-chat__bar-side--end">
               <button className="novel-flow__ghost" onClick={resetInspirationChat} type="button">重置</button>
-              <button className="novel-flow__ghost" onClick={openCreationCenter} type="button">关闭</button>
+              <button className="novel-flow__ghost" onClick={closeInspirationFlow} type="button">关闭</button>
             </div>
           </header>
           <div className="novel-chat__messages">
