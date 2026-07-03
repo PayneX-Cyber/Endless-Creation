@@ -1,0 +1,514 @@
+.novel-workbench {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 18px;
+  height: 100%;
+  min-height: 0;
+  padding: 22px 28px 28px;
+  overflow: hidden;
+}
+
+.novel-workbench__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 0;
+}
+
+.novel-workbench__bar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.novel-workbench__title {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.novel-workbench__title h1 {
+  overflow: hidden;
+  font-size: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.novel-workbench__title span {
+  overflow: hidden;
+  color: #64748b;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.novel-workbench__body {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 22px;
+  min-height: 0;
+}
+
+.novel-workbench__side,
+.novel-workbench__main {
+  min-height: 0;
+  overflow: auto;
+  border-radius: 26px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(23, 32, 51, 0.07);
+}
+
+.novel-workbench__side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px;
+}
+
+.novel-workbench__blueprint {
+  display: grid;
+  gap: 8px;
+  border-radius: 18px;
+  padding: 16px;
+  background: #f5f5ff;
+}
+
+.novel-workbench__blueprint h2 {
+  font-size: 15px;
+}
+
+.novel-workbench__blueprint p {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.novel-workbench__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.novel-workbench__stats > div {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  border-radius: 16px;
+  padding: 12px 8px;
+  background: #f8fafc;
+}
+
+.novel-workbench__stats strong {
+  color: #1f4fb8;
+  font-size: 18px;
+}
+
+.novel-workbench__stats span {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.novel-workbench__list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.novel-workbench__list-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.novel-workbench__chapters {
+  display: grid;
+  gap: 10px;
+}
+
+.novel-workbench__chapter {
+  display: grid;
+  width: 100%;
+  gap: 6px;
+  border: 0;
+  border-radius: 18px;
+  padding: 13px 14px;
+  text-align: left;
+  background: #f8fafc;
+}
+
+.novel-creation .novel-workbench__chapter:hover {
+  border: 0;
+  background: #eef5ff;
+}
+
+.novel-workbench__chapter--active,
+.novel-creation .novel-workbench__chapter--active:hover {
+  background: #eef5ff;
+  box-shadow: 0 0 0 2px rgba(75, 131, 255, 0.28);
+}
+
+.novel-workbench__chapter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.novel-workbench__chapter-row strong {
+  overflow: hidden;
+  color: #172033;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.novel-workbench__chapter-outline {
+  overflow: hidden;
+  color: #94a3b8;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.novel-workbench__pill {
+  flex-shrink: 0;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.novel-workbench__pill--done {
+  background: rgba(47, 158, 99, 0.12);
+  color: #2f9e63;
+}
+
+.novel-workbench__pill--generating {
+  background: rgba(124, 92, 255, 0.12);
+  color: #7c5cff;
+  animation: novel-breathe 1.4s ease-in-out infinite;
+}
+
+.novel-workbench__pill--pending {
+  background: rgba(100, 116, 139, 0.1);
+  color: #64748b;
+}
+
+.novel-workbench__side-empty {
+  display: grid;
+  gap: 6px;
+  border-radius: 18px;
+  padding: 20px 16px;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.novel-workbench__side-empty strong {
+  color: #334155;
+}
+
+.novel-workbench__side-empty span {
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.novel-workbench__side-foot {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.novel-workbench__side-foot .novel-flow__primary--compact {
+  width: 100%;
+}
+
+.novel-workbench__hint {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.novel-workbench__main {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 16px;
+  align-content: start;
+  padding: 26px 30px;
+}
+
+.novel-workbench__chapter-head {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 0;
+}
+
+.novel-workbench__chapter-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.novel-workbench__chapter-title h2 {
+  overflow: hidden;
+  font-size: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.novel-workbench__outline {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.novel-workbench__outline--empty {
+  color: #b3bdcc;
+}
+
+.novel-workbench__state {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  align-self: stretch;
+  border-radius: 22px;
+  padding: 40px 24px;
+  background: #f8fafc;
+  text-align: center;
+}
+
+.novel-workbench__state strong {
+  color: #172033;
+  font-size: 18px;
+}
+
+.novel-workbench__state > span {
+  max-width: 420px;
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.novel-workbench__state .novel-flow__primary {
+  margin-top: 8px;
+}
+
+.novel-workbench__spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #7c5cff;
+  animation: novel-pulse 1.1s ease-in-out infinite;
+}
+
+.novel-workbench__editor {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.novel-workbench__editor-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.novel-workbench__editor-meta span {
+  border-radius: 999px;
+  padding: 5px 11px;
+  background: #eef4fb;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.novel-workbench__editor textarea {
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 20px;
+  outline: none;
+  resize: none;
+  padding: 22px;
+  background: #f8fafc;
+  color: #172033;
+  font-size: 16px;
+  line-height: 1.85;
+}
+
+.novel-workbench__editor textarea:focus {
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(75, 131, 255, 0.16);
+}
+
+.novel-workbench__draft {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  min-height: 0;
+  border-radius: 20px;
+  padding: 18px;
+  background: #f3f7ff;
+}
+
+.novel-workbench__draft-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.novel-workbench__draft-head strong {
+  color: #1f4fb8;
+}
+
+.novel-workbench__draft-head span {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.novel-workbench__draft > p {
+  overflow: auto;
+  color: #334155;
+  font-size: 15px;
+  line-height: 1.85;
+  white-space: pre-wrap;
+}
+
+.novel-workbench__draft footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.novel-modal > div.novel-workbench__preview {
+  width: min(640px, 94vw);
+}
+
+.novel-workbench__preview h2 {
+  font-size: 20px;
+}
+
+.novel-workbench__preview-sub {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.novel-workbench__preview-list {
+  display: grid;
+  gap: 10px;
+  max-height: 46vh;
+  overflow: auto;
+}
+
+.novel-workbench__preview-list article {
+  display: grid;
+  gap: 6px;
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: #f8fafc;
+}
+
+.novel-workbench__preview-list strong {
+  color: #172033;
+  font-size: 13px;
+}
+
+.novel-workbench__preview-list p {
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__side,
+.app-shell[data-theme='dark'] .novel-workbench__main {
+  background: #171d27;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__title span,
+.app-shell[data-theme='dark'] .novel-workbench__blueprint p,
+.app-shell[data-theme='dark'] .novel-workbench__outline,
+.app-shell[data-theme='dark'] .novel-workbench__state > span,
+.app-shell[data-theme='dark'] .novel-workbench__chapter-outline,
+.app-shell[data-theme='dark'] .novel-workbench__preview-sub,
+.app-shell[data-theme='dark'] .novel-workbench__preview-list p {
+  color: #94a3b8;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__blueprint {
+  background: #1a1d30;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__stats > div,
+.app-shell[data-theme='dark'] .novel-workbench__chapter,
+.app-shell[data-theme='dark'] .novel-workbench__side-empty,
+.app-shell[data-theme='dark'] .novel-workbench__state,
+.app-shell[data-theme='dark'] .novel-workbench__editor textarea,
+.app-shell[data-theme='dark'] .novel-workbench__preview-list article {
+  background: #111822;
+}
+
+.app-shell[data-theme='dark'] .novel-creation .novel-workbench__chapter:hover,
+.app-shell[data-theme='dark'] .novel-workbench__chapter--active,
+.app-shell[data-theme='dark'] .novel-creation .novel-workbench__chapter--active:hover {
+  background: #1b2536;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__chapter-row strong,
+.app-shell[data-theme='dark'] .novel-workbench__state strong,
+.app-shell[data-theme='dark'] .novel-workbench__side-empty strong,
+.app-shell[data-theme='dark'] .novel-workbench__preview-list strong,
+.app-shell[data-theme='dark'] .novel-workbench__editor textarea {
+  color: #edf2fa;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__editor textarea:focus {
+  background: #111822;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__editor-meta span {
+  background: #1b2230;
+  color: #94a3b8;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__draft {
+  background: #1b2230;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__draft > p {
+  color: #cbd5e1;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__draft-head strong {
+  color: #9fc0ff;
+}
+
+@media (max-width: 960px) {
+  .novel-workbench {
+    height: auto;
+    min-height: 100%;
+    padding: 18px;
+    overflow: visible;
+  }
+
+  .novel-workbench__body {
+    grid-template-columns: 1fr;
+  }
+
+  .novel-workbench__side,
+  .novel-workbench__main {
+    overflow: visible;
+  }
+
+  .novel-workbench__editor textarea {
+    min-height: 320px;
+  }
+}

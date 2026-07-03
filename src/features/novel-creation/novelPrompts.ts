@@ -78,8 +78,9 @@ export function buildOutlinePrompt(novel: Novel): TextMessage[] {
   ];
 }
 
-export function buildChapterFromOutlinePrompt(novel: Novel, chapter: Chapter): TextMessage[] {
+export function buildChapterFromOutlinePrompt(novel: Novel, chapter: Chapter, previousChapter?: Chapter): TextMessage[] {
   const tail = chapter.content.slice(-800);
+  const previousTail = previousChapter?.content.trim() ? previousChapter.content.trim().slice(-600) : '';
   return [
     { role: 'system', content: '你是小说写作助手，按本章大纲写正文，直接输出正文，不解释，不加标题。' },
     {
@@ -88,11 +89,44 @@ export function buildChapterFromOutlinePrompt(novel: Novel, chapter: Chapter): T
         `小说标题：${novel.title}`,
         novel.summary ? `小说简介：${novel.summary}` : '',
         novel.blueprint ? `作品蓝图：${novel.blueprint}` : '',
+        previousTail ? `上一章《${previousChapter?.title || '未命名章节'}》结尾：\n${previousTail}` : '',
         `当前章节：${chapter.title || '未命名章节'}`,
         '本章大纲：',
         chapter.outline || '',
         tail ? `已写正文末尾：\n${tail}` : '',
-        tail ? '请衔接已写内容，按本章大纲继续写正文。' : '请按本章大纲写出本章正文。',
+        tail ? '请衔接已写内容，按本章大纲继续写正文。' : previousTail ? '请自然衔接上一章结尾，按本章大纲写出本章正文。' : '请按本章大纲写出本章正文。',
+      ].filter(Boolean).join('\n'),
+    },
+  ];
+}
+
+export function buildMissingOutlinePrompt(novel: Novel, chapters: Chapter[]): TextMessage[] {
+  const chapterLines = chapters.map((chapter, index) => {
+    const status = chapter.content.trim() ? '已完成' : '未开始';
+    const outline = chapter.outline?.trim() ? `大纲：${chapter.outline.trim()}` : '大纲：缺失';
+    return `第${index + 1}章 ${chapter.title || '未命名章节'}（${status}）\n${outline}`;
+  });
+  const missingLines = chapters
+    .map((chapter, index) => ({ chapter, index }))
+    .filter(({ chapter }) => !chapter.outline?.trim())
+    .map(({ chapter, index }) => `第${index + 1}章 ${chapter.title || '未命名章节'}`);
+  return [
+    { role: 'system', content: '你是小说大纲助手，只按用户要求的固定格式输出章节大纲，不解释，不加开场白或总结。' },
+    {
+      role: 'user',
+      content: [
+        `小说标题：${novel.title}`,
+        novel.summary ? `小说简介：${novel.summary}` : '',
+        novel.idea ? `创意：${novel.idea}` : '',
+        novel.blueprint ? `作品蓝图：${novel.blueprint}` : '',
+        '全书章节现状如下：',
+        chapterLines.join('\n\n'),
+        '请只为下面这些缺少大纲的章节补写大纲，剧情需与前后章节自然衔接：',
+        missingLines.join('\n'),
+        '严格按以下格式输出，每章两行，章与章之间空一行，章号和章节标题保持不变：',
+        '第1章 章节标题',
+        '大纲：本章剧情要点，80 字以内。',
+        '除这些章节外不要输出任何其他内容。',
       ].filter(Boolean).join('\n'),
     },
   ];

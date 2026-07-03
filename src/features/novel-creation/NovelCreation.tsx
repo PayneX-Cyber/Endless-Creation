@@ -2,14 +2,11 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, Novel, NovelSummary } from '../../types/novel';
-import { buildBlueprintFromConversationPrompt, buildBlueprintPrompt, buildChapterFromOutlinePrompt, buildContinueChapterPrompt, buildInspirationChatPrompt, buildOutlinePrompt, buildPolishChapterPrompt, buildRewriteChapterPrompt, INSPIRATION_OPENING_MESSAGE, parseOutlineText, type InspirationChatMessage, type TextMessage } from './novelPrompts';
+import { buildBlueprintFromConversationPrompt, buildInspirationChatPrompt, buildOutlinePrompt, INSPIRATION_OPENING_MESSAGE, parseOutlineText, type InspirationChatMessage, type TextMessage } from './novelPrompts';
+import { ChapterWorkbench } from './ChapterWorkbench';
+import { countWords, createId, formatTime, type SaveStatus } from './novelShared';
 import './NovelCreation.css';
 
-type SaveStatus = 'saved' | 'dirty' | 'saving' | 'failed';
-type TextGenerationStatus = 'idle' | 'generating' | 'failed';
-type AiDraftAction = 'continue' | 'polish' | 'rewrite' | 'outline';
-type AiDraftSource = { type: 'insert' } | { type: 'chapter'; chapterId: string } | { type: 'selection'; chapterId: string; start: number; end: number; text: string } | { type: 'outline'; chapterId: string; content: string; updatedAt: string };
-type WizardStep = 'idea' | 'blueprint' | 'outline';
 type NovelView = 'creationCenter' | 'projectList' | 'projectView' | 'inspirationIntro' | 'inspirationPreparing' | 'inspirationChat' | 'inspirationBlueprint' | 'inspirationOutline' | 'workbench';
 type ProjectViewTab = 'overview' | 'outline' | 'chapters';
 type InspirationBusy = 'idle' | 'chat' | 'blueprint' | 'outline';
@@ -36,18 +33,6 @@ export function NovelCreation() {
   const [form, setForm] = useState<NovelForm>(emptyForm);
   const [modelPreferences, setModelPreferences] = useState<ModelPreferences>(() => readLocalStorage(MODEL_PREFERENCES_STORAGE_KEY, {}));
   const [apiProviderStore, setApiProviderStore] = useState<ApiProviderStore>(() => readLocalStorage(API_PROVIDER_STORAGE_KEY, {}));
-  const [textGenerationStatus, setTextGenerationStatus] = useState<TextGenerationStatus>('idle');
-  const [textGenerationError, setTextGenerationError] = useState('');
-  const [aiDraft, setAiDraft] = useState('');
-  const [aiDraftAction, setAiDraftAction] = useState<AiDraftAction>('continue');
-  const [aiDraftSource, setAiDraftSource] = useState<AiDraftSource>({ type: 'insert' });
-  const [wizardStep, setWizardStep] = useState<WizardStep | null>(null);
-  const [wizardIdea, setWizardIdea] = useState('');
-  const [wizardBlueprint, setWizardBlueprint] = useState('');
-  const [wizardOutline, setWizardOutline] = useState('');
-  const [wizardStatus, setWizardStatus] = useState<TextGenerationStatus>('idle');
-  const [wizardError, setWizardError] = useState('');
-  const [wizardNotice, setWizardNotice] = useState('');
   const [view, setView] = useState<NovelView>('creationCenter');
   const [projectViewTab, setProjectViewTab] = useState<ProjectViewTab>('overview');
   const [chatMessages, setChatMessages] = useState<ChatBubble[]>([]);
@@ -58,24 +43,15 @@ export function NovelCreation() {
   const [inspirationIdeaDraft, setInspirationIdeaDraft] = useState('');
   const [inspirationOutlineDraft, setInspirationOutlineDraft] = useState('');
   const [blueprintConfirmed, setBlueprintConfirmed] = useState(false);
-  const chapterTitleRef = useRef<HTMLInputElement | null>(null);
-  const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const revisionRef = useRef(0);
   const latestNovelRef = useRef<Novel | null>(null);
   const latestSaveStatusRef = useRef<SaveStatus>('saved');
-  const activeTextRequestIdRef = useRef<string | null>(null);
-  const textGenerationRunRef = useRef(0);
-  const wizardRequestIdRef = useRef<string | null>(null);
-  const wizardRunRef = useRef(0);
   const inspirationRequestIdRef = useRef<string | null>(null);
   const inspirationRunRef = useRef(0);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const chapters = useMemo(() => [...(currentNovel?.chapters ?? [])].sort((a, b) => a.order - b.order), [currentNovel]);
-  const activeChapter = chapters.find((chapter) => chapter.id === activeChapterId) ?? null;
-  const currentChapterWords = countWords(activeChapter?.content ?? '');
-  const totalWords = chapters.reduce((sum, chapter) => sum + countWords(chapter.content), 0);
   const selectedTextModel = useMemo(() => resolveTextModel(modelPreferences, apiProviderStore), [apiProviderStore, modelPreferences]);
   const chatUserTurns = chatMessages.filter((message) => message.role === 'user').length;
   const chatStage = Math.min(chatUserTurns, INSPIRATION_STAGES.length - 1);
@@ -188,7 +164,7 @@ export function NovelCreation() {
 
   async function openProjectWorkbench(id: string, chapterId?: string) {
     if (!await openNovel(id)) return;
-    if (chapterId) setActiveChapterId(chapterId);
+    setActiveChapterId(chapterId ?? null);
     setView('workbench');
   }
 
@@ -240,30 +216,11 @@ export function NovelCreation() {
     setModalMode(null);
   }
 
-  async function deleteCurrentNovel() {
-    if (!currentNovel || !window.confirm('确定删除这本小说吗？此操作不可撤销。')) return;
-    const result = await novelService.deleteNovel(currentNovel.id);
-    if (!result.ok) {
-      setFeedback(result.message);
-      return;
-    }
-    setCurrentNovel(null);
-    setActiveChapterId(null);
-    setSaveStatus('saved');
-    await loadSummaries();
-  }
-
   function addChapter() {
     const now = new Date().toISOString();
     const chapter: Chapter = { id: createId('chapter'), title: '未命名章节', content: '', order: chapters.length, createdAt: now, updatedAt: now };
     updateNovel((novel) => ({ ...novel, chapters: [...novel.chapters, chapter], updatedAt: now }));
     setActiveChapterId(chapter.id);
-    window.setTimeout(() => chapterTitleRef.current?.focus(), 0);
-  }
-
-  function updateChapter(patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline'>>) {
-    if (!activeChapter) return;
-    updateChapterById(activeChapter.id, patch);
   }
 
   function updateChapterById(chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline'>>) {
@@ -273,15 +230,6 @@ export function NovelCreation() {
       updatedAt: now,
       chapters: novel.chapters.map((chapter) => chapter.id === chapterId ? { ...chapter, ...patch, updatedAt: now } : chapter),
     }));
-  }
-
-  function deleteChapter(chapterId: string) {
-    if (!window.confirm('确定删除这个章节吗？此操作不可撤销。')) return;
-    updateNovel((novel) => {
-      const nextChapters = novel.chapters.filter((chapter) => chapter.id !== chapterId).map((chapter, index) => ({ ...chapter, order: index }));
-      return { ...novel, chapters: nextChapters, updatedAt: new Date().toISOString() };
-    });
-    if (activeChapterId === chapterId) setActiveChapterId(chapters.find((chapter) => chapter.id !== chapterId)?.id ?? null);
   }
 
   function ensureTextModelReady(onIssue: (message: string) => void): { channel: ApiProviderChannel; model: string; baseUrl: string; apiKey: string } | null {
@@ -307,229 +255,6 @@ export function NovelCreation() {
     return { channel, model: selectedTextModel.model, baseUrl, apiKey };
   }
 
-  async function generateChapterDraft(action: AiDraftAction) {
-    if (!currentNovel || !activeChapter) return;
-    const readyModel = ensureTextModelReady(setTextGenerationError);
-    if (!readyModel) return;
-    if (action === 'outline' && !activeChapter.outline?.trim()) {
-      setTextGenerationError('\u672c\u7ae0\u8fd8\u6ca1\u6709\u5927\u7eb2\uff0c\u8bf7\u5148\u901a\u8fc7\u300cAI \u751f\u6210\u5927\u7eb2\u300d\u751f\u6210\uff0c\u6216\u5c55\u5f00\u300c\u672c\u7ae0\u5927\u7eb2\u300d\u586b\u5199\u3002');
-      return;
-    }
-
-    const selection = getChapterSelection();
-    const aiSource: AiDraftSource = action === 'continue'
-      ? { type: 'insert' }
-      : action === 'outline'
-        ? { type: 'outline', chapterId: activeChapter.id, content: activeChapter.content, updatedAt: activeChapter.updatedAt }
-        : selection
-          ? { type: 'selection', chapterId: activeChapter.id, start: selection.start, end: selection.end, text: selection.text }
-          : { type: 'chapter', chapterId: activeChapter.id };
-    const editText = selection?.text || activeChapter.content;
-    if ((action === 'polish' || action === 'rewrite') && !editText.trim()) {
-      setTextGenerationError('\u8bf7\u5148\u8f93\u5165\u6b63\u6587\u3002');
-      return;
-    }
-
-    const requestId = createId('text-request');
-    const runId = textGenerationRunRef.current + 1;
-    textGenerationRunRef.current = runId;
-    activeTextRequestIdRef.current = requestId;
-    setTextGenerationStatus('generating');
-    setTextGenerationError('');
-    setAiDraft('');
-    setAiDraftAction(action);
-    setAiDraftSource(aiSource);
-
-    const messages = action === 'polish'
-      ? buildPolishChapterPrompt(currentNovel, activeChapter, editText)
-      : action === 'rewrite'
-        ? buildRewriteChapterPrompt(currentNovel, activeChapter, editText)
-        : action === 'outline'
-          ? buildChapterFromOutlinePrompt(currentNovel, activeChapter)
-          : buildContinueChapterPrompt(currentNovel, activeChapter);
-
-    const result = await rendererBridge.generateText({
-      requestId,
-      channelId: readyModel.channel.id,
-      channelLabel: readyModel.channel.name,
-      baseUrl: readyModel.baseUrl,
-      apiKey: readyModel.apiKey,
-      model: readyModel.model,
-      messages,
-      temperature: action === 'rewrite' ? 0.85 : action === 'outline' ? 0.8 : 0.75,
-      maxTokens: action === 'outline' ? 1500 : action === 'continue' ? 700 : 1200,
-    });
-
-    if (textGenerationRunRef.current !== runId) return;
-    activeTextRequestIdRef.current = null;
-    if (!result.ok || !result.text) {
-      setTextGenerationStatus('failed');
-      setTextGenerationError(result.message || `${aiActionLabel(action)}\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5\u3002`);
-      return;
-    }
-    setTextGenerationStatus('idle');
-    setAiDraft(result.text);
-  }
-
-  function getChapterSelection() {
-    const target = editorRef.current;
-    if (!target || !activeChapter) return null;
-    const start = target.selectionStart;
-    const end = target.selectionEnd;
-    return end > start ? { start, end, text: activeChapter.content.slice(start, end) } : null;
-  }
-
-  function cancelTextGeneration() {
-    const requestId = activeTextRequestIdRef.current;
-    textGenerationRunRef.current += 1;
-    activeTextRequestIdRef.current = null;
-    setTextGenerationStatus('idle');
-    if (requestId) void rendererBridge.cancelTextGeneration(requestId);
-  }
-
-  async function copyAiDraft() {
-    if (!aiDraft) return;
-    await rendererBridge.copyText(aiDraft);
-  }
-
-  function insertAiDraft() {
-    if (!activeChapter || !aiDraft) return;
-    if (aiDraftSource.type === 'outline') {
-      if (aiDraftSource.chapterId !== activeChapter.id) {
-        setTextGenerationError('当前章节已切换，请切回原章节后再插入，或重新生成。');
-        return;
-      }
-      const chapterChanged = activeChapter.content !== aiDraftSource.content || activeChapter.updatedAt !== aiDraftSource.updatedAt;
-      if (chapterChanged && !window.confirm('生成期间本章正文已被修改，仍要在当前位置插入草稿吗？')) return;
-    }
-    const target = editorRef.current;
-    const content = activeChapter.content;
-    const cursor = target && document.activeElement === target ? target.selectionStart : content.length;
-    const prefix = content.slice(0, cursor);
-    const suffix = content.slice(cursor);
-    const spacer = prefix && !prefix.endsWith('\n') ? '\n\n' : '';
-    const inserted = `${spacer}${aiDraft}`;
-    updateChapter({ content: `${prefix}${inserted}${suffix}` });
-    setAiDraft('');
-    window.setTimeout(() => {
-      target?.focus();
-      const nextCursor = cursor + inserted.length;
-      target?.setSelectionRange(nextCursor, nextCursor);
-    }, 0);
-  }
-
-  function replaceAiDraftSource() {
-    if (!activeChapter || !aiDraft || aiDraftSource.type === 'insert') return;
-    if (aiDraftSource.chapterId !== activeChapter.id) {
-      setTextGenerationError('\u539f\u6587\u8303\u56f4\u5df2\u53d8\u5316\uff0c\u8bf7\u91cd\u65b0\u9009\u62e9\u540e\u751f\u6210\u3002');
-      return;
-    }
-    if (aiDraftSource.type === 'chapter') {
-      updateChapter({ content: aiDraft });
-      setAiDraft('');
-      return;
-    }
-    if (aiDraftSource.type !== 'selection') return;
-    const content = activeChapter.content;
-    if (aiDraftSource.end > content.length || content.slice(aiDraftSource.start, aiDraftSource.end) !== aiDraftSource.text) {
-      setTextGenerationError('\u539f\u6587\u8303\u56f4\u5df2\u53d8\u5316\uff0c\u8bf7\u91cd\u65b0\u9009\u62e9\u540e\u751f\u6210\u3002');
-      return;
-    }
-    updateChapter({ content: `${content.slice(0, aiDraftSource.start)}${aiDraft}${content.slice(aiDraftSource.end)}` });
-    setAiDraft('');
-  }
-
-  function openOutlineWizard() {
-    if (!currentNovel) return;
-    setWizardIdea(currentNovel.idea ?? '');
-    setWizardBlueprint(currentNovel.blueprint ?? '');
-    setWizardOutline('');
-    setWizardError('');
-    setWizardNotice('');
-    setWizardStatus('idle');
-    setWizardStep('idea');
-  }
-
-  function closeOutlineWizard() {
-    cancelWizardGeneration();
-    setWizardStep(null);
-    setWizardError('');
-    setWizardNotice('');
-  }
-
-  function goToWizardStep(step: WizardStep) {
-    setWizardError('');
-    setWizardNotice('');
-    setWizardStep(step);
-  }
-
-  function saveWizardBlueprint() {
-    updateNovel((novel) => ({ ...novel, idea: wizardIdea, blueprint: wizardBlueprint, updatedAt: new Date().toISOString() }));
-  }
-
-  async function runWizardGeneration(kind: 'blueprint' | 'outline') {
-    if (!currentNovel) return;
-    const readyModel = ensureTextModelReady(setWizardError);
-    if (!readyModel) return;
-    if (kind === 'blueprint' && !wizardIdea.trim()) {
-      setWizardError('请先输入一句创意。');
-      return;
-    }
-    if (kind === 'outline' && !wizardBlueprint.trim()) {
-      setWizardError('请先生成或填写作品蓝图。');
-      return;
-    }
-    if (kind === 'outline') saveWizardBlueprint();
-
-    const requestId = createId('text-request');
-    const runId = wizardRunRef.current + 1;
-    wizardRunRef.current = runId;
-    wizardRequestIdRef.current = requestId;
-    setWizardStatus('generating');
-    setWizardError('');
-    setWizardNotice('');
-
-    const messages = kind === 'blueprint'
-      ? buildBlueprintPrompt(wizardIdea.trim())
-      : buildOutlinePrompt({ ...currentNovel, idea: wizardIdea, blueprint: wizardBlueprint });
-
-    const result = await rendererBridge.generateText({
-      requestId,
-      channelId: readyModel.channel.id,
-      channelLabel: readyModel.channel.name,
-      baseUrl: readyModel.baseUrl,
-      apiKey: readyModel.apiKey,
-      model: readyModel.model,
-      messages,
-      temperature: kind === 'blueprint' ? 0.85 : 0.7,
-      maxTokens: kind === 'blueprint' ? 1000 : 2000,
-    });
-
-    if (wizardRunRef.current !== runId) return;
-    wizardRequestIdRef.current = null;
-    if (!result.ok || !result.text) {
-      setWizardStatus('failed');
-      setWizardError(result.message || (kind === 'blueprint' ? '生成蓝图失败，请稍后重试。' : '生成章节大纲失败，请稍后重试。'));
-      return;
-    }
-    setWizardStatus('idle');
-    if (kind === 'blueprint') {
-      setWizardBlueprint(result.text);
-      setWizardStep('blueprint');
-      return;
-    }
-    setWizardOutline(result.text);
-    setWizardStep('outline');
-  }
-
-  function cancelWizardGeneration() {
-    const requestId = wizardRequestIdRef.current;
-    wizardRunRef.current += 1;
-    wizardRequestIdRef.current = null;
-    setWizardStatus('idle');
-    if (requestId) void rendererBridge.cancelTextGeneration(requestId);
-  }
-
   function applyParsedOutline(outlineText: string, onIssue: (message: string) => void): boolean {
     if (!currentNovel) return false;
     const parsed = parseOutlineText(outlineText);
@@ -551,14 +276,6 @@ export function NovelCreation() {
     updateNovel((novel) => ({ ...novel, chapters: nextChapters, updatedAt: now }));
     setActiveChapterId(nextChapters[0]?.id ?? null);
     return true;
-  }
-
-  function confirmWizardOutline() {
-    if (!currentNovel) return;
-    if (!applyParsedOutline(wizardOutline, setWizardError)) return;
-    setWizardStep(null);
-    setWizardError('');
-    setWizardNotice('');
   }
 
   function openCreationCenter() {
@@ -743,7 +460,7 @@ export function NovelCreation() {
   }
 
   return (
-    <main className={view === 'workbench' ? 'novel-creation' : 'novel-creation novel-creation--flow'} aria-label="小说创作">
+    <main className="novel-creation novel-creation--flow" aria-label="小说创作">
       {view === 'creationCenter' && (
         <section className="novel-center" aria-label="创作中心">
           <header className="novel-center__head">
@@ -775,6 +492,7 @@ export function NovelCreation() {
             </div>
             <button className="novel-flow__ghost" onClick={openCreationCenter} type="button">返回</button>
           </header>
+          {feedback && <p className="novel-flow__error">{feedback}</p>}
           {isLoading ? <EmptyState title="正在加载小说…" /> : summaries.length ? (
             <div className="novel-project-grid">
               {summaries.map((novel) => {
@@ -961,102 +679,24 @@ export function NovelCreation() {
           </footer>
         </section>
       )}
-      {view === 'workbench' && (
-        <>
-      <section className="novel-creation__list">
-        <header>
-          <div><p>Novel Studio</p><h1>小说创作</h1></div>
-          <button onClick={() => { setForm(emptyForm); setModalMode('create'); }} type="button">新建小说</button>
-        </header>
-        <button className="novel-list__inspiration" onClick={startInspirationIntro} type="button">从灵感开始</button>
-        {isLoading ? <EmptyState title="正在加载小说…" /> : summaries.length ? (
-          <div className="novel-list">
-            {summaries.map((novel) => (
-              <button className={currentNovel?.id === novel.id ? 'novel-list__item novel-list__item--active' : 'novel-list__item'} key={novel.id} onClick={() => void openNovel(novel.id)} type="button">
-                <strong>{novel.title}</strong>
-                <span>{novel.chapterCount} 章 · {novel.wordCount} 字</span>
-                <small>{formatTime(novel.updatedAt)}</small>
-              </button>
-            ))}
-          </div>
-        ) : <EmptyState title="暂无小说" text="新建一本小说后，会显示在这里。" />}
-      </section>
-
-      <section className="novel-creation__chapters">
-        {currentNovel ? (
-          <>
-            <header>
-              <div><p>{currentNovel.summary || '暂无简介'}</p><h2>{currentNovel.title}</h2></div>
-              <div><button onClick={() => { setForm({ title: currentNovel.title, summary: currentNovel.summary, note: currentNovel.note }); setModalMode('edit'); }} type="button">编辑信息</button><button onClick={() => void deleteCurrentNovel()} type="button">删除</button></div>
-            </header>
-            {currentNovel.note && <p className="novel-note">{currentNovel.note}</p>}
-            <div className="chapter-head"><span>章节</span><div className="chapter-head__actions"><button onClick={openOutlineWizard} type="button">AI 生成大纲</button><button onClick={addChapter} type="button">新建章节</button></div></div>
-            {chapters.length ? <div className="chapter-list">{chapters.map((chapter) => <button className={chapter.id === activeChapterId ? 'chapter-list__item chapter-list__item--active' : 'chapter-list__item'} key={chapter.id} onClick={() => setActiveChapterId(chapter.id)} type="button"><strong>{chapter.title || '未命名章节'}</strong><span>{countWords(chapter.content)} 字</span></button>)}</div> : <EmptyState title="暂无章节" text="点击新建章节开始写作。" />}
-          </>
-        ) : <EmptyState title={feedback || '未选择小说'} text="从左侧选择一本小说，或新建一本小说。" />}
-      </section>
-
-      <section className="novel-creation__editor">
-        {currentNovel && activeChapter ? (
-          <>
-            <header>
-              <input ref={chapterTitleRef} value={activeChapter.title} onChange={(event) => updateChapter({ title: event.target.value })} placeholder="未命名章节" />
-              <div className="editor-stats"><span>{saveStatusLabel(saveStatus)}</span><span>{'\u5f53\u524d\u7ae0'} {currentChapterWords} {'\u5b57'}</span><span>{'\u5168\u4e66'} {totalWords} {'\u5b57'}</span><span>{formatTime(activeChapter.updatedAt)}</span><button disabled={textGenerationStatus === 'generating'} onClick={() => void generateChapterDraft('continue')} type="button">{textGenerationStatus === 'generating' ? '\u751f\u6210\u4e2d' : 'AI \u7eed\u5199'}</button><button disabled={textGenerationStatus === 'generating'} onClick={() => void generateChapterDraft('polish')} type="button">{'AI \u6da6\u8272'}</button><button disabled={textGenerationStatus === 'generating'} onClick={() => void generateChapterDraft('rewrite')} type="button">{'AI \u6539\u5199'}</button>{typeof activeChapter.outline === 'string' && activeChapter.outline.trim() !== '' && <button disabled={textGenerationStatus === 'generating'} onClick={() => void generateChapterDraft('outline')} type="button">{'\u6309\u5927\u7eb2\u751f\u6210\u6b63\u6587'}</button>}{textGenerationStatus === 'generating' && <button onClick={cancelTextGeneration} type="button">{'\u53d6\u6d88'}</button>}{saveStatus === 'failed' && <button onClick={() => void saveCurrentNovel()} type="button">{'\u91cd\u8bd5'}</button>}</div>
-              {typeof activeChapter.outline === 'string' && <details className="chapter-outline"><summary>本章大纲</summary><textarea value={activeChapter.outline} onChange={(event) => updateChapter({ outline: event.target.value })} placeholder="本章剧情要点…" /></details>}
-            </header>
-            <textarea ref={editorRef} value={activeChapter.content} onChange={(event) => updateChapter({ content: event.target.value })} placeholder="开始写正文…" />
-            {(aiDraft || textGenerationError) && <div className="novel-ai-draft">{textGenerationError ? <p>{textGenerationError}</p> : <><strong>{aiDraftTitle(aiDraftAction)}</strong><p>{aiDraft}</p><div>{(aiDraftSource.type === 'chapter' || aiDraftSource.type === 'selection') && <button onClick={replaceAiDraftSource} type="button">{'\u66ff\u6362\u539f\u6587'}</button>}<button onClick={insertAiDraft} type="button">{'\u63d2\u5165\u6b63\u6587'}</button><button onClick={() => void copyAiDraft()} type="button">{'\u590d\u5236'}</button><button onClick={() => setAiDraft('')} type="button">{'\u653e\u5f03'}</button></div></>}</div>}
-            <button className="chapter-delete" onClick={() => deleteChapter(activeChapter.id)} type="button">删除章节</button>
-          </>
-        ) : currentNovel ? <EmptyState title="无章节" text="在中间栏新建章节后开始写作。" /> : <EmptyState title="小说工作台" text="本地保存，选择小说后进入章节编辑。" />}
-      </section>
-
+      {view === 'workbench' && currentNovel && (
+        <ChapterWorkbench
+          novel={currentNovel}
+          chapters={chapters}
+          activeChapterId={activeChapterId}
+          saveStatus={saveStatus}
+          onSelectChapter={setActiveChapterId}
+          onUpdateChapter={updateChapterById}
+          onRetrySave={() => void saveCurrentNovel()}
+          onBackToProjects={() => setView('projectList')}
+          onOpenProjectView={() => { setProjectViewTab('overview'); setView('projectView'); }}
+          ensureTextModel={(onIssue) => {
+            const ready = ensureTextModelReady(onIssue);
+            return ready ? { channelId: ready.channel.id, channelLabel: ready.channel.name, baseUrl: ready.baseUrl, apiKey: ready.apiKey, model: ready.model } : null;
+          }}
+        />
+      )}
       {modalMode && <div className="novel-modal" role="dialog" aria-modal="true" aria-label={modalMode === 'create' ? '新建小说' : '编辑小说信息'} onClick={() => setModalMode(null)}><div onClick={(event) => event.stopPropagation()}><h2>{modalMode === 'create' ? '新建小说' : '编辑小说信息'}</h2><label>标题<input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></label><label>简介<textarea value={form.summary} onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))} /></label><label>备注<input value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} /></label><footer><button onClick={() => setModalMode(null)} type="button">取消</button><button onClick={() => void submitNovelForm()} type="button">保存</button></footer></div></div>}
-      {wizardStep && currentNovel && (
-        <div className="novel-modal" role="dialog" aria-modal="true" aria-label="AI 生成大纲" onClick={closeOutlineWizard}>
-          <div className="novel-wizard" onClick={(event) => event.stopPropagation()}>
-            <h2>AI 生成大纲</h2>
-            <p className="novel-wizard__steps">{wizardStepLabel(wizardStep)}</p>
-            {wizardStep === 'idea' && (
-              <>
-                <label>一句创意<textarea className="novel-wizard__input--short" value={wizardIdea} onChange={(event) => setWizardIdea(event.target.value)} placeholder="例：一个能听见植物说话的植物学家，被卷入一场灭世阴谋。" /></label>
-                <footer>
-                  <button onClick={closeOutlineWizard} type="button">取消</button>
-                  {wizardBlueprint.trim() !== '' && <button disabled={wizardStatus === 'generating'} onClick={() => goToWizardStep('blueprint')} type="button">使用已有蓝图</button>}
-                  <button disabled={wizardStatus === 'generating'} onClick={() => void runWizardGeneration('blueprint')} type="button">{wizardStatus === 'generating' ? '生成中…' : '生成蓝图'}</button>
-                </footer>
-              </>
-            )}
-            {wizardStep === 'blueprint' && (
-              <>
-                <label>作品蓝图（可编辑）<textarea className="novel-wizard__input" value={wizardBlueprint} onChange={(event) => setWizardBlueprint(event.target.value)} placeholder="生成或手动填写作品蓝图…" /></label>
-                <footer>
-                  <button disabled={wizardStatus === 'generating'} onClick={() => goToWizardStep('idea')} type="button">上一步</button>
-                  <button disabled={wizardStatus === 'generating'} onClick={() => void runWizardGeneration('blueprint')} type="button">重新生成</button>
-                  <button disabled={wizardStatus === 'generating'} onClick={() => { saveWizardBlueprint(); setWizardNotice('蓝图已保存。'); }} type="button">保存蓝图</button>
-                  <button disabled={wizardStatus === 'generating'} onClick={() => void runWizardGeneration('outline')} type="button">{wizardStatus === 'generating' ? '生成中…' : '生成章节大纲'}</button>
-                </footer>
-              </>
-            )}
-            {wizardStep === 'outline' && (
-              <>
-                <label>章节大纲（可编辑）<textarea className="novel-wizard__input" value={wizardOutline} onChange={(event) => setWizardOutline(event.target.value)} placeholder="生成或手动填写章节大纲，每章两行：第1章 标题 / 大纲：…" /></label>
-                <footer>
-                  <button disabled={wizardStatus === 'generating'} onClick={() => goToWizardStep('blueprint')} type="button">上一步</button>
-                  <button disabled={wizardStatus === 'generating'} onClick={() => void runWizardGeneration('outline')} type="button">重新生成</button>
-                  <button disabled={wizardStatus === 'generating'} onClick={confirmWizardOutline} type="button">确认生成章节</button>
-                </footer>
-              </>
-            )}
-            {wizardStatus === 'generating' && <p className="novel-wizard__hint">AI 生成中，请稍候… <button onClick={cancelWizardGeneration} type="button">取消生成</button></p>}
-            {wizardNotice && <p className="novel-wizard__notice">{wizardNotice}</p>}
-            {wizardError && <p className="novel-wizard__error">{wizardError}</p>}
-          </div>
-        </div>
-      )}
-        </>
-      )}
-      {view !== 'workbench' && modalMode && <div className="novel-modal" role="dialog" aria-modal="true" aria-label={modalMode === 'create' ? '新建小说' : '编辑小说信息'} onClick={() => setModalMode(null)}><div onClick={(event) => event.stopPropagation()}><h2>{modalMode === 'create' ? '新建小说' : '编辑小说信息'}</h2><label>标题<input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></label><label>简介<textarea value={form.summary} onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))} /></label><label>备注<input value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} /></label><footer><button onClick={() => setModalMode(null)} type="button">取消</button><button onClick={() => void submitNovelForm()} type="button">保存</button></footer></div></div>}
     </main>
   );
 }
@@ -1067,45 +707,8 @@ function projectTabLabel(tab: ProjectViewTab): string {
   return '项目概览';
 }
 
-function wizardStepLabel(step: WizardStep): string {
-  if (step === 'idea') return '第 1 步 / 共 3 步：输入一句创意';
-  if (step === 'blueprint') return '第 2 步 / 共 3 步：确认作品蓝图';
-  return '第 3 步 / 共 3 步：确认章节大纲';
-}
-
-function aiActionLabel(action: AiDraftAction): string {
-  if (action === 'polish') return '\u6da6\u8272';
-  if (action === 'rewrite') return '\u6539\u5199';
-  if (action === 'outline') return '\u6309\u5927\u7eb2\u751f\u6210\u6b63\u6587';
-  return '\u7eed\u5199';
-}
-
-function aiDraftTitle(action: AiDraftAction): string {
-  return `${aiActionLabel(action)}\u8349\u7a3f`;
-}
-
 function EmptyState({ title, text }: { title: string; text?: string }) {
   return <div className="novel-empty"><strong>{title}</strong>{text && <span>{text}</span>}</div>;
-}
-
-function countWords(text: string): number {
-  return Array.from(text.replace(/\s+/g, '')).length;
-}
-
-function createId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function formatTime(value: string): string {
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '未更新' : date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-}
-
-function saveStatusLabel(status: SaveStatus): string {
-  if (status === 'dirty') return '未保存';
-  if (status === 'saving') return '保存中';
-  if (status === 'failed') return '保存失败';
-  return '已保存';
 }
 
 function resolveTextModel(modelPreferences: ModelPreferences, apiProviderStore: ApiProviderStore): { channel: ApiProviderChannel; model: string } | null {
