@@ -1,6 +1,7 @@
 import type { Chapter, Novel } from '../../types/novel';
 
 export type TextMessage = { role: 'system' | 'user'; content: string };
+export type OptimizeType = 'dialogue' | 'environment' | 'psychology';
 
 export function buildContinueChapterPrompt(novel: Novel, chapter: Chapter): TextMessage[] {
   const tail = chapter.content.slice(-1500);
@@ -225,6 +226,31 @@ export function buildChapterReviewPrompt(novel: Novel, chapter: Chapter): TextMe
         '本章正文：',
         chapter.content,
         '请评审本章正文，指出优点、存在的问题（如偏离大纲、节奏拖沓、人物行为不合理等）以及修改建议。评审意见 200-400 字。',
+      ].filter(Boolean).join('\n'),
+    },
+  ];
+}
+
+export function buildOptimizeSelectionPrompt(novel: Novel, chapter: Chapter, selectedText: string, type: OptimizeType): TextMessage[] {
+  const typeInstruction: Record<OptimizeType, string> = {
+    dialogue: '优化下面这段的对话：让人物语言更自然、更有个性、更符合身份与当前情绪，保留原有对话意图和信息，不新增剧情，不添加原文没有的台词。',
+    environment: '优化下面这段的环境描写：增强画面感、氛围与感官细节，但不喧宾夺主、不拖慢节奏，保留原有情节推进。',
+    psychology: '优化下面这段的心理描写：让人物内心活动更细腻、可信、贴合当前处境，不改变人物已有决定和剧情走向。',
+  };
+  return [
+    {
+      role: 'system',
+      content: '你是小说文本优化助手。只优化用户选中的片段，直接输出优化后的正文。不要解释，不要加标题，不要加引号，不要输出选中片段以外的内容。不改变剧情走向、人物关系和关键信息。输出长度应与原片段接近，不得大幅扩写或缩写。',
+    },
+    {
+      role: 'user',
+      content: [
+        `小说标题：${novel.title}`,
+        novel.summary ? `小说简介：${novel.summary}` : '',
+        `当前章节：${chapter.title || '未命名章节'}`,
+        typeInstruction[type],
+        '选中片段：',
+        selectedText,
       ].filter(Boolean).join('\n'),
     },
   ];

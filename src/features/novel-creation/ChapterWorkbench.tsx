@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, ChapterVersion, Novel } from '../../types/novel';
-import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt } from './novelPrompts';
+import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, type OptimizeType } from './novelPrompts';
 import { countWords, createId, formatTime, saveStatusLabel, type SaveStatus } from './novelShared';
 import './ChapterWorkbench.css';
 
@@ -11,6 +11,15 @@ export type ReadyTextModel = { channelId: string; channelLabel?: string; baseUrl
 type ChapterStatus = 'done' | 'generating' | 'pending';
 type VersionPreviewState = { chapterId: string; activeVersionId: string; contentSnapshot: string };
 type OutlinePreviewEntry = { chapterId: string; label: string; title: string; outline: string };
+type SelectionState = { start: number; end: number; text: string };
+type OptimizeJob = SelectionState & {
+  status: 'loading' | 'success';
+  chapterId: string;
+  contentSnapshot: string;
+  selectedText: string;
+  type: OptimizeType;
+  optimizedText?: string;
+};
 
 const MAX_CHAPTER_VERSIONS = 5;
 
@@ -39,6 +48,11 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState('');
   const [reviewResult, setReviewResult] = useState<{ chapterId: string; content: string } | null>(null);
+  const [selection, setSelection] = useState<SelectionState | null>(null);
+  const [optimizeTypeOpen, setOptimizeTypeOpen] = useState(false);
+  const [optimizeJob, setOptimizeJob] = useState<OptimizeJob | null>(null);
+  const [optimizeError, setOptimizeError] = useState('');
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const requestIdRef = useRef<string | null>(null);
   const runRef = useRef(0);
   const confirmBusyRef = useRef(false);
@@ -57,7 +71,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   const progress = chapters.length ? Math.round((doneCount / chapters.length) * 100) : 0;
   const firstPendingIndex = chapters.findIndex((chapter) => chapter.content.trim() === '');
   const missingOutlineCount = chapters.filter((chapter) => !chapter.outline?.trim()).length;
-  const busy = generatingChapterId !== null || outlineBusy || reviewBusy;
+  const busy = generatingChapterId !== null || outlineBusy || reviewBusy || optimizeTypeOpen || optimizeJob !== null;
   const summaryBrief = brief(novel.summary, 42);
   const blueprintBrief = brief(novel.blueprint?.trim() || novel.summary.trim() || novel.idea?.trim() || '', 130);
 
@@ -71,6 +85,102 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     const chapter = chapters[firstPendingIndex];
     onSelectChapter(chapter.id);
     window.setTimeout(() => document.getElementById(`workbench-chapter-${chapter.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
+  }
+
+  function recordSelection(target: HTMLTextAreaElement) {
+    const start = target.selectionStart;
+    const end = target.selectionEnd;
+    setSelection(start < end ? { start, end, text: target.value.slice(start, end) } : null);
+  }
+
+  function openOptimizeType() {
+    if (busy) return;
+    if (!selection?.text.trim()) {
+      window.alert('请先选择要优化的正文');
+      return;
+    }
+    setOptimizeError('');
+    setOptimizeTypeOpen(true);
+  }
+
+  async function startOptimize(type: OptimizeType) {
+    if (!activeChapter || !selection?.text.trim()) return;
+    const ready = ensureTextModel(setOptimizeError);
+    if (!ready) {
+      setOptimizeTypeOpen(false);
+      return;
+    }
+    const snapshot: OptimizeJob = {
+      ...selection,
+      status: 'loading',
+      chapterId: activeChapter.id,
+      contentSnapshot: activeChapter.content,
+      selectedText: selection.text,
+      type,
+    };
+    const requestId = createId('text-request');
+    const runId = runRef.current + 1;
+    runRef.current = runId;
+    requestIdRef.current = requestId;
+    setOptimizeTypeOpen(false);
+    setOptimizeJob(snapshot);
+    setOptimizeError('');
+    const result = await rendererBridge.generateText({
+      requestId,
+      channelId: ready.channelId,
+      channelLabel: ready.channelLabel,
+      baseUrl: ready.baseUrl,
+      apiKey: ready.apiKey,
+      model: ready.model,
+      messages: buildOptimizeSelectionPrompt(novel, activeChapter, snapshot.selectedText, type),
+      temperature: 0.7,
+      maxTokens: 1000,
+    });
+    if (runRef.current !== runId) return;
+    requestIdRef.current = null;
+    if (!result.ok || !result.text) {
+      setOptimizeJob(null);
+      setOptimizeError(result.message || '优化选区失败，请稍后重试。');
+      return;
+    }
+    setOptimizeJob({ ...snapshot, status: 'success', optimizedText: result.text });
+  }
+
+  function cancelOptimize() {
+    const requestId = requestIdRef.current;
+    runRef.current += 1;
+    requestIdRef.current = null;
+    setOptimizeJob(null);
+    if (requestId) void rendererBridge.cancelTextGeneration(requestId);
+  }
+
+  function confirmOptimizeWrite() {
+    if (!activeChapter || optimizeJob?.status !== 'success' || optimizeJob.optimizedText === undefined) return;
+    const { chapterId, contentSnapshot, selectionStart, selectionEnd, selectedText, optimizedText } = {
+      chapterId: optimizeJob.chapterId,
+      contentSnapshot: optimizeJob.contentSnapshot,
+      selectionStart: optimizeJob.start,
+      selectionEnd: optimizeJob.end,
+      selectedText: optimizeJob.selectedText,
+      optimizedText: optimizeJob.optimizedText,
+    };
+    const contentValid =
+      activeChapter.id === chapterId &&
+      activeChapter.content === contentSnapshot &&
+      activeChapter.content.slice(selectionStart, selectionEnd) === selectedText;
+    if (!contentValid) {
+      window.alert('原文范围已变化，请重新选择后生成。');
+      setOptimizeJob(null);
+      return;
+    }
+    const nextContent = activeChapter.content.slice(0, selectionStart) + optimizedText + activeChapter.content.slice(selectionEnd);
+    const nextEnd = selectionStart + optimizedText.length;
+    onUpdateChapter(chapterId, { content: nextContent });
+    setOptimizeJob(null);
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(selectionStart, nextEnd);
+    });
   }
 
   async function generateChapterBody() {
@@ -349,7 +459,15 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
               {activeChapter.content.trim() && (
                 <button className="novel-flow__ghost" disabled={busy} onClick={() => void generateChapterReview(activeChapter)} type="button">章节评审</button>
               )}
+              <button className="novel-flow__ghost" disabled={busy} onClick={openOptimizeType} type="button">优化选区</button>
             </div>
+            {optimizeJob?.status === 'loading' && optimizeJob.chapterId === activeChapter.id && (
+              <div className="novel-workbench__optimize-loading">
+                <span className="novel-workbench__spinner" aria-hidden="true" />
+                <span>正在优化选区…</span>
+                <button className="novel-flow__ghost" onClick={cancelOptimize} type="button">取消优化</button>
+              </div>
+            )}
             {reviewBusy && (
               <div className="novel-workbench__review-loading">
                 <span className="novel-workbench__spinner" aria-hidden="true" />
@@ -358,7 +476,15 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
               </div>
             )}
             {reviewError && <p className="novel-flow__error">{reviewError}</p>}
-            <textarea value={activeChapter.content} onChange={(event) => onUpdateChapter(activeChapter.id, { content: event.target.value })} placeholder="继续打磨本章正文…" />
+            {optimizeError && <p className="novel-flow__error">{optimizeError}</p>}
+            <textarea
+              ref={textareaRef}
+              value={activeChapter.content}
+              onChange={(event) => onUpdateChapter(activeChapter.id, { content: event.target.value })}
+              onSelect={(event) => recordSelection(event.currentTarget)}
+              readOnly={busy}
+              placeholder="继续打磨本章正文…"
+            />
           </div>
         ) : isFirstPending ? (
           <div className="novel-workbench__state">
@@ -501,6 +627,43 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
             <footer>
               <button className="novel-flow__ghost" onClick={() => setReviewResult(null)} type="button">关闭</button>
               <button className="novel-flow__ghost" disabled={busy} onClick={() => void generateChapterReview(activeChapter!)} type="button">重新评审</button>
+            </footer>
+          </div>
+        </div>
+      )}
+      {optimizeTypeOpen && selection && (
+        <div className="novel-modal" role="dialog" aria-modal="true" aria-label="选择优化类型" onClick={() => setOptimizeTypeOpen(false)}>
+          <div className="novel-workbench__preview" onClick={(event) => event.stopPropagation()}>
+            <h2>优化选区</h2>
+            <p className="novel-workbench__preview-sub">将对下面选中的片段做针对性优化，确认后可替换原文。</p>
+            <p className="novel-workbench__optimize-selected">{brief(selection.text, 80)}</p>
+            <footer>
+              <button className="novel-flow__ghost" onClick={() => setOptimizeTypeOpen(false)} type="button">取消</button>
+              <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void startOptimize('dialogue')} type="button">对话优化</button>
+              <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void startOptimize('environment')} type="button">环境描写优化</button>
+              <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void startOptimize('psychology')} type="button">心理描写优化</button>
+            </footer>
+          </div>
+        </div>
+      )}
+      {optimizeJob?.status === 'success' && optimizeJob.optimizedText !== undefined && (
+        <div className="novel-modal" role="dialog" aria-modal="true" aria-label="优化对照" onClick={() => setOptimizeJob(null)}>
+          <div className="novel-workbench__preview" onClick={(event) => event.stopPropagation()}>
+            <h2>优化对照</h2>
+            <p className="novel-workbench__preview-sub">确认后将用改写稿替换选中的原文片段；取消则丢弃，不影响正文。</p>
+            <div className="novel-workbench__optimize-compare">
+              <article>
+                <strong>原文（{countWords(optimizeJob.selectedText)} 字）</strong>
+                <p>{optimizeJob.selectedText}</p>
+              </article>
+              <article>
+                <strong>改写稿（{countWords(optimizeJob.optimizedText)} 字）</strong>
+                <p>{optimizeJob.optimizedText}</p>
+              </article>
+            </div>
+            <footer>
+              <button className="novel-flow__ghost" onClick={() => setOptimizeJob(null)} type="button">取消</button>
+              <button className="novel-flow__primary novel-flow__primary--compact" onClick={confirmOptimizeWrite} type="button">确认替换</button>
             </footer>
           </div>
         </div>
