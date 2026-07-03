@@ -62,12 +62,14 @@ optimizeTypeOpen: boolean
 
 一个 ref：`textareaRef` — 用于替换后 `focus + setSelectionRange`。
 
-**busy 派生，不新增独立 bool**：
+**busy 派生，不新增独立 bool**（`optimizeTypeOpen` 和 `optimizeJob !== null` 都纳入，保证类型 modal / 对照 modal 打开期间其它 AI 按钮也 disabled）：
 
 ```ts
 busy = generatingChapterId !== null || outlineBusy || reviewBusy
-       || optimizeJob?.status === 'loading'
+       || optimizeTypeOpen || optimizeJob !== null
 ```
+
+> 类型 modal（`optimizeTypeOpen`）和对照 modal（`optimizeJob.status === 'success'`）虽非「AI 生成中」，但从 UI 互斥角度就该锁；一个 `busy` 覆盖到底，不引入第二个派生锁。textarea `readOnly = busy`（点「优化选区」即锁，取消后恢复）。
 
 ## 三、快照与写回校验
 
