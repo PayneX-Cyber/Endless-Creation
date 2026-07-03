@@ -232,6 +232,20 @@ export function NovelCreation() {
     }));
   }
 
+  function deleteChapterById(chapterId: string) {
+    const index = chapters.findIndex((chapter) => chapter.id === chapterId);
+    if (index < 0) return;
+    const chapter = chapters[index];
+    if (!window.confirm(`确定删除「第 ${index + 1} 章 · ${chapter.title || '未命名章节'}」吗？本章大纲与正文将一并删除，不可恢复。`)) return;
+    const now = new Date().toISOString();
+    updateNovel((novel) => ({
+      ...novel,
+      updatedAt: now,
+      chapters: novel.chapters.filter((item) => item.id !== chapterId).sort((a, b) => a.order - b.order).map((item, order) => ({ ...item, order })),
+    }));
+    setActiveChapterId((current) => current === chapterId ? null : current);
+  }
+
   function ensureTextModelReady(onIssue: (message: string) => void): { channel: ApiProviderChannel; model: string; baseUrl: string; apiKey: string } | null {
     if (!selectedTextModel) {
       onIssue('\u8bf7\u5148\u5728 API\u914d\u7f6e / \u6a21\u578b\u504f\u597d \u4e2d\u914d\u7f6e\u53ef\u7528\u6587\u672c\u6a21\u578b\u3002');
@@ -555,7 +569,10 @@ export function NovelCreation() {
                   <div className="novel-project-panel__head"><h2>章节大纲</h2><button className="novel-flow__primary novel-flow__primary--compact" onClick={addChapter} type="button">新增章节</button></div>
                   {chapters.length ? <div className="novel-outline-list">{chapters.map((chapter, index) => (
                     <article className="novel-outline-card" key={chapter.id}>
-                      <span>第 {index + 1} 章</span>
+                      <div className="novel-outline-card__head">
+                        <span>第 {index + 1} 章</span>
+                        <button className="novel-flow__ghost" onClick={() => deleteChapterById(chapter.id)} type="button">删除</button>
+                      </div>
                       <input value={chapter.title} onChange={(event) => updateChapterById(chapter.id, { title: event.target.value })} placeholder="未命名章节" />
                       <textarea value={chapter.outline ?? ''} onChange={(event) => updateChapterById(chapter.id, { outline: event.target.value })} placeholder="本章故事结构规划…" />
                     </article>

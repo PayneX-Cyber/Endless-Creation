@@ -728,6 +728,13 @@
   font-weight: 800;
 }
 
+.novel-outline-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .novel-project-panel textarea,
 .novel-outline-card input {
   width: 100%;
