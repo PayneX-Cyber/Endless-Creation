@@ -233,8 +233,26 @@ export function NovelCreation() {
   }
 
   function updateChapterByIdAndSave(chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId'>>) {
-    updateChapterById(chapterId, patch);
-    window.setTimeout(() => { void saveCurrentNovel(); }, 0);
+    if (!currentNovel) return;
+    const now = new Date().toISOString();
+    const nextNovel: Novel = {
+      ...currentNovel,
+      updatedAt: now,
+      chapters: currentNovel.chapters.map((chapter) => chapter.id === chapterId ? { ...chapter, ...patch, updatedAt: now } : chapter),
+    };
+    revisionRef.current += 1;
+    setCurrentNovel(nextNovel);
+    setSaveStatus('saving');
+    void novelService.saveNovel(nextNovel).then((result) => {
+      if (!result.ok) {
+        setSaveStatus('failed');
+        setFeedback(result.message);
+        return;
+      }
+      setSaveStatus('saved');
+      if (result.novel) setCurrentNovel((current) => current && current.id === result.novel?.id ? { ...current, updatedAt: result.novel.updatedAt } : current);
+      void loadSummaries();
+    });
   }
 
   function deleteChapterById(chapterId: string) {
