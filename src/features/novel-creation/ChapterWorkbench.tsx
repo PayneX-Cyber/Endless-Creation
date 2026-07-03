@@ -21,13 +21,14 @@ interface ChapterWorkbenchProps {
   saveStatus: SaveStatus;
   onSelectChapter: (chapterId: string) => void;
   onUpdateChapter: (chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId'>>) => void;
+  onUpdateChapterAndSave: (chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId'>>) => void;
   onRetrySave: () => void;
   onBackToProjects: () => void;
   onOpenProjectView: () => void;
   ensureTextModel: (onIssue: (message: string) => void) => ReadyTextModel | null;
 }
 
-export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus, onSelectChapter, onUpdateChapter, onRetrySave, onBackToProjects, onOpenProjectView, ensureTextModel }: ChapterWorkbenchProps) {
+export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus, onSelectChapter, onUpdateChapter, onUpdateChapterAndSave, onRetrySave, onBackToProjects, onOpenProjectView, ensureTextModel }: ChapterWorkbenchProps) {
   const [generatingChapterId, setGeneratingChapterId] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<{ chapterId: string; message: string } | null>(null);
   const [preview, setPreview] = useState<VersionPreviewState | null>(null);
@@ -103,7 +104,8 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
       return;
     }
     const version: ChapterVersion = { id: createId('version'), content: result.text, createdAt: new Date().toISOString() };
-    onUpdateChapter(chapter.id, { versions: [...(chapter.versions ?? []), version] });
+    const updatedVersions = [...(chapter.versions ?? []), version].slice(-MAX_CHAPTER_VERSIONS);
+    onUpdateChapterAndSave(chapter.id, { versions: updatedVersions });
     setPreview({ chapterId: chapter.id, activeVersionId: version.id, contentSnapshot });
   }
 
@@ -126,26 +128,42 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     }
     confirmBusyRef.current = true;
     try {
-      let contentChanged = target.content !== preview.contentSnapshot;
-      if (!contentChanged) {
-        // 内存态可能感知不到生成期间落盘的手动改动，写入前再核对一次持久化内容
-        const stored = await novelService.loadNovel(novel.id);
-        const storedChapter = stored.ok && stored.novel ? stored.novel.chapters.find((chapter) => chapter.id === target.id) : undefined;
-        contentChanged = Boolean(storedChapter && storedChapter.content !== preview.contentSnapshot);
-      }
-      if (contentChanged && !window.confirm('正文已被修改，写入将覆盖当前内容。仍要写入吗？')) return;
-      onUpdateChapter(target.id, { content: version.content, selectedVersionId: version.id });
+      await writeVersionToChapter(novel.id, target, version, preview.contentSnapshot);
       setPreview(null);
       setGenerationError(null);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('取消')) return;
+      throw error;
     } finally {
       confirmBusyRef.current = false;
     }
   }
 
-  function restoreVersion(chapter: Chapter, version: ChapterVersion) {
-    if (!window.confirm('将用该版本覆盖当前正文，确定吗？')) return;
+  async function restoreVersion(chapter: Chapter, version: ChapterVersion) {
+    try {
+      await writeVersionToChapter(novel.id, chapter, version, chapter.content);
+      setHistoryOpen(false);
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('取消')) return;
+      throw error;
+    }
+  }
+
+  async function writeVersionToChapter(novelId: string, chapter: Chapter, version: ChapterVersion, contentSnapshot: string) {
+    const stored = await novelService.loadNovel(novelId);
+    if (!stored.ok || !stored.novel) {
+      window.alert('无法确认最新正文状态，请重新加载后再试。');
+      throw new Error('加载小说失败，写入已取消。');
+    }
+    const storedChapter = stored.novel.chapters.find((item) => item.id === chapter.id);
+    if (!storedChapter) {
+      window.alert('章节不存在，请重新加载后再试。');
+      throw new Error('章节不存在，写入已取消。');
+    }
+    if (storedChapter.content !== contentSnapshot && !window.confirm('正文已被修改，写入将覆盖当前内容。仍要写入吗？')) {
+      throw new Error('用户取消写入。');
+    }
     onUpdateChapter(chapter.id, { content: version.content, selectedVersionId: version.id });
-    setHistoryOpen(false);
   }
 
   async function generateMissingOutlines() {

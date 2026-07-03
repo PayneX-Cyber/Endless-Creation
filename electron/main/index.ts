@@ -477,7 +477,7 @@ function sanitizeChapterVersions(value: unknown, fallbackTime: string): ChapterV
       content: item.content,
       createdAt: typeof item.createdAt === 'string' ? item.createdAt : fallbackTime,
     };
-  }).filter((entry): entry is ChapterVersion => entry !== null);
+  }).filter((entry): entry is ChapterVersion => entry !== null).slice(-5);
 }
 
 function toNovelSummary(novel: Novel): NovelSummary {

@@ -232,6 +232,11 @@ export function NovelCreation() {
     }));
   }
 
+  function updateChapterByIdAndSave(chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId'>>) {
+    updateChapterById(chapterId, patch);
+    window.setTimeout(() => { void saveCurrentNovel(); }, 0);
+  }
+
   function deleteChapterById(chapterId: string) {
     const index = chapters.findIndex((chapter) => chapter.id === chapterId);
     if (index < 0) return;
@@ -704,6 +709,7 @@ export function NovelCreation() {
           saveStatus={saveStatus}
           onSelectChapter={setActiveChapterId}
           onUpdateChapter={updateChapterById}
+          onUpdateChapterAndSave={updateChapterByIdAndSave}
           onRetrySave={() => void saveCurrentNovel()}
           onBackToProjects={() => setView('projectList')}
           onOpenProjectView={() => { setProjectViewTab('overview'); setView('projectView'); }}
