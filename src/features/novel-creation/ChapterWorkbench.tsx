@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { rendererBridge } from '../../services/rendererBridge';
+import { novelService } from '../../services/novelService';
 import type { Chapter, Novel } from '../../types/novel';
 import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText } from './novelPrompts';
 import { countWords, createId, saveStatusLabel, type SaveStatus } from './novelShared';
@@ -33,6 +34,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   const [outlinePreview, setOutlinePreview] = useState<OutlinePreviewEntry[] | null>(null);
   const requestIdRef = useRef<string | null>(null);
   const runRef = useRef(0);
+  const confirmBusyRef = useRef(false);
 
   useEffect(() => () => {
     const requestId = requestIdRef.current;
@@ -109,17 +111,29 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     if (requestId) void rendererBridge.cancelTextGeneration(requestId);
   }
 
-  function confirmDraft() {
-    if (!draft) return;
+  async function confirmDraft() {
+    if (!draft || confirmBusyRef.current) return;
     const target = chapters.find((chapter) => chapter.id === draft.chapterId);
     if (!target) {
       setDraft(null);
       return;
     }
-    if (target.content !== draft.contentSnapshot && !window.confirm('正文已被修改，写入将覆盖当前内容。仍要写入吗？')) return;
-    onUpdateChapter(draft.chapterId, { content: draft.text });
-    setDraft(null);
-    setGenerationError(null);
+    confirmBusyRef.current = true;
+    try {
+      let contentChanged = target.content !== draft.contentSnapshot;
+      if (!contentChanged) {
+        // 内存态可能感知不到生成期间落盘的手动改动，写入前再核对一次持久化内容
+        const stored = await novelService.loadNovel(novel.id);
+        const storedChapter = stored.ok && stored.novel ? stored.novel.chapters.find((chapter) => chapter.id === draft.chapterId) : undefined;
+        contentChanged = Boolean(storedChapter && storedChapter.content !== draft.contentSnapshot);
+      }
+      if (contentChanged && !window.confirm('正文已被修改，写入将覆盖当前内容。仍要写入吗？')) return;
+      onUpdateChapter(draft.chapterId, { content: draft.text });
+      setDraft(null);
+      setGenerationError(null);
+    } finally {
+      confirmBusyRef.current = false;
+    }
   }
 
   async function generateMissingOutlines() {
@@ -230,7 +244,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
             <p>{chapterDraft.text}</p>
             <footer>
               <button className="novel-flow__ghost" onClick={() => setDraft(null)} type="button">放弃</button>
-              <button className="novel-flow__primary novel-flow__primary--compact" onClick={confirmDraft} type="button">确认写入</button>
+              <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void confirmDraft()} type="button">确认写入</button>
             </footer>
           </div>
         ) : status === 'done' ? (
