@@ -241,6 +241,7 @@ export function NovelCreation() {
       chapters: currentNovel.chapters.map((chapter) => chapter.id === chapterId ? { ...chapter, ...patch, updatedAt: now } : chapter),
     };
     revisionRef.current += 1;
+    const revision = revisionRef.current;
     setCurrentNovel(nextNovel);
     setSaveStatus('saving');
     void novelService.saveNovel(nextNovel).then((result) => {
@@ -249,7 +250,8 @@ export function NovelCreation() {
         setFeedback(result.message);
         return;
       }
-      setSaveStatus('saved');
+      if (revisionRef.current === revision) setSaveStatus('saved');
+      else setSaveStatus('dirty');
       if (result.novel) setCurrentNovel((current) => current && current.id === result.novel?.id ? { ...current, updatedAt: result.novel.updatedAt } : current);
       void loadSummaries();
     });
