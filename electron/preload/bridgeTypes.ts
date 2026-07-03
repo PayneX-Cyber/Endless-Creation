@@ -72,11 +72,19 @@ export interface ApiTextGenerationResult {
   text?: string;
 }
 
+export interface ChapterVersion {
+  id: string;
+  content: string;
+  createdAt: string;
+}
+
 export interface Chapter {
   id: string;
   title: string;
   content: string;
   outline?: string;
+  versions?: ChapterVersion[];
+  selectedVersionId?: string;
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -90,7 +98,7 @@ export interface Novel {
   idea?: string;
   blueprint?: string;
   chapters: Chapter[];
-  version: 2;
+  version: 3;
   createdAt: string;
   updatedAt: string;
 }

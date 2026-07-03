@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
-import type { Chapter, Novel } from '../../types/novel';
+import type { Chapter, ChapterVersion, Novel } from '../../types/novel';
 import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText } from './novelPrompts';
-import { countWords, createId, saveStatusLabel, type SaveStatus } from './novelShared';
+import { countWords, createId, formatTime, saveStatusLabel, type SaveStatus } from './novelShared';
 import './ChapterWorkbench.css';
 
 export type ReadyTextModel = { channelId: string; channelLabel?: string; baseUrl: string; apiKey: string; model: string };
 
 type ChapterStatus = 'done' | 'generating' | 'pending';
-type DraftState = { chapterId: string; text: string; contentSnapshot: string };
+type VersionPreviewState = { chapterId: string; activeVersionId: string; contentSnapshot: string };
 type OutlinePreviewEntry = { chapterId: string; label: string; title: string; outline: string };
+
+const MAX_CHAPTER_VERSIONS = 5;
 
 interface ChapterWorkbenchProps {
   novel: Novel;
@@ -18,7 +20,7 @@ interface ChapterWorkbenchProps {
   activeChapterId: string | null;
   saveStatus: SaveStatus;
   onSelectChapter: (chapterId: string) => void;
-  onUpdateChapter: (chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline'>>) => void;
+  onUpdateChapter: (chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId'>>) => void;
   onRetrySave: () => void;
   onBackToProjects: () => void;
   onOpenProjectView: () => void;
@@ -28,7 +30,8 @@ interface ChapterWorkbenchProps {
 export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus, onSelectChapter, onUpdateChapter, onRetrySave, onBackToProjects, onOpenProjectView, ensureTextModel }: ChapterWorkbenchProps) {
   const [generatingChapterId, setGeneratingChapterId] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<{ chapterId: string; message: string } | null>(null);
-  const [draft, setDraft] = useState<DraftState | null>(null);
+  const [preview, setPreview] = useState<VersionPreviewState | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [outlineBusy, setOutlineBusy] = useState(false);
   const [outlineError, setOutlineError] = useState('');
   const [outlinePreview, setOutlinePreview] = useState<OutlinePreviewEntry[] | null>(null);
@@ -70,6 +73,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     if (busy || firstPendingIndex < 0) return;
     const chapter = chapters[firstPendingIndex];
     if (!chapter.outline?.trim()) return;
+    if ((chapter.versions?.length ?? 0) >= MAX_CHAPTER_VERSIONS) return;
     const previousChapter = firstPendingIndex > 0 ? chapters[firstPendingIndex - 1] : undefined;
     const ready = ensureTextModel((message) => setGenerationError({ chapterId: chapter.id, message }));
     if (!ready) return;
@@ -79,7 +83,6 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     requestIdRef.current = requestId;
     setGeneratingChapterId(chapter.id);
     setGenerationError(null);
-    setDraft(null);
     const contentSnapshot = chapter.content;
     const result = await rendererBridge.generateText({
       requestId,
@@ -99,7 +102,9 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
       setGenerationError({ chapterId: chapter.id, message: result.message || '生成章节正文失败，请稍后重试。' });
       return;
     }
-    setDraft({ chapterId: chapter.id, text: result.text, contentSnapshot });
+    const version: ChapterVersion = { id: createId('version'), content: result.text, createdAt: new Date().toISOString() };
+    onUpdateChapter(chapter.id, { versions: [...(chapter.versions ?? []), version] });
+    setPreview({ chapterId: chapter.id, activeVersionId: version.id, contentSnapshot });
   }
 
   function cancelGeneration() {
@@ -111,29 +116,36 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     if (requestId) void rendererBridge.cancelTextGeneration(requestId);
   }
 
-  async function confirmDraft() {
-    if (!draft || confirmBusyRef.current) return;
-    const target = chapters.find((chapter) => chapter.id === draft.chapterId);
-    if (!target) {
-      setDraft(null);
+  async function confirmPreviewWrite() {
+    if (!preview || confirmBusyRef.current) return;
+    const target = chapters.find((chapter) => chapter.id === preview.chapterId);
+    const version = target?.versions?.find((item) => item.id === preview.activeVersionId);
+    if (!target || !version) {
+      setPreview(null);
       return;
     }
     confirmBusyRef.current = true;
     try {
-      let contentChanged = target.content !== draft.contentSnapshot;
+      let contentChanged = target.content !== preview.contentSnapshot;
       if (!contentChanged) {
         // 内存态可能感知不到生成期间落盘的手动改动，写入前再核对一次持久化内容
         const stored = await novelService.loadNovel(novel.id);
-        const storedChapter = stored.ok && stored.novel ? stored.novel.chapters.find((chapter) => chapter.id === draft.chapterId) : undefined;
-        contentChanged = Boolean(storedChapter && storedChapter.content !== draft.contentSnapshot);
+        const storedChapter = stored.ok && stored.novel ? stored.novel.chapters.find((chapter) => chapter.id === target.id) : undefined;
+        contentChanged = Boolean(storedChapter && storedChapter.content !== preview.contentSnapshot);
       }
       if (contentChanged && !window.confirm('正文已被修改，写入将覆盖当前内容。仍要写入吗？')) return;
-      onUpdateChapter(draft.chapterId, { content: draft.text });
-      setDraft(null);
+      onUpdateChapter(target.id, { content: version.content, selectedVersionId: version.id });
+      setPreview(null);
       setGenerationError(null);
     } finally {
       confirmBusyRef.current = false;
     }
+  }
+
+  function restoreVersion(chapter: Chapter, version: ChapterVersion) {
+    if (!window.confirm('将用该版本覆盖当前正文，确定吗？')) return;
+    onUpdateChapter(chapter.id, { content: version.content, selectedVersionId: version.id });
+    setHistoryOpen(false);
   }
 
   async function generateMissingOutlines() {
@@ -218,7 +230,10 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     const isFirstPending = activeIndex === firstPendingIndex;
     const hasOutline = Boolean(activeChapter.outline?.trim());
     const chapterError = generationError && generationError.chapterId === activeChapter.id ? generationError.message : '';
-    const chapterDraft = draft && draft.chapterId === activeChapter.id ? draft : null;
+    const versions = activeChapter.versions ?? [];
+    const chapterPreview = preview && preview.chapterId === activeChapter.id ? preview : null;
+    const activeVersion = chapterPreview ? versions.find((item) => item.id === chapterPreview.activeVersionId) ?? null : null;
+    const atVersionCap = versions.length >= MAX_CHAPTER_VERSIONS;
     return (
       <>
         <header className="novel-workbench__chapter-head">
@@ -232,19 +247,34 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
           <div className="novel-workbench__state">
             <span className="novel-workbench__spinner" aria-hidden="true" />
             <strong>正在生成章节正文…</strong>
-            <span>生成完成后会先展示草稿，确认后才会写入正文。</span>
+            <span>生成完成后会先展示草稿版本，确认后才会写入正文。</span>
             <button className="novel-flow__ghost" onClick={cancelGeneration} type="button">取消生成</button>
           </div>
-        ) : chapterDraft ? (
+        ) : chapterPreview && activeVersion ? (
           <div className="novel-workbench__draft">
             <div className="novel-workbench__draft-head">
               <strong>正文草稿</strong>
-              <span>{countWords(chapterDraft.text)} 字 · 确认后写入本章正文</span>
+              <span>{countWords(activeVersion.content)} 字 · 确认后写入本章正文</span>
             </div>
-            <p>{chapterDraft.text}</p>
+            <div className="novel-workbench__versions">
+              {versions.map((version, index) => (
+                <button
+                  className={version.id === chapterPreview.activeVersionId ? 'novel-workbench__version-pill novel-workbench__version-pill--active' : 'novel-workbench__version-pill'}
+                  key={version.id}
+                  onClick={() => setPreview({ ...chapterPreview, activeVersionId: version.id })}
+                  type="button"
+                >
+                  版本 {index + 1}
+                </button>
+              ))}
+              {atVersionCap && <span className="novel-workbench__hint">已达 {MAX_CHAPTER_VERSIONS} 个版本上限</span>}
+            </div>
+            <p>{activeVersion.content}</p>
             <footer>
-              <button className="novel-flow__ghost" onClick={() => setDraft(null)} type="button">放弃</button>
-              <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void confirmDraft()} type="button">确认写入</button>
+              {chapterError && <p className="novel-flow__error">{chapterError}</p>}
+              <button className="novel-flow__ghost" onClick={() => setPreview(null)} type="button">关闭预览</button>
+              <button className="novel-flow__ghost" disabled={busy || atVersionCap} onClick={() => void generateChapterBody()} type="button">再生成一版</button>
+              <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void confirmPreviewWrite()} type="button">确认写入</button>
             </footer>
           </div>
         ) : status === 'done' ? (
@@ -253,6 +283,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
               <span>{saveStatusLabel(saveStatus)}</span>
               <span>{countWords(activeChapter.content)} 字</span>
               {saveStatus === 'failed' && <button className="novel-flow__ghost" onClick={onRetrySave} type="button">重试保存</button>}
+              {versions.length > 0 && <button className="novel-flow__ghost" onClick={() => setHistoryOpen(true)} type="button">历史版本</button>}
             </div>
             <textarea value={activeChapter.content} onChange={(event) => onUpdateChapter(activeChapter.id, { content: event.target.value })} placeholder="继续打磨本章正文…" />
           </div>
@@ -261,7 +292,13 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
             <strong>开始创作</strong>
             <span>{hasOutline ? '前面的章节都已完成，可以按顺序生成本章正文。' : '本章还没有大纲，请先通过左侧「生成后续大纲」补齐本章大纲。'}</span>
             {chapterError && <p className="novel-flow__error">{chapterError}</p>}
-            <button className="novel-flow__primary" disabled={busy || !hasOutline} onClick={() => void generateChapterBody()} type="button">{chapterError ? '重试生成' : '按顺序生成'}</button>
+            {atVersionCap && <span className="novel-workbench__hint">已达 {MAX_CHAPTER_VERSIONS} 个版本上限，请从已有草稿版本中选定写入。</span>}
+            <button className="novel-flow__primary" disabled={busy || !hasOutline || atVersionCap} onClick={() => void generateChapterBody()} type="button">{chapterError ? '重试生成' : '按顺序生成'}</button>
+            {versions.length > 0 && (
+              <button className="novel-flow__ghost" onClick={() => setPreview({ chapterId: activeChapter.id, activeVersionId: versions[versions.length - 1].id, contentSnapshot: activeChapter.content })} type="button">
+                查看草稿版本（{versions.length}）
+              </button>
+            )}
           </div>
         ) : (
           <div className="novel-workbench__state">
@@ -349,6 +386,29 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
             <footer>
               <button className="novel-flow__ghost" onClick={() => setOutlinePreview(null)} type="button">取消</button>
               <button className="novel-flow__primary novel-flow__primary--compact" onClick={confirmOutlinePreview} type="button">确认写入</button>
+            </footer>
+          </div>
+        </div>
+      )}
+      {historyOpen && activeChapter && (activeChapter.versions?.length ?? 0) > 0 && (
+        <div className="novel-modal" role="dialog" aria-modal="true" aria-label="历史版本" onClick={() => setHistoryOpen(false)}>
+          <div className="novel-workbench__preview" onClick={(event) => event.stopPropagation()}>
+            <h2>历史版本</h2>
+            <p className="novel-workbench__preview-sub">写回会用所选版本覆盖当前正文，需再次确认；手动编辑不会改动这些版本。</p>
+            <div className="novel-workbench__preview-list">
+              {(activeChapter.versions ?? []).map((version, index) => (
+                <article key={version.id}>
+                  <div className="novel-workbench__version-row">
+                    <strong>版本 {index + 1} · {countWords(version.content)} 字 · {formatTime(version.createdAt)}</strong>
+                    {activeChapter.selectedVersionId === version.id && <span className="novel-workbench__pill novel-workbench__pill--done">当前选定</span>}
+                    <button className="novel-flow__ghost" onClick={() => restoreVersion(activeChapter, version)} type="button">写回正文</button>
+                  </div>
+                  <p>{brief(version.content, 120)}</p>
+                </article>
+              ))}
+            </div>
+            <footer>
+              <button className="novel-flow__ghost" onClick={() => setHistoryOpen(false)} type="button">关闭</button>
             </footer>
           </div>
         </div>

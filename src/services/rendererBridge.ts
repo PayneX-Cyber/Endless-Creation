@@ -225,7 +225,7 @@ export const rendererBridge = {
       summary: input.summary?.trim() ?? '',
       note: input.note?.trim() ?? '',
       chapters: [],
-      version: 2,
+      version: 3,
       createdAt: now,
       updatedAt: now,
     };

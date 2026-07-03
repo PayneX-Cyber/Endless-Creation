@@ -223,7 +223,7 @@ export function NovelCreation() {
     setActiveChapterId(chapter.id);
   }
 
-  function updateChapterById(chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline'>>) {
+  function updateChapterById(chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId'>>) {
     const now = new Date().toISOString();
     updateNovel((novel) => ({
       ...novel,

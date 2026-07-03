@@ -82,11 +82,19 @@ interface ApiTextGenerationResult {
   text?: string;
 }
 
+interface ChapterVersion {
+  id: string;
+  content: string;
+  createdAt: string;
+}
+
 interface Chapter {
   id: string;
   title: string;
   content: string;
   outline?: string;
+  versions?: ChapterVersion[];
+  selectedVersionId?: string;
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -100,7 +108,7 @@ interface Novel {
   idea?: string;
   blueprint?: string;
   chapters: Chapter[];
-  version: 2;
+  version: 3;
   createdAt: string;
   updatedAt: string;
 }
@@ -436,6 +444,8 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
       title: typeof item.title === 'string' ? item.title : '',
       content: typeof item.content === 'string' ? item.content : '',
       outline: typeof item.outline === 'string' ? item.outline : undefined,
+      versions: sanitizeChapterVersions(item.versions, now),
+      selectedVersionId: typeof item.selectedVersionId === 'string' ? item.selectedVersionId : undefined,
       order: Number.isFinite(item.order) ? Number(item.order) : index,
       createdAt: typeof item.createdAt === 'string' ? item.createdAt : now,
       updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : now,
@@ -450,10 +460,24 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
     idea: typeof candidate.idea === 'string' ? candidate.idea : undefined,
     blueprint: typeof candidate.blueprint === 'string' ? candidate.blueprint : undefined,
     chapters,
-    version: 2,
+    version: 3,
     createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : now,
     updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : now,
   };
+}
+
+function sanitizeChapterVersions(value: unknown, fallbackTime: string): ChapterVersion[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.map((entry): ChapterVersion | null => {
+    if (!entry || typeof entry !== 'object') return null;
+    const item = entry as Partial<ChapterVersion>;
+    if (typeof item.content !== 'string') return null;
+    return {
+      id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : randomUUID(),
+      content: item.content,
+      createdAt: typeof item.createdAt === 'string' ? item.createdAt : fallbackTime,
+    };
+  }).filter((entry): entry is ChapterVersion => entry !== null);
 }
 
 function toNovelSummary(novel: Novel): NovelSummary {
@@ -505,7 +529,7 @@ async function createNovel(input: unknown): Promise<{ ok: boolean; message: stri
     summary: typeof candidate.summary === 'string' ? candidate.summary : '',
     note: typeof candidate.note === 'string' ? candidate.note : '',
     chapters: [],
-    version: 2,
+    version: 3,
     createdAt: now,
     updatedAt: now,
   };
