@@ -11,7 +11,7 @@ export type ReadyTextModel = { channelId: string; channelLabel?: string; baseUrl
 type ChapterStatus = 'done' | 'generating' | 'pending';
 type VersionPreviewState = { chapterId: string; activeVersionId: string; contentSnapshot: string };
 type OutlinePreviewEntry = { chapterId: string; label: string; title: string; outline: string };
-type SelectionState = { start: number; end: number; text: string };
+type SelectionState = { chapterId: string; start: number; end: number; text: string };
 type OptimizeJob = SelectionState & {
   status: 'loading' | 'success';
   chapterId: string;
@@ -64,6 +64,11 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     if (requestId) void rendererBridge.cancelTextGeneration(requestId);
   }, []);
 
+  useEffect(() => {
+    setSelection(null);
+    setOptimizeError('');
+  }, [activeChapterId]);
+
   const activeIndex = chapters.findIndex((chapter) => chapter.id === activeChapterId);
   const activeChapter = activeIndex >= 0 ? chapters[activeIndex] : null;
   const doneCount = chapters.filter((chapter) => chapter.content.trim() !== '').length;
@@ -88,15 +93,25 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   }
 
   function recordSelection(target: HTMLTextAreaElement) {
+    if (!activeChapter) return;
     const start = target.selectionStart;
     const end = target.selectionEnd;
-    setSelection(start < end ? { start, end, text: target.value.slice(start, end) } : null);
+    setSelection(start < end ? { chapterId: activeChapter.id, start, end, text: target.value.slice(start, end) } : null);
+  }
+
+  function getValidSelection(): SelectionState | null {
+    if (!activeChapter || !selection?.text.trim() || selection.chapterId !== activeChapter.id) return null;
+    return activeChapter.content.slice(selection.start, selection.end) === selection.text ? selection : null;
   }
 
   function openOptimizeType() {
     if (busy) return;
-    if (!selection?.text.trim()) {
+    if (!activeChapter || !selection?.text.trim() || selection.chapterId !== activeChapter.id) {
       window.alert('请先选择要优化的正文');
+      return;
+    }
+    if (!getValidSelection()) {
+      window.alert('原文范围已变化，请重新选择后生成。');
       return;
     }
     setOptimizeError('');
@@ -104,18 +119,22 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   }
 
   async function startOptimize(type: OptimizeType) {
-    if (!activeChapter || !selection?.text.trim()) return;
+    const currentSelection = getValidSelection();
+    if (!activeChapter || !currentSelection) {
+      window.alert('原文范围已变化，请重新选择后生成。');
+      return;
+    }
     const ready = ensureTextModel(setOptimizeError);
     if (!ready) {
       setOptimizeTypeOpen(false);
       return;
     }
     const snapshot: OptimizeJob = {
-      ...selection,
+      ...currentSelection,
       status: 'loading',
       chapterId: activeChapter.id,
       contentSnapshot: activeChapter.content,
-      selectedText: selection.text,
+      selectedText: currentSelection.text,
       type,
     };
     const requestId = createId('text-request');
@@ -481,6 +500,8 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
               ref={textareaRef}
               value={activeChapter.content}
               onChange={(event) => onUpdateChapter(activeChapter.id, { content: event.target.value })}
+              onKeyUp={(event) => recordSelection(event.currentTarget)}
+              onMouseUp={(event) => recordSelection(event.currentTarget)}
               onSelect={(event) => recordSelection(event.currentTarget)}
               readOnly={busy}
               placeholder="继续打磨本章正文…"
