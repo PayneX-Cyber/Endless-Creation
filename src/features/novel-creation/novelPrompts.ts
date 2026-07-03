@@ -207,3 +207,25 @@ function finishOutlineChapter(chapter: { title: string; outlineLines: string[] }
 function cleanOutlineTitle(raw: string): string {
   return raw.replace(/[*#]+/g, '').replace(/^[\s:：、.．\-—·]+/, '').trim();
 }
+
+export function buildChapterReviewPrompt(novel: Novel, chapter: Chapter): TextMessage[] {
+  return [
+    {
+      role: 'system',
+      content: '你是小说评审助手，基于作品蓝图和章节大纲评估章节正文质量。输出评审意见，包含优点、问题和修改建议，直接输出评审内容，不加标题，不使用 Markdown 标记。',
+    },
+    {
+      role: 'user',
+      content: [
+        `小说标题：${novel.title}`,
+        novel.summary ? `小说简介：${novel.summary}` : '',
+        novel.blueprint ? `作品蓝图：\n${novel.blueprint}` : '',
+        `当前章节：${chapter.title || '未命名章节'}`,
+        chapter.outline ? `本章大纲：\n${chapter.outline}` : '',
+        '本章正文：',
+        chapter.content,
+        '请评审本章正文，指出优点、存在的问题（如偏离大纲、节奏拖沓、人物行为不合理等）以及修改建议。评审意见 200-400 字。',
+      ].filter(Boolean).join('\n'),
+    },
+  ];
+}

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, ChapterVersion, Novel } from '../../types/novel';
-import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText } from './novelPrompts';
+import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt } from './novelPrompts';
 import { countWords, createId, formatTime, saveStatusLabel, type SaveStatus } from './novelShared';
 import './ChapterWorkbench.css';
 
@@ -36,6 +36,9 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   const [outlineBusy, setOutlineBusy] = useState(false);
   const [outlineError, setOutlineError] = useState('');
   const [outlinePreview, setOutlinePreview] = useState<OutlinePreviewEntry[] | null>(null);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewError, setReviewError] = useState('');
+  const [reviewResult, setReviewResult] = useState<{ chapterId: string; content: string } | null>(null);
   const requestIdRef = useRef<string | null>(null);
   const runRef = useRef(0);
   const confirmBusyRef = useRef(false);
@@ -54,7 +57,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   const progress = chapters.length ? Math.round((doneCount / chapters.length) * 100) : 0;
   const firstPendingIndex = chapters.findIndex((chapter) => chapter.content.trim() === '');
   const missingOutlineCount = chapters.filter((chapter) => !chapter.outline?.trim()).length;
-  const busy = generatingChapterId !== null || outlineBusy;
+  const busy = generatingChapterId !== null || outlineBusy || reviewBusy;
   const summaryBrief = brief(novel.summary, 42);
   const blueprintBrief = brief(novel.blueprint?.trim() || novel.summary.trim() || novel.idea?.trim() || '', 130);
 
@@ -115,6 +118,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     requestIdRef.current = null;
     setGeneratingChapterId(null);
     setOutlineBusy(false);
+    setReviewBusy(false);
     if (requestId) void rendererBridge.cancelTextGeneration(requestId);
   }
 
@@ -227,6 +231,46 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     setOutlinePreview(null);
   }
 
+  async function generateChapterReview(chapter: Chapter) {
+    if (busy || !chapter.content.trim()) return;
+    const ready = ensureTextModel((message) => setReviewError(message));
+    if (!ready) return;
+    const requestId = createId('text-request');
+    const runId = runRef.current + 1;
+    runRef.current = runId;
+    requestIdRef.current = requestId;
+    setReviewBusy(true);
+    setReviewError('');
+    setReviewResult(null);
+    const result = await rendererBridge.generateText({
+      requestId,
+      channelId: ready.channelId,
+      channelLabel: ready.channelLabel,
+      baseUrl: ready.baseUrl,
+      apiKey: ready.apiKey,
+      model: ready.model,
+      messages: buildChapterReviewPrompt(novel, chapter),
+      temperature: 0.7,
+      maxTokens: 800,
+    });
+    if (runRef.current !== runId) return;
+    requestIdRef.current = null;
+    setReviewBusy(false);
+    if (!result.ok || !result.text) {
+      setReviewError(result.message || '评审失败，请稍后重试。');
+      return;
+    }
+    setReviewResult({ chapterId: chapter.id, content: result.text.trim() });
+  }
+
+  function cancelReview() {
+    const requestId = requestIdRef.current;
+    runRef.current += 1;
+    requestIdRef.current = null;
+    setReviewBusy(false);
+    if (requestId) void rendererBridge.cancelTextGeneration(requestId);
+  }
+
   function renderMain() {
     if (!chapters.length) {
       return (
@@ -302,7 +346,18 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
               <span>{countWords(activeChapter.content)} 字</span>
               {saveStatus === 'failed' && <button className="novel-flow__ghost" onClick={onRetrySave} type="button">重试保存</button>}
               {versions.length > 0 && <button className="novel-flow__ghost" onClick={() => setHistoryOpen(true)} type="button">历史版本</button>}
+              {activeChapter.content.trim() && (
+                <button className="novel-flow__ghost" disabled={busy} onClick={() => void generateChapterReview(activeChapter)} type="button">章节评审</button>
+              )}
             </div>
+            {reviewBusy && (
+              <div className="novel-workbench__review-loading">
+                <span className="novel-workbench__spinner" aria-hidden="true" />
+                <span>正在评审章节…</span>
+                <button className="novel-flow__ghost" onClick={cancelReview} type="button">取消</button>
+              </div>
+            )}
+            {reviewError && <p className="novel-flow__error">{reviewError}</p>}
             <textarea value={activeChapter.content} onChange={(event) => onUpdateChapter(activeChapter.id, { content: event.target.value })} placeholder="继续打磨本章正文…" />
           </div>
         ) : isFirstPending ? (
@@ -427,6 +482,25 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
             </div>
             <footer>
               <button className="novel-flow__ghost" onClick={() => setHistoryOpen(false)} type="button">关闭</button>
+            </footer>
+          </div>
+        </div>
+      )}
+      {reviewResult && reviewResult.chapterId === activeChapter?.id && (
+        <div className="novel-modal" role="dialog" aria-modal="true" aria-label="章节评审" onClick={() => setReviewResult(null)}>
+          <div className="novel-workbench__preview" onClick={(event) => event.stopPropagation()}>
+            <h2>章节评审</h2>
+            <p className="novel-workbench__preview-sub">AI 基于作品蓝图和章节大纲给出的评审意见，仅供参考。</p>
+            <div className="novel-workbench__preview-list">
+              {reviewResult.content.split('\n').filter((p) => p.trim()).map((paragraph, index) => (
+                <article key={index}>
+                  <p>{paragraph}</p>
+                </article>
+              ))}
+            </div>
+            <footer>
+              <button className="novel-flow__ghost" onClick={() => setReviewResult(null)} type="button">关闭</button>
+              <button className="novel-flow__ghost" disabled={busy} onClick={() => void generateChapterReview(activeChapter!)} type="button">重新评审</button>
             </footer>
           </div>
         </div>

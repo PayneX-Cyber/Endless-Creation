@@ -328,6 +328,21 @@
   font-weight: 800;
 }
 
+.novel-workbench__review-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-radius: 14px;
+  padding: 12px 16px;
+  background: #eef5ff;
+}
+
+.novel-workbench__review-loading > span:nth-child(2) {
+  flex: 1;
+  color: #64748b;
+  font-size: 13px;
+}
+
 .novel-workbench__editor textarea {
   width: 100%;
   min-height: 0;
@@ -516,6 +531,14 @@
 
 .app-shell[data-theme='dark'] .novel-workbench__editor-meta span {
   background: #1b2230;
+  color: #94a3b8;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__review-loading {
+  background: #1b2536;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__review-loading > span:nth-child(2) {
   color: #94a3b8;
 }
 
