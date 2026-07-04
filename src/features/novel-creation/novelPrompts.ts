@@ -258,6 +258,30 @@ export function buildChapterConsistencyPrompt(novel: Novel, chapter: Chapter): T
   ];
 }
 
+export function buildChapterRhythmPrompt(novel: Novel, chapter: Chapter): TextMessage[] {
+  return [
+    {
+      role: 'system',
+      content: '你是小说节奏检查助手。只指出节奏问题和调整建议，不改写正文，不输出新正文。',
+    },
+    {
+      role: 'user',
+      content: [
+        `小说标题：${novel.title}`,
+        novel.summary ? `小说简介：${novel.summary}` : '',
+        novel.blueprint ? `作品蓝图：\n${novel.blueprint}` : '',
+        novel.idea ? `创意：${novel.idea}` : '',
+        `当前章节：${chapter.title || '未命名章节'}`,
+        chapter.outline ? `本章大纲：\n${chapter.outline}` : '',
+        '本章正文：',
+        limitText(chapter.content, 5000),
+        '请从四类维度做轻量节奏检查：1. 开头是否拖沓或进入冲突过慢；2. 中段是否重复、解释过多、缺少推进；3. 结尾是否缺少钩子或收束过急；4. 段落节奏、信息密度、情绪起伏是否失衡。',
+        '输出格式：总体判断、节奏问题、定位建议、调整建议。不要改写正文，不要给出完整替换稿。',
+      ].filter(Boolean).join('\n'),
+    },
+  ];
+}
+
 export function buildOptimizeSelectionPrompt(novel: Novel, chapter: Chapter, selectedText: string, type: OptimizeType): TextMessage[] {
   const typeInstruction: Record<OptimizeType, string> = {
     dialogue: '优化下面这段的对话：让人物语言更自然、更有个性、更符合身份与当前情绪，保留原有对话意图和信息，不新增剧情，不添加原文没有的台词。',
