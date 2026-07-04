@@ -4,6 +4,7 @@ import { novelService } from '../../services/novelService';
 import type { Chapter, Novel, NovelSummary } from '../../types/novel';
 import { buildBlueprintFromConversationPrompt, buildInspirationChatPrompt, buildOutlinePrompt, INSPIRATION_OPENING_MESSAGE, parseOutlineText, type InspirationChatMessage, type TextMessage } from './novelPrompts';
 import { ChapterWorkbench } from './ChapterWorkbench';
+import { NovelStats } from './NovelStats';
 import { countWords, createId, formatTime, type SaveStatus } from './novelShared';
 import './NovelCreation.css';
 
@@ -584,6 +585,7 @@ export function NovelCreation() {
               {projectViewTab === 'overview' && (
                 <>
                   <div className="novel-project-panel__head"><h2>项目概览</h2><button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void openProjectWorkbench(currentNovel.id)} type="button">开始创作</button></div>
+                  <NovelStats novel={currentNovel} />
                   <label>核心摘要<textarea value={projectSummary(currentNovel)} onChange={(event) => updateProjectField('blueprint', event.target.value)} placeholder="写下这本小说的核心设定、主线冲突和整体梗概。" /></label>
                   <label>简介<textarea value={currentNovel.summary} onChange={(event) => updateProjectField('summary', event.target.value)} placeholder="一句话介绍这本小说。" /></label>
                   <label>创意源<textarea value={currentNovel.idea ?? ''} onChange={(event) => updateProjectField('idea', event.target.value)} placeholder="最初的灵感、主题或想表达的情绪。" /></label>

@@ -907,6 +907,62 @@
   color: #edf2fa;
 }
 
+.novel-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.novel-stats__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.novel-stats__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.novel-stats__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #f8fafc;
+}
+
+.novel-stats__cell strong {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #1f4fb8;
+}
+
+.novel-stats__cell span {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.novel-stats__hint {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: #f8fafc;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.app-shell[data-theme='dark'] .novel-stats__cell,
+.app-shell[data-theme='dark'] .novel-stats__hint {
+  background: #111822;
+  color: inherit;
+}
+
 @media (max-width: 820px) {
   .novel-creation {
     grid-template-columns: 1fr;
