@@ -490,6 +490,20 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     if (requestId) void rendererBridge.cancelTextGeneration(requestId);
   }
 
+  async function copyWholeBookMarkdown() {
+    const markdown = buildWholeBookMarkdown(novel);
+    if (!markdown) {
+      window.alert('暂无可复制的正文');
+      return;
+    }
+    try {
+      await rendererBridge.copyText(markdown);
+      window.alert('全书 Markdown 已复制');
+    } catch {
+      window.alert('复制失败，请手动复制');
+    }
+  }
+
   function renderMain() {
     if (!chapters.length) {
       return (
@@ -652,6 +666,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
             <span>{summaryBrief ? `${summaryBrief} · ` : ''}{progress}% 完成 · {doneCount}/{chapters.length} 章</span>
           </div>
         </div>
+        <button className="novel-flow__ghost" onClick={() => void copyWholeBookMarkdown()} type="button">复制全书 Markdown</button>
         <button className="novel-flow__ghost" onClick={onOpenProjectView} type="button">项目详情</button>
       </header>
       <div className="novel-workbench__body">
@@ -851,6 +866,17 @@ function statusLabel(status: ChapterStatus): string {
 function brief(text: string, max: number): string {
   const normalized = text.replace(/\s+/g, ' ').trim();
   return normalized.length > max ? `${Array.from(normalized).slice(0, max).join('')}…` : normalized;
+}
+
+function buildWholeBookMarkdown(novel: Novel): string | null {
+  const chapters = novel.chapters.filter((chapter) => chapter.content.trim()).sort((a, b) => a.order - b.order);
+  if (!chapters.length) return null;
+  const parts = [`# ${novel.title.trim() || '未命名小说'}`];
+  if (novel.summary.trim()) parts.push(novel.summary.trim());
+  for (const chapter of chapters) {
+    parts.push(`## 第 ${chapter.order + 1} 章 · ${chapter.title.trim() || '未命名章节'}`, chapter.content.trim());
+  }
+  return parts.join('\n\n');
 }
 
 function normalizeTitle(title: string): string {
