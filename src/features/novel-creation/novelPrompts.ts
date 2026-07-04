@@ -231,6 +231,33 @@ export function buildChapterReviewPrompt(novel: Novel, chapter: Chapter): TextMe
   ];
 }
 
+export function buildChapterConsistencyPrompt(novel: Novel, chapter: Chapter): TextMessage[] {
+  const previousContext = buildPreviousChapterContext(novel, chapter);
+  return [
+    {
+      role: 'system',
+      content: '你是小说一致性检查助手。只检查疑似矛盾和定位建议，不改写正文。不要编造矛盾；如果没有明显问题，明确输出「未发现明显一致性问题」。',
+    },
+    {
+      role: 'user',
+      content: [
+        `小说标题：${novel.title}`,
+        novel.summary ? `小说简介：${novel.summary}` : '',
+        novel.blueprint ? `作品蓝图：\n${novel.blueprint}` : '',
+        novel.idea ? `创意：${novel.idea}` : '',
+        '前文已完成章节摘录：',
+        previousContext,
+        `当前章节：${chapter.title || '未命名章节'}`,
+        chapter.outline ? `本章大纲：\n${chapter.outline}` : '',
+        '本章正文：',
+        limitText(chapter.content, 5000),
+        '请从四类维度做轻量一致性检查：1. 人物称呼、身份、关系漂移；2. 时间线、事件顺序冲突；3. 世界观、设定、规则矛盾；4. 本章是否明显违背蓝图或章节大纲。',
+        '输出格式：总体判断、疑似矛盾、定位建议、修改建议。若未发现明显问题，请写「未发现明显一致性问题」，并给出 1-2 条保守提醒。',
+      ].filter(Boolean).join('\n'),
+    },
+  ];
+}
+
 export function buildOptimizeSelectionPrompt(novel: Novel, chapter: Chapter, selectedText: string, type: OptimizeType): TextMessage[] {
   const typeInstruction: Record<OptimizeType, string> = {
     dialogue: '优化下面这段的对话：让人物语言更自然、更有个性、更符合身份与当前情绪，保留原有对话意图和信息，不新增剧情，不添加原文没有的台词。',
@@ -254,4 +281,33 @@ export function buildOptimizeSelectionPrompt(novel: Novel, chapter: Chapter, sel
       ].filter(Boolean).join('\n'),
     },
   ];
+}
+
+function buildPreviousChapterContext(novel: Novel, currentChapter: Chapter): string {
+  const blocks: string[] = [];
+  let total = 0;
+  for (const chapter of novel.chapters.filter((item) => item.order < currentChapter.order && item.content.trim()).sort((a, b) => b.order - a.order)) {
+    const block = [
+      `第 ${chapter.order + 1} 章 · ${chapter.title || '未命名章节'}`,
+      chapter.outline ? `大纲：${limitText(chapter.outline, 160)}` : '',
+      `正文尾部：\n${tailText(chapter.content, 400)}`,
+    ].filter(Boolean).join('\n');
+    if (total + block.length > 4000 && blocks.length) continue;
+    blocks.push(block);
+    total += block.length;
+    if (total >= 4000) break;
+  }
+  return blocks.reverse().join('\n\n') || '无已完成前文。';
+}
+
+function tailText(text: string, max: number): string {
+  const chars = Array.from(text.trim());
+  return chars.length > max ? chars.slice(-max).join('') : chars.join('');
+}
+
+function limitText(text: string, max: number): string {
+  const chars = Array.from(text.trim());
+  if (chars.length <= max) return chars.join('');
+  const half = Math.floor(max / 2);
+  return `${chars.slice(0, half).join('')}\n……\n${chars.slice(-half).join('')}`;
 }

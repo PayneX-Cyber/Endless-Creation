@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, ChapterVersion, Novel } from '../../types/novel';
-import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, type OptimizeType } from './novelPrompts';
+import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, buildChapterConsistencyPrompt, type OptimizeType } from './novelPrompts';
 import { countWords, createId, formatTime, saveStatusLabel, type SaveStatus } from './novelShared';
 import './ChapterWorkbench.css';
 
@@ -48,6 +48,9 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState('');
   const [reviewResult, setReviewResult] = useState<{ chapterId: string; content: string } | null>(null);
+  const [consistencyBusy, setConsistencyBusy] = useState(false);
+  const [consistencyError, setConsistencyError] = useState('');
+  const [consistencyResult, setConsistencyResult] = useState<{ chapterId: string; content: string } | null>(null);
   const [selection, setSelection] = useState<SelectionState | null>(null);
   const [optimizeTypeOpen, setOptimizeTypeOpen] = useState(false);
   const [optimizeJob, setOptimizeJob] = useState<OptimizeJob | null>(null);
@@ -67,6 +70,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   useEffect(() => {
     setSelection(null);
     setOptimizeError('');
+    setConsistencyError('');
   }, [activeChapterId]);
 
   const activeIndex = chapters.findIndex((chapter) => chapter.id === activeChapterId);
@@ -76,7 +80,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   const progress = chapters.length ? Math.round((doneCount / chapters.length) * 100) : 0;
   const firstPendingIndex = chapters.findIndex((chapter) => chapter.content.trim() === '');
   const missingOutlineCount = chapters.filter((chapter) => !chapter.outline?.trim()).length;
-  const busy = generatingChapterId !== null || outlineBusy || reviewBusy || optimizeTypeOpen || optimizeJob !== null;
+  const busy = generatingChapterId !== null || outlineBusy || reviewBusy || consistencyBusy || optimizeTypeOpen || optimizeJob !== null;
   const summaryBrief = brief(novel.summary, 42);
   const blueprintBrief = brief(novel.blueprint?.trim() || novel.summary.trim() || novel.idea?.trim() || '', 130);
 
@@ -248,6 +252,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     setGeneratingChapterId(null);
     setOutlineBusy(false);
     setReviewBusy(false);
+    setConsistencyBusy(false);
     if (requestId) void rendererBridge.cancelTextGeneration(requestId);
   }
 
@@ -400,6 +405,46 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     if (requestId) void rendererBridge.cancelTextGeneration(requestId);
   }
 
+  async function generateChapterConsistency(chapter: Chapter) {
+    if (busy || !chapter.content.trim()) return;
+    const ready = ensureTextModel(setConsistencyError);
+    if (!ready) return;
+    const requestId = createId('text-request');
+    const runId = runRef.current + 1;
+    runRef.current = runId;
+    requestIdRef.current = requestId;
+    setConsistencyBusy(true);
+    setConsistencyError('');
+    setConsistencyResult(null);
+    const result = await rendererBridge.generateText({
+      requestId,
+      channelId: ready.channelId,
+      channelLabel: ready.channelLabel,
+      baseUrl: ready.baseUrl,
+      apiKey: ready.apiKey,
+      model: ready.model,
+      messages: buildChapterConsistencyPrompt(novel, chapter),
+      temperature: 0.7,
+      maxTokens: 1200,
+    });
+    if (runRef.current !== runId) return;
+    requestIdRef.current = null;
+    setConsistencyBusy(false);
+    if (!result.ok || !result.text) {
+      setConsistencyError(result.message || '一致性检查失败，请稍后重试。');
+      return;
+    }
+    setConsistencyResult({ chapterId: chapter.id, content: result.text.trim() });
+  }
+
+  function cancelConsistency() {
+    const requestId = requestIdRef.current;
+    runRef.current += 1;
+    requestIdRef.current = null;
+    setConsistencyBusy(false);
+    if (requestId) void rendererBridge.cancelTextGeneration(requestId);
+  }
+
   function renderMain() {
     if (!chapters.length) {
       return (
@@ -478,8 +523,18 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
               {activeChapter.content.trim() && (
                 <button className="novel-flow__ghost" disabled={busy} onClick={() => void generateChapterReview(activeChapter)} type="button">章节评审</button>
               )}
+              {activeChapter.content.trim() && (
+                <button className="novel-flow__ghost" disabled={busy} onClick={() => void generateChapterConsistency(activeChapter)} type="button">一致性检查</button>
+              )}
               <button className="novel-flow__ghost" disabled={busy} onClick={openOptimizeType} type="button">优化选区</button>
             </div>
+            {consistencyBusy && (
+              <div className="novel-workbench__review-loading">
+                <span className="novel-workbench__spinner" aria-hidden="true" />
+                <span>正在检查一致性…</span>
+                <button className="novel-flow__ghost" onClick={cancelConsistency} type="button">取消</button>
+              </div>
+            )}
             {optimizeJob?.status === 'loading' && optimizeJob.chapterId === activeChapter.id && (
               <div className="novel-workbench__optimize-loading">
                 <span className="novel-workbench__spinner" aria-hidden="true" />
@@ -495,6 +550,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
               </div>
             )}
             {reviewError && <p className="novel-flow__error">{reviewError}</p>}
+            {consistencyError && <p className="novel-flow__error">{consistencyError}</p>}
             {optimizeError && <p className="novel-flow__error">{optimizeError}</p>}
             <textarea
               ref={textareaRef}
@@ -648,6 +704,24 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
             <footer>
               <button className="novel-flow__ghost" onClick={() => setReviewResult(null)} type="button">关闭</button>
               <button className="novel-flow__ghost" disabled={busy} onClick={() => void generateChapterReview(activeChapter!)} type="button">重新评审</button>
+            </footer>
+          </div>
+        </div>
+      )}
+      {consistencyResult && consistencyResult.chapterId === activeChapter?.id && (
+        <div className="novel-modal" role="dialog" aria-modal="true" aria-label="一致性检查" onClick={() => setConsistencyResult(null)}>
+          <div className="novel-workbench__preview" onClick={(event) => event.stopPropagation()}>
+            <h2>一致性检查</h2>
+            <p className="novel-workbench__preview-sub">AI 基于作品蓝图、前文摘录和本章正文给出的只读一致性报告，关闭后不保存。</p>
+            <div className="novel-workbench__preview-list">
+              {consistencyResult.content.split('\n').filter((p) => p.trim()).map((paragraph, index) => (
+                <article key={index}>
+                  <p>{paragraph}</p>
+                </article>
+              ))}
+            </div>
+            <footer>
+              <button className="novel-flow__ghost" onClick={() => setConsistencyResult(null)} type="button">关闭</button>
             </footer>
           </div>
         </div>
