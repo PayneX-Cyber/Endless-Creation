@@ -811,6 +811,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
               <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void startOptimize('dialogue')} type="button">对话优化</button>
               <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void startOptimize('environment')} type="button">环境描写优化</button>
               <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void startOptimize('psychology')} type="button">心理描写优化</button>
+              <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void startOptimize('action')} type="button">动作描写优化</button>
             </footer>
           </div>
         </div>

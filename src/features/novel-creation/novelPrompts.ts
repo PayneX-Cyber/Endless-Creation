@@ -1,7 +1,7 @@
 import type { Chapter, Novel } from '../../types/novel';
 
 export type TextMessage = { role: 'system' | 'user'; content: string };
-export type OptimizeType = 'dialogue' | 'environment' | 'psychology';
+export type OptimizeType = 'dialogue' | 'environment' | 'psychology' | 'action';
 
 export function buildContinueChapterPrompt(novel: Novel, chapter: Chapter): TextMessage[] {
   const tail = chapter.content.slice(-1500);
@@ -287,6 +287,7 @@ export function buildOptimizeSelectionPrompt(novel: Novel, chapter: Chapter, sel
     dialogue: '优化下面这段的对话：让人物语言更自然、更有个性、更符合身份与当前情绪，保留原有对话意图和信息，不新增剧情，不添加原文没有的台词。',
     environment: '优化下面这段的环境描写：增强画面感、氛围与感官细节，但不喧宾夺主、不拖慢节奏，保留原有情节推进。',
     psychology: '优化下面这段的心理描写：让人物内心活动更细腻、可信、贴合当前处境，不改变人物已有决定和剧情走向。',
+    action: '优化下面这段的动作描写：增强动作清晰度、连贯性和画面感，让动作符合当前情绪与场景节奏，不改变剧情结果、人物关系和关键信息，不新增原文没有的大段动作。',
   };
   return [
     {
