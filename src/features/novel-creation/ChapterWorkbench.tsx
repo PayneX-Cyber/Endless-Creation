@@ -72,6 +72,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
 
   useEffect(() => {
     setSelection(null);
+    setReviewError('');
     setOptimizeError('');
     setConsistencyError('');
     setRhythmError('');
@@ -660,14 +661,14 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     <section className="novel-workbench" aria-label="章节创作工作台">
       <header className="novel-workbench__bar">
         <div className="novel-workbench__bar-left">
-          <button className="novel-flow__ghost" onClick={onBackToProjects} type="button">返回</button>
+          <button className="novel-flow__ghost" disabled={busy} onClick={onBackToProjects} type="button">返回</button>
           <div className="novel-workbench__title">
             <h1>{novel.title}</h1>
             <span>{summaryBrief ? `${summaryBrief} · ` : ''}{progress}% 完成 · {doneCount}/{chapters.length} 章</span>
           </div>
         </div>
         <button className="novel-flow__ghost" onClick={() => void copyWholeBookMarkdown()} type="button">复制全书 Markdown</button>
-        <button className="novel-flow__ghost" onClick={onOpenProjectView} type="button">项目详情</button>
+        <button className="novel-flow__ghost" disabled={busy} onClick={onOpenProjectView} type="button">项目详情</button>
       </header>
       <div className="novel-workbench__body">
         <aside className="novel-workbench__side" aria-label="蓝图与章节列表">
@@ -682,14 +683,14 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
           </div>
           <div className="novel-workbench__list-head">
             <h3>章节大纲</h3>
-            {firstPendingIndex >= 0 && <button className="novel-flow__ghost" onClick={locateFirstPending} type="button">定位未完成</button>}
+            {firstPendingIndex >= 0 && <button className="novel-flow__ghost" disabled={busy} onClick={locateFirstPending} type="button">定位未完成</button>}
           </div>
           {chapters.length ? (
             <div className="novel-workbench__chapters">
               {chapters.map((chapter, index) => {
                 const status = chapterStatus(chapter);
                 return (
-                  <button className={chapter.id === activeChapterId ? 'novel-workbench__chapter novel-workbench__chapter--active' : 'novel-workbench__chapter'} id={`workbench-chapter-${chapter.id}`} key={chapter.id} onClick={() => onSelectChapter(chapter.id)} type="button">
+                  <button className={chapter.id === activeChapterId ? 'novel-workbench__chapter novel-workbench__chapter--active' : 'novel-workbench__chapter'} disabled={busy} id={`workbench-chapter-${chapter.id}`} key={chapter.id} onClick={() => onSelectChapter(chapter.id)} type="button">
                     <span className="novel-workbench__chapter-row">
                       <strong>第 {index + 1} 章 · {chapter.title || '未命名章节'}</strong>
                       <span className={`novel-workbench__pill novel-workbench__pill--${status}`}>{statusLabel(status)}</span>
