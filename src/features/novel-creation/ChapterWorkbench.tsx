@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, ChapterVersion, Novel } from '../../types/novel';
-import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, buildChapterConsistencyPrompt, buildChapterRhythmPrompt, type OptimizeType } from './novelPrompts';
+import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, buildChapterConsistencyPrompt, buildChapterRhythmPrompt, type OptimizeType, type TextMessage } from './novelPrompts';
 import { countWords, createId, formatTime, saveStatusLabel, type SaveStatus } from './novelShared';
 import './ChapterWorkbench.css';
 
@@ -37,6 +37,60 @@ interface ChapterWorkbenchProps {
   ensureTextModel: (onIssue: (message: string) => void) => ReadyTextModel | null;
 }
 
+// ChapterWorkbench 专用只读 AI 检查 hook——单章只读 AI 检查（评审/一致性/节奏同构）。
+// 依赖组件级共享 runRef/requestIdRef 与 cancelGeneration 跨作废语义，勿外导、勿通用化、勿预埋写回。
+function useAiCheck(config: {
+  buildMessages: (novel: Novel, chapter: Chapter) => TextMessage[];
+  maxTokens: number;
+  failMessage: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState<{ chapterId: string; content: string } | null>(null);
+
+  async function run(
+    chapter: Chapter,
+    ctx: { novel: Novel; ready: ReadyTextModel; runRef: { current: number }; requestIdRef: { current: string | null } },
+  ) {
+    const requestId = createId('text-request');
+    const runId = ctx.runRef.current + 1;
+    ctx.runRef.current = runId;
+    ctx.requestIdRef.current = requestId;
+    setBusy(true);
+    setError('');
+    setResult(null);
+    const result = await rendererBridge.generateText({
+      requestId,
+      channelId: ctx.ready.channelId,
+      channelLabel: ctx.ready.channelLabel,
+      baseUrl: ctx.ready.baseUrl,
+      apiKey: ctx.ready.apiKey,
+      model: ctx.ready.model,
+      messages: config.buildMessages(ctx.novel, chapter),
+      temperature: 0.7,
+      maxTokens: config.maxTokens,
+    });
+    if (ctx.runRef.current !== runId) return;
+    ctx.requestIdRef.current = null;
+    setBusy(false);
+    if (!result.ok || !result.text) {
+      setError(result.message || config.failMessage);
+      return;
+    }
+    setResult({ chapterId: chapter.id, content: result.text.trim() });
+  }
+
+  function cancel(ctx: { runRef: { current: number }; requestIdRef: { current: string | null } }) {
+    const requestId = ctx.requestIdRef.current;
+    ctx.runRef.current += 1;
+    ctx.requestIdRef.current = null;
+    setBusy(false);
+    if (requestId) void rendererBridge.cancelTextGeneration(requestId);
+  }
+
+  return { busy, error, result, setError, setResult, setBusy, run, cancel };
+}
+
 export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus, onSelectChapter, onUpdateChapter, onUpdateChapterAndSave, onRetrySave, onBackToProjects, onOpenProjectView, ensureTextModel }: ChapterWorkbenchProps) {
   const [generatingChapterId, setGeneratingChapterId] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<{ chapterId: string; message: string } | null>(null);
@@ -45,15 +99,9 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   const [outlineBusy, setOutlineBusy] = useState(false);
   const [outlineError, setOutlineError] = useState('');
   const [outlinePreview, setOutlinePreview] = useState<OutlinePreviewEntry[] | null>(null);
-  const [reviewBusy, setReviewBusy] = useState(false);
-  const [reviewError, setReviewError] = useState('');
-  const [reviewResult, setReviewResult] = useState<{ chapterId: string; content: string } | null>(null);
-  const [consistencyBusy, setConsistencyBusy] = useState(false);
-  const [consistencyError, setConsistencyError] = useState('');
-  const [consistencyResult, setConsistencyResult] = useState<{ chapterId: string; content: string } | null>(null);
-  const [rhythmBusy, setRhythmBusy] = useState(false);
-  const [rhythmError, setRhythmError] = useState('');
-  const [rhythmResult, setRhythmResult] = useState<{ chapterId: string; content: string } | null>(null);
+  const review = useAiCheck({ buildMessages: buildChapterReviewPrompt, maxTokens: 800, failMessage: '评审失败，请稍后重试。' });
+  const consistency = useAiCheck({ buildMessages: buildChapterConsistencyPrompt, maxTokens: 1200, failMessage: '一致性检查失败，请稍后重试。' });
+  const rhythm = useAiCheck({ buildMessages: buildChapterRhythmPrompt, maxTokens: 1000, failMessage: '节奏检查失败，请稍后重试。' });
   const [selection, setSelection] = useState<SelectionState | null>(null);
   const [optimizeTypeOpen, setOptimizeTypeOpen] = useState(false);
   const [optimizeJob, setOptimizeJob] = useState<OptimizeJob | null>(null);
@@ -72,10 +120,10 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
 
   useEffect(() => {
     setSelection(null);
-    setReviewError('');
+    review.setError('');
     setOptimizeError('');
-    setConsistencyError('');
-    setRhythmError('');
+    consistency.setError('');
+    rhythm.setError('');
   }, [activeChapterId]);
 
   const activeIndex = chapters.findIndex((chapter) => chapter.id === activeChapterId);
@@ -85,7 +133,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   const progress = chapters.length ? Math.round((doneCount / chapters.length) * 100) : 0;
   const firstPendingIndex = chapters.findIndex((chapter) => chapter.content.trim() === '');
   const missingOutlineCount = chapters.filter((chapter) => !chapter.outline?.trim()).length;
-  const busy = generatingChapterId !== null || outlineBusy || reviewBusy || consistencyBusy || rhythmBusy || optimizeTypeOpen || optimizeJob !== null;
+  const busy = generatingChapterId !== null || outlineBusy || review.busy || consistency.busy || rhythm.busy || optimizeTypeOpen || optimizeJob !== null;
   const summaryBrief = brief(novel.summary, 42);
   const blueprintBrief = brief(novel.blueprint?.trim() || novel.summary.trim() || novel.idea?.trim() || '', 130);
 
@@ -256,9 +304,9 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     requestIdRef.current = null;
     setGeneratingChapterId(null);
     setOutlineBusy(false);
-    setReviewBusy(false);
-    setConsistencyBusy(false);
-    setRhythmBusy(false);
+    review.setBusy(false);
+    consistency.setBusy(false);
+    rhythm.setBusy(false);
     if (requestId) void rendererBridge.cancelTextGeneration(requestId);
   }
 
@@ -373,122 +421,35 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
 
   async function generateChapterReview(chapter: Chapter) {
     if (busy || !chapter.content.trim()) return;
-    const ready = ensureTextModel((message) => setReviewError(message));
+    const ready = ensureTextModel((message) => review.setError(message));
     if (!ready) return;
-    const requestId = createId('text-request');
-    const runId = runRef.current + 1;
-    runRef.current = runId;
-    requestIdRef.current = requestId;
-    setReviewBusy(true);
-    setReviewError('');
-    setReviewResult(null);
-    const result = await rendererBridge.generateText({
-      requestId,
-      channelId: ready.channelId,
-      channelLabel: ready.channelLabel,
-      baseUrl: ready.baseUrl,
-      apiKey: ready.apiKey,
-      model: ready.model,
-      messages: buildChapterReviewPrompt(novel, chapter),
-      temperature: 0.7,
-      maxTokens: 800,
-    });
-    if (runRef.current !== runId) return;
-    requestIdRef.current = null;
-    setReviewBusy(false);
-    if (!result.ok || !result.text) {
-      setReviewError(result.message || '评审失败，请稍后重试。');
-      return;
-    }
-    setReviewResult({ chapterId: chapter.id, content: result.text.trim() });
+    await review.run(chapter, { novel, ready, runRef, requestIdRef });
   }
 
   function cancelReview() {
-    const requestId = requestIdRef.current;
-    runRef.current += 1;
-    requestIdRef.current = null;
-    setReviewBusy(false);
-    if (requestId) void rendererBridge.cancelTextGeneration(requestId);
+    review.cancel({ runRef, requestIdRef });
   }
 
   async function generateChapterConsistency(chapter: Chapter) {
     if (busy || !chapter.content.trim()) return;
-    const ready = ensureTextModel(setConsistencyError);
+    const ready = ensureTextModel(consistency.setError);
     if (!ready) return;
-    const requestId = createId('text-request');
-    const runId = runRef.current + 1;
-    runRef.current = runId;
-    requestIdRef.current = requestId;
-    setConsistencyBusy(true);
-    setConsistencyError('');
-    setConsistencyResult(null);
-    const result = await rendererBridge.generateText({
-      requestId,
-      channelId: ready.channelId,
-      channelLabel: ready.channelLabel,
-      baseUrl: ready.baseUrl,
-      apiKey: ready.apiKey,
-      model: ready.model,
-      messages: buildChapterConsistencyPrompt(novel, chapter),
-      temperature: 0.7,
-      maxTokens: 1200,
-    });
-    if (runRef.current !== runId) return;
-    requestIdRef.current = null;
-    setConsistencyBusy(false);
-    if (!result.ok || !result.text) {
-      setConsistencyError(result.message || '一致性检查失败，请稍后重试。');
-      return;
-    }
-    setConsistencyResult({ chapterId: chapter.id, content: result.text.trim() });
+    await consistency.run(chapter, { novel, ready, runRef, requestIdRef });
   }
 
   function cancelConsistency() {
-    const requestId = requestIdRef.current;
-    runRef.current += 1;
-    requestIdRef.current = null;
-    setConsistencyBusy(false);
-    if (requestId) void rendererBridge.cancelTextGeneration(requestId);
+    consistency.cancel({ runRef, requestIdRef });
   }
 
   async function generateChapterRhythm(chapter: Chapter) {
     if (busy || !chapter.content.trim()) return;
-    const ready = ensureTextModel(setRhythmError);
+    const ready = ensureTextModel(rhythm.setError);
     if (!ready) return;
-    const requestId = createId('text-request');
-    const runId = runRef.current + 1;
-    runRef.current = runId;
-    requestIdRef.current = requestId;
-    setRhythmBusy(true);
-    setRhythmError('');
-    setRhythmResult(null);
-    const result = await rendererBridge.generateText({
-      requestId,
-      channelId: ready.channelId,
-      channelLabel: ready.channelLabel,
-      baseUrl: ready.baseUrl,
-      apiKey: ready.apiKey,
-      model: ready.model,
-      messages: buildChapterRhythmPrompt(novel, chapter),
-      temperature: 0.7,
-      maxTokens: 1000,
-    });
-    if (runRef.current !== runId) return;
-    requestIdRef.current = null;
-    setRhythmBusy(false);
-    if (!result.ok || !result.text) {
-      setRhythmError(result.message || '节奏检查失败，请稍后重试。');
-      return;
-    }
-    setRhythmResult({ chapterId: chapter.id, content: result.text.trim() });
+    await rhythm.run(chapter, { novel, ready, runRef, requestIdRef });
   }
 
   function cancelRhythm() {
-    const requestId = requestIdRef.current;
-    runRef.current += 1;
-    requestIdRef.current = null;
-    setRhythmBusy(false);
-    if (requestId) void rendererBridge.cancelTextGeneration(requestId);
+    rhythm.cancel({ runRef, requestIdRef });
   }
 
   async function copyWholeBookMarkdown() {
@@ -607,14 +568,14 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
               )}
               <button className="novel-flow__ghost" disabled={busy} onClick={openOptimizeType} type="button">优化选区</button>
             </div>
-            {rhythmBusy && (
+            {rhythm.busy && (
               <div className="novel-workbench__review-loading">
                 <span className="novel-workbench__spinner" aria-hidden="true" />
                 <span>正在检查节奏…</span>
                 <button className="novel-flow__ghost" onClick={cancelRhythm} type="button">取消</button>
               </div>
             )}
-            {consistencyBusy && (
+            {consistency.busy && (
               <div className="novel-workbench__review-loading">
                 <span className="novel-workbench__spinner" aria-hidden="true" />
                 <span>正在检查一致性…</span>
@@ -628,16 +589,16 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
                 <button className="novel-flow__ghost" onClick={cancelOptimize} type="button">取消优化</button>
               </div>
             )}
-            {reviewBusy && (
+            {review.busy && (
               <div className="novel-workbench__review-loading">
                 <span className="novel-workbench__spinner" aria-hidden="true" />
                 <span>正在评审章节…</span>
                 <button className="novel-flow__ghost" onClick={cancelReview} type="button">取消</button>
               </div>
             )}
-            {reviewError && <p className="novel-flow__error">{reviewError}</p>}
-            {consistencyError && <p className="novel-flow__error">{consistencyError}</p>}
-            {rhythmError && <p className="novel-flow__error">{rhythmError}</p>}
+            {review.error && <p className="novel-flow__error">{review.error}</p>}
+            {consistency.error && <p className="novel-flow__error">{consistency.error}</p>}
+            {rhythm.error && <p className="novel-flow__error">{rhythm.error}</p>}
             {optimizeError && <p className="novel-flow__error">{optimizeError}</p>}
             <textarea
               ref={textareaRef}
@@ -778,57 +739,57 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
           </div>
         </div>
       )}
-      {reviewResult && reviewResult.chapterId === activeChapter?.id && (
-        <div className="novel-modal" role="dialog" aria-modal="true" aria-label="章节评审" onClick={() => setReviewResult(null)}>
+      {review.result && review.result.chapterId === activeChapter?.id && (
+        <div className="novel-modal" role="dialog" aria-modal="true" aria-label="章节评审" onClick={() => review.setResult(null)}>
           <div className="novel-workbench__preview" onClick={(event) => event.stopPropagation()}>
             <h2>章节评审</h2>
             <p className="novel-workbench__preview-sub">AI 基于作品蓝图和章节大纲给出的评审意见，仅供参考。</p>
             <div className="novel-workbench__preview-list">
-              {reviewResult.content.split('\n').filter((p) => p.trim()).map((paragraph, index) => (
+              {review.result.content.split('\n').filter((p) => p.trim()).map((paragraph, index) => (
                 <article key={index}>
                   <p>{paragraph}</p>
                 </article>
               ))}
             </div>
             <footer>
-              <button className="novel-flow__ghost" onClick={() => setReviewResult(null)} type="button">关闭</button>
+              <button className="novel-flow__ghost" onClick={() => review.setResult(null)} type="button">关闭</button>
               <button className="novel-flow__ghost" disabled={busy} onClick={() => void generateChapterReview(activeChapter!)} type="button">重新评审</button>
             </footer>
           </div>
         </div>
       )}
-      {consistencyResult && consistencyResult.chapterId === activeChapter?.id && (
-        <div className="novel-modal" role="dialog" aria-modal="true" aria-label="一致性检查" onClick={() => setConsistencyResult(null)}>
+      {consistency.result && consistency.result.chapterId === activeChapter?.id && (
+        <div className="novel-modal" role="dialog" aria-modal="true" aria-label="一致性检查" onClick={() => consistency.setResult(null)}>
           <div className="novel-workbench__preview" onClick={(event) => event.stopPropagation()}>
             <h2>一致性检查</h2>
             <p className="novel-workbench__preview-sub">AI 基于作品蓝图、前文摘录和本章正文给出的只读一致性报告，关闭后不保存。</p>
             <div className="novel-workbench__preview-list">
-              {consistencyResult.content.split('\n').filter((p) => p.trim()).map((paragraph, index) => (
+              {consistency.result.content.split('\n').filter((p) => p.trim()).map((paragraph, index) => (
                 <article key={index}>
                   <p>{paragraph}</p>
                 </article>
               ))}
             </div>
             <footer>
-              <button className="novel-flow__ghost" onClick={() => setConsistencyResult(null)} type="button">关闭</button>
+              <button className="novel-flow__ghost" onClick={() => consistency.setResult(null)} type="button">关闭</button>
             </footer>
           </div>
         </div>
       )}
-      {rhythmResult && rhythmResult.chapterId === activeChapter?.id && (
-        <div className="novel-modal" role="dialog" aria-modal="true" aria-label="节奏检查" onClick={() => setRhythmResult(null)}>
+      {rhythm.result && rhythm.result.chapterId === activeChapter?.id && (
+        <div className="novel-modal" role="dialog" aria-modal="true" aria-label="节奏检查" onClick={() => rhythm.setResult(null)}>
           <div className="novel-workbench__preview" onClick={(event) => event.stopPropagation()}>
             <h2>节奏检查</h2>
             <p className="novel-workbench__preview-sub">AI 基于作品蓝图、章节大纲和本章正文给出的只读节奏报告，关闭后不保存。</p>
             <div className="novel-workbench__preview-list">
-              {rhythmResult.content.split('\n').filter((p) => p.trim()).map((paragraph, index) => (
+              {rhythm.result.content.split('\n').filter((p) => p.trim()).map((paragraph, index) => (
                 <article key={index}>
                   <p>{paragraph}</p>
                 </article>
               ))}
             </div>
             <footer>
-              <button className="novel-flow__ghost" onClick={() => setRhythmResult(null)} type="button">关闭</button>
+              <button className="novel-flow__ghost" onClick={() => rhythm.setResult(null)} type="button">关闭</button>
             </footer>
           </div>
         </div>
