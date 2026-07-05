@@ -505,6 +505,22 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     }
   }
 
+  async function exportWholeBookMarkdownFile() {
+    const markdown = buildWholeBookMarkdown(novel);
+    if (!markdown) {
+      window.alert('暂无可导出的正文');
+      return;
+    }
+    const defaultName = `${novel.title.trim() || '未命名小说'}.md`;
+    try {
+      const result = await rendererBridge.saveTextFile(defaultName, markdown);
+      if (result.ok) window.alert('全书 Markdown 已导出');
+      // 取消（ok:false）静默，不 alert
+    } catch {
+      window.alert('导出失败，请重试');
+    }
+  }
+
   function renderMain() {
     if (!chapters.length) {
       return (
@@ -668,6 +684,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
           </div>
         </div>
         <button className="novel-flow__ghost" onClick={() => void copyWholeBookMarkdown()} type="button">复制全书 Markdown</button>
+        <button className="novel-flow__ghost" onClick={() => void exportWholeBookMarkdownFile()} type="button">导出 .md 文件</button>
         <button className="novel-flow__ghost" disabled={busy} onClick={onOpenProjectView} type="button">项目详情</button>
       </header>
       <div className="novel-workbench__body">

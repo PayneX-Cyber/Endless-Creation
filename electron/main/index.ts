@@ -1,5 +1,5 @@
 import { app, BrowserWindow, clipboard, dialog, ipcMain, shell } from 'electron';
-import type { OpenDialogOptions } from 'electron';
+import type { OpenDialogOptions, SaveDialogOptions } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -589,6 +589,11 @@ function closeAfterNovelFlush(targetWindow: BrowserWindow): void {
   targetWindow.close();
 }
 
+function sanitizeExportFileName(name: string): string {
+  const cleaned = name.replace(/[/\\:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
+  return cleaned || '未命名小说';
+}
+
 function registerIpcHandlers(): void {
   ipcMain.handle('app:get-version', () => app.getVersion());
   ipcMain.handle('app:get-platform', () => process.platform);
@@ -630,6 +635,20 @@ function registerIpcHandlers(): void {
 
     if (result.canceled || !result.filePaths[0]) return { ok: false, message: '已取消选择。' };
     return { ok: true, message: '已更新保存位置。', path: result.filePaths[0] };
+  });
+
+  ipcMain.handle('app:save-text-file', async (_event, defaultName: unknown, content: unknown): Promise<{ ok: boolean; message: string; path?: string }> => {
+    if (typeof content !== 'string') throw new Error('saveTextFile expects string content.');
+    const safeName = sanitizeExportFileName(typeof defaultName === 'string' ? defaultName : '未命名小说.md');
+    const options: SaveDialogOptions = {
+      title: '导出为 Markdown 文件',
+      defaultPath: safeName,
+      filters: [{ name: 'Markdown', extensions: ['md'] }],
+    };
+    const result = mainWindow ? await dialog.showSaveDialog(mainWindow, options) : await dialog.showSaveDialog(options);
+    if (result.canceled || !result.filePath) return { ok: false, message: '已取消导出。' };
+    await fs.writeFile(result.filePath, content, 'utf-8');
+    return { ok: true, message: '已导出。', path: result.filePath };
   });
 
   ipcMain.handle('window:minimize', (event) => {

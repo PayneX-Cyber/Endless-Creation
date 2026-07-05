@@ -158,6 +158,28 @@ export const rendererBridge = {
     }
   },
 
+  async saveTextFile(defaultName: string, content: string): Promise<{ ok: boolean; message: string }> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) {
+      const result = await electronBridge.app.saveTextFile(defaultName, content);
+      return { ok: result.ok, message: result.message };
+    }
+    // Web fallback: Blob 下载
+    const document = globalThis.document;
+    if (!document?.body) throw new Error('File export bridge is unavailable.');
+    const safeName = defaultName.replace(/[/\\:*?"<>|]/g, '_').trim() || '未命名小说.md';
+    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = safeName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+    return { ok: true, message: '已导出。' };
+  },
+
   async testApiConnection(config: ApiProviderConfig): Promise<ApiConnectionTestResult> {
     const electronBridge = getElectronBridge();
 
