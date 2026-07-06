@@ -1,13 +1,21 @@
 import { useState } from 'react';
 import type { Chapter, Foreshadowing } from '../../types/novel';
 
-// 受控伏笔面板：自身不落库，只通过 props 回调改 Novel（写入走 ChapterWorkbench 的 updateNovel 链）。
-// 零 AI、不解析正文、不新增 IPC；悬空章节引用降级显示，不崩。
+// 受控伏笔面板：不调 AI bridge、不解析、不落库。手动 CRUD 只通过 props 回调改 Novel
+// （写入走 ChapterWorkbench 的 updateNovel 链）；AI 建议区也只收 props 渲染，AI 调用/解析/
+// 状态机全在 ChapterWorkbench，本面板绝不接触桥接调用、结构化解析、提示词构造。
+// 不新增 IPC；悬空章节引用降级显示，不崩。
 
 export interface ForeshadowingDraft {
   title: string;
   plantedChapterId: string;
   payoffChapterId: string;
+  note: string;
+}
+
+export interface ForeshadowingAiCandidate {
+  id: string;
+  title: string;
   note: string;
 }
 
@@ -19,11 +27,35 @@ interface ForeshadowingPanelProps {
   onToggleStatus: (id: string) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
+  aiCandidates: ForeshadowingAiCandidate[];
+  aiBusy: boolean;
+  aiError: string;
+  aiRawText: string;
+  aiGenerateDisabledReason: string;
+  onGenerateAiCandidates: () => void;
+  onAcceptAiCandidate: (candidateId: string) => void;
+  onDismissAiCandidate: (candidateId: string) => void;
 }
 
 const emptyDraft: ForeshadowingDraft = { title: '', plantedChapterId: '', payoffChapterId: '', note: '' };
 
-export function ForeshadowingPanel({ foreshadowings, chapters, onAdd, onEdit, onToggleStatus, onDelete, onClose }: ForeshadowingPanelProps) {
+export function ForeshadowingPanel({
+  foreshadowings,
+  chapters,
+  onAdd,
+  onEdit,
+  onToggleStatus,
+  onDelete,
+  onClose,
+  aiCandidates,
+  aiBusy,
+  aiError,
+  aiRawText,
+  aiGenerateDisabledReason,
+  onGenerateAiCandidates,
+  onAcceptAiCandidate,
+  onDismissAiCandidate,
+}: ForeshadowingPanelProps) {
   const [mode, setMode] = useState<'list' | 'create' | { editId: string }>('list');
   const [draft, setDraft] = useState<ForeshadowingDraft>(emptyDraft);
   const [formError, setFormError] = useState('');
@@ -180,6 +212,41 @@ export function ForeshadowingPanel({ foreshadowings, chapters, onAdd, onEdit, on
                 <span>点下面的「新增伏笔」，把埋设的线索记下来，方便后续回收。</span>
               </div>
             )}
+            <section className="novel-foreshadow__ai">
+              <div className="novel-foreshadow__ai-head">
+                <strong>AI 建议</strong>
+                <button
+                  className="novel-flow__primary novel-flow__primary--compact"
+                  disabled={aiBusy || Boolean(aiGenerateDisabledReason)}
+                  onClick={onGenerateAiCandidates}
+                  type="button"
+                >
+                  {aiBusy ? 'AI 识别中…' : 'AI 找伏笔'}
+                </button>
+              </div>
+              {aiGenerateDisabledReason && <p className="novel-foreshadow__ai-hint">{aiGenerateDisabledReason}</p>}
+              {aiCandidates.length > 0 && (
+                <div className="novel-foreshadow__ai-list">
+                  {aiCandidates.map((candidate) => (
+                    <article className="novel-foreshadow__ai-card" key={candidate.id}>
+                      <strong>{candidate.title}</strong>
+                      {candidate.note && <p className="novel-foreshadow__note">{candidate.note}</p>}
+                      <div className="novel-foreshadow__item-actions">
+                        <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => onAcceptAiCandidate(candidate.id)} type="button">加入记录</button>
+                        <button className="novel-flow__ghost" onClick={() => onDismissAiCandidate(candidate.id)} type="button">忽略</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              )}
+              {aiError && <p className="novel-foreshadow__ai-error">{aiError}</p>}
+              {aiRawText && (
+                <div className="novel-foreshadow__ai-raw">
+                  <span>AI 原始输出：</span>
+                  <pre>{aiRawText}</pre>
+                </div>
+              )}
+            </section>
             <footer>
               <button className="novel-flow__ghost" onClick={onClose} type="button">关闭</button>
               <button className="novel-flow__primary novel-flow__primary--compact" onClick={openCreate} type="button">新增伏笔</button>

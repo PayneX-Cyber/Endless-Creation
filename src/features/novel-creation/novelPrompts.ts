@@ -308,6 +308,71 @@ export function buildOptimizeSelectionPrompt(novel: Novel, chapter: Chapter, sel
   ];
 }
 
+export interface ForeshadowingCandidate {
+  title: string;
+  note: string;
+}
+
+export type ParsedForeshadowingCandidates =
+  | { kind: 'ok'; candidates: ForeshadowingCandidate[] }
+  | { kind: 'empty' }
+  | { kind: 'invalid' };
+
+export function buildForeshadowingCandidatesPrompt(novel: Novel, chapter: Chapter): TextMessage[] {
+  return [
+    {
+      role: 'system',
+      content: '你是小说伏笔识别助手。职责是从当前章正文里找出作者可能想在后文回收的伏笔或线索（埋设的悬念、被强调的物件、未解释的反常、人物暗示等），只产「新埋」候选，不做回收判断，不匹配已有伏笔。严格输出 JSON 数组，最多 3 条，只挑最值得记的，宁缺毋滥。每条格式为 {"title": string, "note": string}：title 是伏笔简述（短句），note 说明为什么这可能是伏笔或后文可怎么回收（可为空串）。只输出 JSON，不要加解释、不要加代码围栏、不要加标题。若找不到，输出 []。',
+    },
+    {
+      role: 'user',
+      content: [
+        `小说标题：${novel.title}`,
+        novel.summary ? `小说简介：${novel.summary}` : '',
+        novel.blueprint ? `作品蓝图：\n${novel.blueprint}` : '',
+        novel.idea ? `创意：${novel.idea}` : '',
+        `当前章节：${chapter.title || '未命名章节'}`,
+        chapter.outline ? `本章大纲：\n${chapter.outline}` : '',
+        '本章正文：',
+        limitText(chapter.content, 5000),
+        '请从本章正文里识别最多 3 条新埋伏笔候选，按上述 JSON 数组格式输出。',
+      ].filter(Boolean).join('\n'),
+    },
+  ];
+}
+
+const FORESHADOW_CODE_FENCE_PATTERN = /^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i;
+
+function stripForeshadowCodeFence(text: string): string {
+  const trimmed = text.trim();
+  const match = trimmed.match(FORESHADOW_CODE_FENCE_PATTERN);
+  return match ? match[1].trim() : trimmed;
+}
+
+// 宽松解析 AI 伏笔候选输出：剥围栏 → JSON.parse → 逐条校验。返回判别式联合类型，
+// 调用侧按 kind 三分支处理，绝不靠空数组猜语义（'empty' 与 'invalid' 语义不同）。
+export function parseForeshadowingCandidates(text: string): ParsedForeshadowingCandidates {
+  const stripped = stripForeshadowCodeFence(text);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stripped);
+  } catch {
+    return { kind: 'invalid' };
+  }
+  if (!Array.isArray(parsed)) return { kind: 'invalid' };
+  const candidates: ForeshadowingCandidate[] = [];
+  for (const item of parsed) {
+    if (!item || typeof item !== 'object') continue;
+    const record = item as Record<string, unknown>;
+    const title = typeof record.title === 'string' ? record.title.trim() : '';
+    if (!title) continue;
+    const note = typeof record.note === 'string' ? record.note.trim() : '';
+    candidates.push({ title, note });
+  }
+  if (!candidates.length) return { kind: 'empty' };
+  return { kind: 'ok', candidates: candidates.slice(0, 3) };
+}
+
 function buildPreviousChapterContext(novel: Novel, currentChapter: Chapter): string {
   const blocks: string[] = [];
   let total = 0;

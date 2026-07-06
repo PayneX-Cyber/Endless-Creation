@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, ChapterVersion, Foreshadowing, Novel } from '../../types/novel';
-import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, buildChapterConsistencyPrompt, buildChapterRhythmPrompt, type OptimizeType, type TextMessage } from './novelPrompts';
+import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, buildChapterConsistencyPrompt, buildChapterRhythmPrompt, buildForeshadowingCandidatesPrompt, parseForeshadowingCandidates, type OptimizeType, type TextMessage } from './novelPrompts';
 import { countWords, createId, formatTime, saveStatusLabel, type SaveStatus } from './novelShared';
-import { ForeshadowingPanel, type ForeshadowingDraft } from './ForeshadowingPanel';
+import { ForeshadowingPanel, type ForeshadowingDraft, type ForeshadowingAiCandidate } from './ForeshadowingPanel';
 import './ChapterWorkbench.css';
 
 export type ReadyTextModel = { channelId: string; channelLabel?: string; baseUrl: string; apiKey: string; model: string };
@@ -21,6 +21,7 @@ type OptimizeJob = SelectionState & {
   type: OptimizeType;
   optimizedText?: string;
 };
+type ForeshadowCandidateState = { id: string; title: string; note: string; sourceChapterId: string };
 
 const MAX_CHAPTER_VERSIONS = 5;
 
@@ -109,6 +110,10 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   const [optimizeJob, setOptimizeJob] = useState<OptimizeJob | null>(null);
   const [optimizeError, setOptimizeError] = useState('');
   const [foreshadowOpen, setForeshadowOpen] = useState(false);
+  const [foreshadowAiBusy, setForeshadowAiBusy] = useState(false);
+  const [foreshadowAiError, setForeshadowAiError] = useState('');
+  const [foreshadowAiRawText, setForeshadowAiRawText] = useState('');
+  const [foreshadowCandidates, setForeshadowCandidates] = useState<ForeshadowCandidateState[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const requestIdRef = useRef<string | null>(null);
   const runRef = useRef(0);
@@ -127,6 +132,9 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     setOptimizeError('');
     consistency.setError('');
     rhythm.setError('');
+    setForeshadowCandidates([]);
+    setForeshadowAiRawText('');
+    setForeshadowAiError('');
   }, [activeChapterId]);
 
   const activeIndex = chapters.findIndex((chapter) => chapter.id === activeChapterId);
@@ -136,7 +144,9 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   const progress = chapters.length ? Math.round((doneCount / chapters.length) * 100) : 0;
   const firstPendingIndex = chapters.findIndex((chapter) => chapter.content.trim() === '');
   const missingOutlineCount = chapters.filter((chapter) => !chapter.outline?.trim()).length;
-  const busy = generatingChapterId !== null || outlineBusy || review.busy || consistency.busy || rhythm.busy || optimizeTypeOpen || optimizeJob !== null;
+  const otherAiBusy = generatingChapterId !== null || outlineBusy || review.busy || consistency.busy || rhythm.busy || optimizeTypeOpen || optimizeJob !== null;
+  const busy = otherAiBusy || foreshadowAiBusy;
+  const foreshadowGenerateDisabledReason = (!activeChapter || !activeChapter.content.trim()) ? '请先选择有正文的章节' : otherAiBusy ? 'AI 正在忙，请稍候' : '';
   const summaryBrief = brief(novel.summary, 42);
   const blueprintBrief = brief(novel.blueprint?.trim() || novel.summary.trim() || novel.idea?.trim() || '', 130);
 
@@ -310,6 +320,10 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     review.setBusy(false);
     consistency.setBusy(false);
     rhythm.setBusy(false);
+    setForeshadowAiBusy(false);
+    setForeshadowCandidates([]);
+    setForeshadowAiRawText('');
+    setForeshadowAiError('');
     if (requestId) void rendererBridge.cancelTextGeneration(requestId);
   }
 
@@ -453,6 +467,82 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
 
   function cancelRhythm() {
     rhythm.cancel({ runRef, requestIdRef });
+  }
+
+  // 伏笔 AI 候选状态机：调 generateText + 解析 + 兜底，全部在此层（面板不碰 AI）。写入复用下方 addForeshadowing。
+  async function generateForeshadowingCandidates() {
+    if (!activeChapter || !activeChapter.content.trim()) {
+      setForeshadowAiError('请先选择有正文的章节');
+      return;
+    }
+    if (busy) return;
+    const ready = ensureTextModel(setForeshadowAiError);
+    if (!ready) return;
+    const sourceChapter = activeChapter;
+    const requestId = createId('text-request');
+    const runId = runRef.current + 1;
+    runRef.current = runId;
+    requestIdRef.current = requestId;
+    setForeshadowAiBusy(true);
+    setForeshadowAiError('');
+    setForeshadowAiRawText('');
+    setForeshadowCandidates([]);
+    const result = await rendererBridge.generateText({
+      requestId,
+      channelId: ready.channelId,
+      channelLabel: ready.channelLabel,
+      baseUrl: ready.baseUrl,
+      apiKey: ready.apiKey,
+      model: ready.model,
+      messages: buildForeshadowingCandidatesPrompt(novel, sourceChapter),
+      temperature: 0.7,
+      maxTokens: 800,
+    });
+    if (runRef.current !== runId) return;
+    requestIdRef.current = null;
+    setForeshadowAiBusy(false);
+    if (!result.ok || !result.text) {
+      setForeshadowAiError(result.message || 'AI 生成失败，请稍后重试。');
+      return;
+    }
+    const parsed = parseForeshadowingCandidates(result.text);
+    if (parsed.kind === 'ok') {
+      setForeshadowCandidates(parsed.candidates.map((candidate) => ({
+        id: createId('foreshadow-cand'),
+        title: candidate.title,
+        note: candidate.note,
+        sourceChapterId: sourceChapter.id,
+      })));
+      setForeshadowAiRawText('');
+      setForeshadowAiError('');
+    } else if (parsed.kind === 'empty') {
+      setForeshadowAiError('AI 未从本章识别出明显伏笔。');
+      setForeshadowAiRawText('');
+    } else {
+      setForeshadowAiRawText(result.text);
+      setForeshadowAiError('未能识别为候选，可自行手动记录。');
+    }
+  }
+
+  function acceptForeshadowingCandidate(candidateId: string) {
+    const candidate = foreshadowCandidates.find((item) => item.id === candidateId);
+    if (!candidate) return;
+    addForeshadowing({
+      title: candidate.title,
+      plantedChapterId: candidate.sourceChapterId,
+      payoffChapterId: '',
+      note: candidate.note,
+    });
+    setForeshadowCandidates((current) => current.filter((item) => item.id !== candidateId));
+  }
+
+  function dismissForeshadowingCandidate(candidateId: string) {
+    setForeshadowCandidates((current) => current.filter((item) => item.id !== candidateId));
+  }
+
+  function closeForeshadowPanel() {
+    if (foreshadowAiBusy) cancelGeneration();
+    setForeshadowOpen(false);
   }
 
   // 伏笔 CRUD：受控写入，全部走 onUpdateNovel（= NovelCreation 现有 updateNovel 链），零新 IPC、零 AI。
@@ -898,7 +988,19 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
           onEdit={editForeshadowing}
           onToggleStatus={toggleForeshadowingStatus}
           onDelete={deleteForeshadowing}
-          onClose={() => setForeshadowOpen(false)}
+          onClose={closeForeshadowPanel}
+          aiCandidates={foreshadowCandidates.map<ForeshadowingAiCandidate>((candidate) => ({
+            id: candidate.id,
+            title: candidate.title,
+            note: candidate.note,
+          }))}
+          aiBusy={foreshadowAiBusy}
+          aiError={foreshadowAiError}
+          aiRawText={foreshadowAiRawText}
+          aiGenerateDisabledReason={foreshadowGenerateDisabledReason}
+          onGenerateAiCandidates={generateForeshadowingCandidates}
+          onAcceptAiCandidate={acceptForeshadowingCandidate}
+          onDismissAiCandidate={dismissForeshadowingCandidate}
         />
       )}
     </section>
