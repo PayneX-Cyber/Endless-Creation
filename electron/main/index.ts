@@ -100,6 +100,17 @@ interface Chapter {
   updatedAt: string;
 }
 
+interface Foreshadowing {
+  id: string;
+  title: string;
+  plantedChapterId: string;
+  status: 'planted' | 'paidOff';
+  payoffChapterId?: string;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface Novel {
   id: string;
   title: string;
@@ -108,7 +119,8 @@ interface Novel {
   idea?: string;
   blueprint?: string;
   chapters: Chapter[];
-  version: 3;
+  foreshadowings: Foreshadowing[];
+  version: 4;
   createdAt: string;
   updatedAt: string;
 }
@@ -460,10 +472,30 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
     idea: typeof candidate.idea === 'string' ? candidate.idea : undefined,
     blueprint: typeof candidate.blueprint === 'string' ? candidate.blueprint : undefined,
     chapters,
-    version: 3,
+    foreshadowings: sanitizeForeshadowings(candidate.foreshadowings, now),
+    version: 4,
     createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : now,
     updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : now,
   };
+}
+
+function sanitizeForeshadowings(value: unknown, now: string): Foreshadowing[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry): Foreshadowing | null => {
+    if (!entry || typeof entry !== 'object') return null;
+    const item = entry as Partial<Foreshadowing>;
+    if (typeof item.title !== 'string' || !item.title.trim()) return null;
+    return {
+      id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : randomUUID(),
+      title: item.title,
+      plantedChapterId: typeof item.plantedChapterId === 'string' ? item.plantedChapterId : '',
+      status: item.status === 'paidOff' ? 'paidOff' : 'planted',
+      payoffChapterId: typeof item.payoffChapterId === 'string' ? item.payoffChapterId : undefined,
+      note: typeof item.note === 'string' ? item.note : undefined,
+      createdAt: typeof item.createdAt === 'string' ? item.createdAt : now,
+      updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : now,
+    };
+  }).filter((entry): entry is Foreshadowing => entry !== null);
 }
 
 function sanitizeChapterVersions(value: unknown, fallbackTime: string): ChapterVersion[] | undefined {
@@ -529,7 +561,8 @@ async function createNovel(input: unknown): Promise<{ ok: boolean; message: stri
     summary: typeof candidate.summary === 'string' ? candidate.summary : '',
     note: typeof candidate.note === 'string' ? candidate.note : '',
     chapters: [],
-    version: 3,
+    foreshadowings: [],
+    version: 4,
     createdAt: now,
     updatedAt: now,
   };

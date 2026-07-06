@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
-import type { Chapter, ChapterVersion, Novel } from '../../types/novel';
+import type { Chapter, ChapterVersion, Foreshadowing, Novel } from '../../types/novel';
 import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, buildChapterConsistencyPrompt, buildChapterRhythmPrompt, type OptimizeType, type TextMessage } from './novelPrompts';
 import { countWords, createId, formatTime, saveStatusLabel, type SaveStatus } from './novelShared';
+import { ForeshadowingPanel, type ForeshadowingDraft } from './ForeshadowingPanel';
 import './ChapterWorkbench.css';
 
 export type ReadyTextModel = { channelId: string; channelLabel?: string; baseUrl: string; apiKey: string; model: string };
@@ -31,6 +32,7 @@ interface ChapterWorkbenchProps {
   onSelectChapter: (chapterId: string) => void;
   onUpdateChapter: (chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId'>>) => void;
   onUpdateChapterAndSave: (chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId'>>) => void;
+  onUpdateNovel: (update: (novel: Novel) => Novel) => void;
   onRetrySave: () => void;
   onBackToProjects: () => void;
   onOpenProjectView: () => void;
@@ -91,7 +93,7 @@ function useAiCheck(config: {
   return { busy, error, result, setError, setResult, setBusy, run, cancel };
 }
 
-export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus, onSelectChapter, onUpdateChapter, onUpdateChapterAndSave, onRetrySave, onBackToProjects, onOpenProjectView, ensureTextModel }: ChapterWorkbenchProps) {
+export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus, onSelectChapter, onUpdateChapter, onUpdateChapterAndSave, onUpdateNovel, onRetrySave, onBackToProjects, onOpenProjectView, ensureTextModel }: ChapterWorkbenchProps) {
   const [generatingChapterId, setGeneratingChapterId] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<{ chapterId: string; message: string } | null>(null);
   const [preview, setPreview] = useState<VersionPreviewState | null>(null);
@@ -106,6 +108,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   const [optimizeTypeOpen, setOptimizeTypeOpen] = useState(false);
   const [optimizeJob, setOptimizeJob] = useState<OptimizeJob | null>(null);
   const [optimizeError, setOptimizeError] = useState('');
+  const [foreshadowOpen, setForeshadowOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const requestIdRef = useRef<string | null>(null);
   const runRef = useRef(0);
@@ -452,6 +455,60 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     rhythm.cancel({ runRef, requestIdRef });
   }
 
+  // 伏笔 CRUD：受控写入，全部走 onUpdateNovel（= NovelCreation 现有 updateNovel 链），零新 IPC、零 AI。
+  function addForeshadowing(draft: ForeshadowingDraft) {
+    const now = new Date().toISOString();
+    const entry: Foreshadowing = {
+      id: createId('foreshadow'),
+      title: draft.title,
+      plantedChapterId: draft.plantedChapterId,
+      status: 'planted',
+      payoffChapterId: draft.payoffChapterId || undefined,
+      note: draft.note || undefined,
+      createdAt: now,
+      updatedAt: now,
+    };
+    onUpdateNovel((current) => ({ ...current, updatedAt: now, foreshadowings: [...current.foreshadowings, entry] }));
+  }
+
+  function editForeshadowing(id: string, draft: ForeshadowingDraft) {
+    const now = new Date().toISOString();
+    onUpdateNovel((current) => ({
+      ...current,
+      updatedAt: now,
+      foreshadowings: current.foreshadowings.map((item) => item.id === id ? {
+        ...item,
+        title: draft.title,
+        plantedChapterId: draft.plantedChapterId,
+        payoffChapterId: draft.payoffChapterId || undefined,
+        note: draft.note || undefined,
+        updatedAt: now,
+      } : item),
+    }));
+  }
+
+  function toggleForeshadowingStatus(id: string) {
+    const now = new Date().toISOString();
+    onUpdateNovel((current) => ({
+      ...current,
+      updatedAt: now,
+      foreshadowings: current.foreshadowings.map((item) => item.id === id ? {
+        ...item,
+        status: item.status === 'planted' ? 'paidOff' : 'planted',
+        updatedAt: now,
+      } : item),
+    }));
+  }
+
+  function deleteForeshadowing(id: string) {
+    const now = new Date().toISOString();
+    onUpdateNovel((current) => ({
+      ...current,
+      updatedAt: now,
+      foreshadowings: current.foreshadowings.filter((item) => item.id !== id),
+    }));
+  }
+
   async function copyWholeBookMarkdown() {
     const markdown = buildWholeBookMarkdown(novel);
     if (!markdown) {
@@ -646,6 +703,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
         </div>
         <button className="novel-flow__ghost" onClick={() => void copyWholeBookMarkdown()} type="button">复制全书 Markdown</button>
         <button className="novel-flow__ghost" onClick={() => void exportWholeBookMarkdownFile()} type="button">导出 .md 文件</button>
+        <button className="novel-flow__ghost" onClick={() => setForeshadowOpen(true)} type="button">伏笔记录</button>
         <button className="novel-flow__ghost" disabled={busy} onClick={onOpenProjectView} type="button">项目详情</button>
       </header>
       <div className="novel-workbench__body">
@@ -831,6 +889,17 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
             </footer>
           </div>
         </div>
+      )}
+      {foreshadowOpen && (
+        <ForeshadowingPanel
+          foreshadowings={novel.foreshadowings}
+          chapters={chapters}
+          onAdd={addForeshadowing}
+          onEdit={editForeshadowing}
+          onToggleStatus={toggleForeshadowingStatus}
+          onDelete={deleteForeshadowing}
+          onClose={() => setForeshadowOpen(false)}
+        />
       )}
     </section>
   );

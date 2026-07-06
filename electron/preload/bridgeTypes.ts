@@ -90,6 +90,17 @@ export interface Chapter {
   updatedAt: string;
 }
 
+export interface Foreshadowing {
+  id: string;
+  title: string;
+  plantedChapterId: string;
+  status: 'planted' | 'paidOff';
+  payoffChapterId?: string;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Novel {
   id: string;
   title: string;
@@ -98,7 +109,8 @@ export interface Novel {
   idea?: string;
   blueprint?: string;
   chapters: Chapter[];
-  version: 3;
+  foreshadowings: Foreshadowing[];
+  version: 4;
   createdAt: string;
   updatedAt: string;
 }

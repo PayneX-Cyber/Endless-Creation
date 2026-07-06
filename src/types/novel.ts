@@ -16,6 +16,17 @@ export interface Chapter {
   updatedAt: string;
 }
 
+export interface Foreshadowing {
+  id: string;
+  title: string;                 // 伏笔简述（必需，空则不落库）
+  plantedChapterId: string;      // 埋设章节引用（可为空串 = 未指定章节）
+  status: 'planted' | 'paidOff'; // 埋设中 / 已回收
+  payoffChapterId?: string;      // 回收章节引用（可选）
+  note?: string;                 // 备注：怎么回收 / 暗示内容（可选）
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Novel {
   id: string;
   title: string;
@@ -24,7 +35,8 @@ export interface Novel {
   idea?: string;
   blueprint?: string;
   chapters: Chapter[];
-  version: 3;
+  foreshadowings: Foreshadowing[];
+  version: 4;
   createdAt: string;
   updatedAt: string;
 }

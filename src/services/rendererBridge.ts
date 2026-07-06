@@ -247,7 +247,8 @@ export const rendererBridge = {
       summary: input.summary?.trim() ?? '',
       note: input.note?.trim() ?? '',
       chapters: [],
-      version: 3,
+      foreshadowings: [],
+      version: 4,
       createdAt: now,
       updatedAt: now,
     };
@@ -318,7 +319,7 @@ function readWebNovels(): Novel[] {
   try {
     const raw = globalThis.localStorage?.getItem(WEB_NOVELS_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.filter(isNovel) : [];
+    return Array.isArray(parsed) ? parsed.map(normalizeWebNovel).filter((novel): novel is Novel => novel !== null) : [];
   } catch {
     return [];
   }
@@ -334,6 +335,16 @@ function writeWebNovels(novels: Novel[]): void {
 
 function isNovel(value: unknown): value is Novel {
   return Boolean(value && typeof value === 'object' && typeof (value as Novel).id === 'string' && typeof (value as Novel).title === 'string');
+}
+
+function normalizeWebNovel(value: unknown): Novel | null {
+  if (!isNovel(value)) return null;
+  return {
+    ...value,
+    chapters: Array.isArray(value.chapters) ? value.chapters : [],
+    foreshadowings: Array.isArray(value.foreshadowings) ? value.foreshadowings : [],
+    version: 4,
+  };
 }
 
 function toNovelSummary(novel: Novel) {

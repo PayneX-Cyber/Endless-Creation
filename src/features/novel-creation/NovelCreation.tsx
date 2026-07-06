@@ -732,6 +732,7 @@ export function NovelCreation() {
           onSelectChapter={setActiveChapterId}
           onUpdateChapter={updateChapterById}
           onUpdateChapterAndSave={updateChapterByIdAndSave}
+          onUpdateNovel={updateNovel}
           onRetrySave={() => void saveCurrentNovel()}
           onBackToProjects={() => setView('projectList')}
           onOpenProjectView={() => { setProjectViewTab('overview'); setView('projectView'); }}
