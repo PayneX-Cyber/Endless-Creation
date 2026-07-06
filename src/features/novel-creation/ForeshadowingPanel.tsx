@@ -19,6 +19,12 @@ export interface ForeshadowingAiCandidate {
   note: string;
 }
 
+export interface ForeshadowingPayoffAiCandidate {
+  id: string;
+  title: string;
+  note: string;
+}
+
 interface ForeshadowingPanelProps {
   foreshadowings: Foreshadowing[];
   chapters: Chapter[];
@@ -28,13 +34,18 @@ interface ForeshadowingPanelProps {
   onDelete: (id: string) => void;
   onClose: () => void;
   aiCandidates: ForeshadowingAiCandidate[];
+  aiPayoffCandidates: ForeshadowingPayoffAiCandidate[];
   aiBusy: boolean;
   aiError: string;
   aiRawText: string;
   aiGenerateDisabledReason: string;
+  aiPayoffGenerateDisabledReason: string;
   onGenerateAiCandidates: () => void;
   onAcceptAiCandidate: (candidateId: string) => void;
   onDismissAiCandidate: (candidateId: string) => void;
+  onGenerateAiPayoffCandidates: () => void;
+  onAcceptAiPayoffCandidate: (candidateId: string) => void;
+  onDismissAiPayoffCandidate: (candidateId: string) => void;
 }
 
 const emptyDraft: ForeshadowingDraft = { title: '', plantedChapterId: '', payoffChapterId: '', note: '' };
@@ -48,13 +59,18 @@ export function ForeshadowingPanel({
   onDelete,
   onClose,
   aiCandidates,
+  aiPayoffCandidates,
   aiBusy,
   aiError,
   aiRawText,
   aiGenerateDisabledReason,
+  aiPayoffGenerateDisabledReason,
   onGenerateAiCandidates,
   onAcceptAiCandidate,
   onDismissAiCandidate,
+  onGenerateAiPayoffCandidates,
+  onAcceptAiPayoffCandidate,
+  onDismissAiPayoffCandidate,
 }: ForeshadowingPanelProps) {
   const [mode, setMode] = useState<'list' | 'create' | { editId: string }>('list');
   const [draft, setDraft] = useState<ForeshadowingDraft>(emptyDraft);
@@ -215,28 +231,61 @@ export function ForeshadowingPanel({
             <section className="novel-foreshadow__ai">
               <div className="novel-foreshadow__ai-head">
                 <strong>AI 建议</strong>
-                <button
-                  className="novel-flow__primary novel-flow__primary--compact"
-                  disabled={aiBusy || Boolean(aiGenerateDisabledReason)}
-                  onClick={onGenerateAiCandidates}
-                  type="button"
-                >
-                  {aiBusy ? 'AI 识别中…' : 'AI 找伏笔'}
-                </button>
+                <div className="novel-foreshadow__ai-actions">
+                  <button
+                    className="novel-flow__primary novel-flow__primary--compact"
+                    disabled={aiBusy || Boolean(aiGenerateDisabledReason)}
+                    onClick={onGenerateAiCandidates}
+                    type="button"
+                  >
+                    {aiBusy ? 'AI 识别中…' : 'AI 找伏笔'}
+                  </button>
+                  <button
+                    className="novel-flow__primary novel-flow__primary--compact"
+                    disabled={aiBusy || Boolean(aiPayoffGenerateDisabledReason)}
+                    onClick={onGenerateAiPayoffCandidates}
+                    type="button"
+                  >
+                    {aiBusy ? 'AI 识别中…' : 'AI 找回收'}
+                  </button>
+                </div>
               </div>
               {aiGenerateDisabledReason && <p className="novel-foreshadow__ai-hint">{aiGenerateDisabledReason}</p>}
+              {aiPayoffGenerateDisabledReason && aiPayoffGenerateDisabledReason !== aiGenerateDisabledReason && (
+                <p className="novel-foreshadow__ai-hint">{aiPayoffGenerateDisabledReason}</p>
+              )}
               {aiCandidates.length > 0 && (
-                <div className="novel-foreshadow__ai-list">
-                  {aiCandidates.map((candidate) => (
-                    <article className="novel-foreshadow__ai-card" key={candidate.id}>
-                      <strong>{candidate.title}</strong>
-                      {candidate.note && <p className="novel-foreshadow__note">{candidate.note}</p>}
-                      <div className="novel-foreshadow__item-actions">
-                        <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => onAcceptAiCandidate(candidate.id)} type="button">加入记录</button>
-                        <button className="novel-flow__ghost" onClick={() => onDismissAiCandidate(candidate.id)} type="button">忽略</button>
-                      </div>
-                    </article>
-                  ))}
+                <div className="novel-foreshadow__ai-group">
+                  <span className="novel-foreshadow__ai-label">新埋候选</span>
+                  <div className="novel-foreshadow__ai-list">
+                    {aiCandidates.map((candidate) => (
+                      <article className="novel-foreshadow__ai-card" key={candidate.id}>
+                        <strong>{candidate.title}</strong>
+                        {candidate.note && <p className="novel-foreshadow__note">{candidate.note}</p>}
+                        <div className="novel-foreshadow__item-actions">
+                          <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => onAcceptAiCandidate(candidate.id)} type="button">加入记录</button>
+                          <button className="novel-flow__ghost" onClick={() => onDismissAiCandidate(candidate.id)} type="button">忽略</button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {aiPayoffCandidates.length > 0 && (
+                <div className="novel-foreshadow__ai-group">
+                  <span className="novel-foreshadow__ai-label">回收候选</span>
+                  <div className="novel-foreshadow__ai-list">
+                    {aiPayoffCandidates.map((candidate) => (
+                      <article className="novel-foreshadow__ai-card" key={candidate.id}>
+                        <strong>{candidate.title}</strong>
+                        {candidate.note && <p className="novel-foreshadow__note">{candidate.note}</p>}
+                        <div className="novel-foreshadow__item-actions">
+                          <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => onAcceptAiPayoffCandidate(candidate.id)} type="button">标记回收</button>
+                          <button className="novel-flow__ghost" onClick={() => onDismissAiPayoffCandidate(candidate.id)} type="button">忽略</button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
                 </div>
               )}
               {aiError && <p className="novel-foreshadow__ai-error">{aiError}</p>}

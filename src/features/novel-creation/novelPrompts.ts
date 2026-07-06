@@ -1,4 +1,4 @@
-import type { Chapter, Novel } from '../../types/novel';
+import type { Chapter, Foreshadowing, Novel } from '../../types/novel';
 
 export type TextMessage = { role: 'system' | 'user'; content: string };
 export type OptimizeType = 'dialogue' | 'environment' | 'psychology' | 'action';
@@ -313,8 +313,18 @@ export interface ForeshadowingCandidate {
   note: string;
 }
 
+export interface ForeshadowingPayoffCandidate {
+  foreshadowingId: string;
+  note: string;
+}
+
 export type ParsedForeshadowingCandidates =
   | { kind: 'ok'; candidates: ForeshadowingCandidate[] }
+  | { kind: 'empty' }
+  | { kind: 'invalid' };
+
+export type ParsedForeshadowingPayoffCandidates =
+  | { kind: 'ok'; candidates: ForeshadowingPayoffCandidate[] }
   | { kind: 'empty' }
   | { kind: 'invalid' };
 
@@ -336,6 +346,38 @@ export function buildForeshadowingCandidatesPrompt(novel: Novel, chapter: Chapte
         '本章正文：',
         limitText(chapter.content, 5000),
         '请从本章正文里识别最多 3 条新埋伏笔候选，按上述 JSON 数组格式输出。',
+      ].filter(Boolean).join('\n'),
+    },
+  ];
+}
+
+export function buildForeshadowingPayoffCandidatesPrompt(novel: Novel, chapter: Chapter, plantedForeshadowings: Foreshadowing[]): TextMessage[] {
+  const chapterLabels = new Map(novel.chapters.map((item, index) => [item.id, `第 ${index + 1} 章 · ${item.title || '未命名章节'}`]));
+  const plantedList = plantedForeshadowings.map((item) => [
+    `id: ${item.id}`,
+    `标题: ${item.title}`,
+    `埋设章节: ${chapterLabels.get(item.plantedChapterId) ?? '未指定章节'}`,
+    item.note ? `备注: ${limitText(item.note, 240)}` : '',
+  ].filter(Boolean).join('\n')).join('\n\n');
+  return [
+    {
+      role: 'system',
+      content: '你是小说伏笔回收识别助手。职责是判断当前章正文是否回收了已记录的未回收伏笔。你只能从用户给出的未回收伏笔 id 中选择，不要创造新 id，不要提出新埋伏笔。严格输出 JSON 数组，最多 3 条，每条格式为 {"foreshadowingId": string, "note": string}：foreshadowingId 必须来自未回收伏笔列表，note 简短说明当前章哪里像是在回收它。只输出 JSON，不要加解释、不要加代码围栏、不要加标题。若找不到明显回收线索，输出 []。',
+    },
+    {
+      role: 'user',
+      content: [
+        `小说标题：${novel.title}`,
+        novel.summary ? `小说简介：${novel.summary}` : '',
+        novel.blueprint ? `作品蓝图：\n${novel.blueprint}` : '',
+        novel.idea ? `创意：${novel.idea}` : '',
+        `当前章节：${chapter.title || '未命名章节'}`,
+        chapter.outline ? `本章大纲：\n${chapter.outline}` : '',
+        '未回收伏笔列表：',
+        plantedList,
+        '本章正文：',
+        limitText(chapter.content, 5000),
+        '请从未回收伏笔列表中识别最多 3 条可能已在本章回收的候选，按上述 JSON 数组格式输出。',
       ].filter(Boolean).join('\n'),
     },
   ];
@@ -368,6 +410,31 @@ export function parseForeshadowingCandidates(text: string): ParsedForeshadowingC
     if (!title) continue;
     const note = typeof record.note === 'string' ? record.note.trim() : '';
     candidates.push({ title, note });
+  }
+  if (!candidates.length) return { kind: 'empty' };
+  return { kind: 'ok', candidates: candidates.slice(0, 3) };
+}
+
+export function parseForeshadowingPayoffCandidates(text: string, validIds: readonly string[]): ParsedForeshadowingPayoffCandidates {
+  const stripped = stripForeshadowCodeFence(text);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(stripped);
+  } catch {
+    return { kind: 'invalid' };
+  }
+  if (!Array.isArray(parsed)) return { kind: 'invalid' };
+  const validIdSet = new Set(validIds);
+  const seen = new Set<string>();
+  const candidates: ForeshadowingPayoffCandidate[] = [];
+  for (const item of parsed) {
+    if (!item || typeof item !== 'object') continue;
+    const record = item as Record<string, unknown>;
+    const foreshadowingId = typeof record.foreshadowingId === 'string' ? record.foreshadowingId.trim() : '';
+    if (!validIdSet.has(foreshadowingId) || seen.has(foreshadowingId)) continue;
+    seen.add(foreshadowingId);
+    const note = typeof record.note === 'string' ? record.note.trim() : '';
+    candidates.push({ foreshadowingId, note });
   }
   if (!candidates.length) return { kind: 'empty' };
   return { kind: 'ok', candidates: candidates.slice(0, 3) };

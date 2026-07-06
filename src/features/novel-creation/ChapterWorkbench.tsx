@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, ChapterVersion, Foreshadowing, Novel } from '../../types/novel';
-import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, buildChapterConsistencyPrompt, buildChapterRhythmPrompt, buildForeshadowingCandidatesPrompt, parseForeshadowingCandidates, type OptimizeType, type TextMessage } from './novelPrompts';
+import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, buildChapterConsistencyPrompt, buildChapterRhythmPrompt, buildForeshadowingCandidatesPrompt, parseForeshadowingCandidates, buildForeshadowingPayoffCandidatesPrompt, parseForeshadowingPayoffCandidates, type OptimizeType, type TextMessage } from './novelPrompts';
 import { countWords, createId, formatTime, saveStatusLabel, type SaveStatus } from './novelShared';
-import { ForeshadowingPanel, type ForeshadowingDraft, type ForeshadowingAiCandidate } from './ForeshadowingPanel';
+import { ForeshadowingPanel, type ForeshadowingDraft, type ForeshadowingAiCandidate, type ForeshadowingPayoffAiCandidate } from './ForeshadowingPanel';
 import './ChapterWorkbench.css';
 
 export type ReadyTextModel = { channelId: string; channelLabel?: string; baseUrl: string; apiKey: string; model: string };
@@ -22,6 +22,7 @@ type OptimizeJob = SelectionState & {
   optimizedText?: string;
 };
 type ForeshadowCandidateState = { id: string; title: string; note: string; sourceChapterId: string };
+type ForeshadowPayoffCandidateState = { id: string; foreshadowingId: string; note: string; sourceChapterId: string };
 
 const MAX_CHAPTER_VERSIONS = 5;
 
@@ -114,6 +115,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   const [foreshadowAiError, setForeshadowAiError] = useState('');
   const [foreshadowAiRawText, setForeshadowAiRawText] = useState('');
   const [foreshadowCandidates, setForeshadowCandidates] = useState<ForeshadowCandidateState[]>([]);
+  const [foreshadowPayoffCandidates, setForeshadowPayoffCandidates] = useState<ForeshadowPayoffCandidateState[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const requestIdRef = useRef<string | null>(null);
   const runRef = useRef(0);
@@ -133,6 +135,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     consistency.setError('');
     rhythm.setError('');
     setForeshadowCandidates([]);
+    setForeshadowPayoffCandidates([]);
     setForeshadowAiRawText('');
     setForeshadowAiError('');
   }, [activeChapterId]);
@@ -146,7 +149,9 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
   const missingOutlineCount = chapters.filter((chapter) => !chapter.outline?.trim()).length;
   const otherAiBusy = generatingChapterId !== null || outlineBusy || review.busy || consistency.busy || rhythm.busy || optimizeTypeOpen || optimizeJob !== null;
   const busy = otherAiBusy || foreshadowAiBusy;
+  const plantedForeshadowings = novel.foreshadowings.filter((item) => item.status === 'planted');
   const foreshadowGenerateDisabledReason = (!activeChapter || !activeChapter.content.trim()) ? '请先选择有正文的章节' : otherAiBusy ? 'AI 正在忙，请稍候' : '';
+  const foreshadowPayoffGenerateDisabledReason = (!activeChapter || !activeChapter.content.trim()) ? '请先选择有正文的章节' : otherAiBusy ? 'AI 正在忙，请稍候' : plantedForeshadowings.length === 0 ? '暂无待回收伏笔' : '';
   const summaryBrief = brief(novel.summary, 42);
   const blueprintBrief = brief(novel.blueprint?.trim() || novel.summary.trim() || novel.idea?.trim() || '', 130);
 
@@ -322,6 +327,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     rhythm.setBusy(false);
     setForeshadowAiBusy(false);
     setForeshadowCandidates([]);
+    setForeshadowPayoffCandidates([]);
     setForeshadowAiRawText('');
     setForeshadowAiError('');
     if (requestId) void rendererBridge.cancelTextGeneration(requestId);
@@ -538,6 +544,92 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
 
   function dismissForeshadowingCandidate(candidateId: string) {
     setForeshadowCandidates((current) => current.filter((item) => item.id !== candidateId));
+  }
+
+  // 回收候选只给出建议，真正写入仍走 5d.1 的 onUpdateNovel 链；候选绑定生成时章节，避免切章后误挂。
+  async function generateForeshadowingPayoffCandidates() {
+    if (!activeChapter || !activeChapter.content.trim()) {
+      setForeshadowAiError('请先选择有正文的章节');
+      return;
+    }
+    if (busy) return;
+    if (!plantedForeshadowings.length) {
+      setForeshadowAiError('暂无待回收伏笔');
+      return;
+    }
+    const ready = ensureTextModel(setForeshadowAiError);
+    if (!ready) return;
+    const sourceChapter = activeChapter;
+    const sourcePlanted = plantedForeshadowings;
+    const requestId = createId('text-request');
+    const runId = runRef.current + 1;
+    runRef.current = runId;
+    requestIdRef.current = requestId;
+    setForeshadowAiBusy(true);
+    setForeshadowAiError('');
+    setForeshadowAiRawText('');
+    setForeshadowPayoffCandidates([]);
+    const result = await rendererBridge.generateText({
+      requestId,
+      channelId: ready.channelId,
+      channelLabel: ready.channelLabel,
+      baseUrl: ready.baseUrl,
+      apiKey: ready.apiKey,
+      model: ready.model,
+      messages: buildForeshadowingPayoffCandidatesPrompt(novel, sourceChapter, sourcePlanted),
+      temperature: 0.7,
+      maxTokens: 700,
+    });
+    if (runRef.current !== runId) return;
+    requestIdRef.current = null;
+    setForeshadowAiBusy(false);
+    if (!result.ok || !result.text) {
+      setForeshadowAiError(result.message || 'AI 生成失败，请稍后重试。');
+      return;
+    }
+    const parsed = parseForeshadowingPayoffCandidates(result.text, sourcePlanted.map((item) => item.id));
+    if (parsed.kind === 'ok') {
+      setForeshadowPayoffCandidates(parsed.candidates.map((candidate) => ({
+        id: createId('foreshadow-payoff-cand'),
+        foreshadowingId: candidate.foreshadowingId,
+        note: candidate.note,
+        sourceChapterId: sourceChapter.id,
+      })));
+      setForeshadowAiRawText('');
+      setForeshadowAiError('');
+    } else if (parsed.kind === 'empty') {
+      setForeshadowPayoffCandidates([]);
+      setForeshadowAiError('AI 未从本章识别出明显回收线索。');
+      setForeshadowAiRawText('');
+    } else {
+      setForeshadowAiRawText(result.text);
+      setForeshadowAiError('未能识别为回收候选，可手动标记回收。');
+    }
+  }
+
+  function acceptForeshadowingPayoffCandidate(candidateId: string) {
+    const candidate = foreshadowPayoffCandidates.find((item) => item.id === candidateId);
+    if (!candidate) return;
+    const now = new Date().toISOString();
+    onUpdateNovel((current) => {
+      let changed = false;
+      const foreshadowings = current.foreshadowings.map((item) => {
+        if (item.id !== candidate.foreshadowingId || item.status !== 'planted') return item;
+        changed = true;
+        return {
+          ...item,
+          status: 'paidOff' as const,
+          payoffChapterId: candidate.sourceChapterId,
+          updatedAt: now,
+        };
+      });
+      return changed ? { ...current, updatedAt: now, foreshadowings } : current;
+    });
+    setForeshadowPayoffCandidates((current) => current.filter((item) => item.id !== candidateId));
+  }
+
+  function dismissForeshadowingPayoffCandidate(candidateId: string) {
+    setForeshadowPayoffCandidates((current) => current.filter((item) => item.id !== candidateId));
   }
 
   function closeForeshadowPanel() {
@@ -994,13 +1086,22 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
             title: candidate.title,
             note: candidate.note,
           }))}
+          aiPayoffCandidates={foreshadowPayoffCandidates.map<ForeshadowingPayoffAiCandidate>((candidate) => ({
+            id: candidate.id,
+            title: novel.foreshadowings.find((item) => item.id === candidate.foreshadowingId)?.title ?? '伏笔已不存在',
+            note: candidate.note,
+          }))}
           aiBusy={foreshadowAiBusy}
           aiError={foreshadowAiError}
           aiRawText={foreshadowAiRawText}
           aiGenerateDisabledReason={foreshadowGenerateDisabledReason}
+          aiPayoffGenerateDisabledReason={foreshadowPayoffGenerateDisabledReason}
           onGenerateAiCandidates={generateForeshadowingCandidates}
           onAcceptAiCandidate={acceptForeshadowingCandidate}
           onDismissAiCandidate={dismissForeshadowingCandidate}
+          onGenerateAiPayoffCandidates={generateForeshadowingPayoffCandidates}
+          onAcceptAiPayoffCandidate={acceptForeshadowingPayoffCandidate}
+          onDismissAiPayoffCandidate={dismissForeshadowingPayoffCandidate}
         />
       )}
     </section>

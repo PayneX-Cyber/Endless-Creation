@@ -802,9 +802,28 @@
   font-size: 15px;
 }
 
+.novel-foreshadow__ai-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .novel-foreshadow__ai-hint {
   margin: 0;
   font-size: 13px;
+  color: #64748b;
+}
+
+.novel-foreshadow__ai-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.novel-foreshadow__ai-label {
+  font-size: 12px;
+  font-weight: 700;
   color: #64748b;
 }
 
@@ -861,6 +880,10 @@
 }
 
 .app-shell[data-theme='dark'] .novel-foreshadow__ai-hint {
+  color: #94a3b8;
+}
+
+.app-shell[data-theme='dark'] .novel-foreshadow__ai-label {
   color: #94a3b8;
 }
 
