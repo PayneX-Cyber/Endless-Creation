@@ -27,6 +27,7 @@ const bridge: EndlessCreationBridge = {
   },
   api: {
     testConnection: (config) => ipcRenderer.invoke('api:test-connection', config),
+    loadAiUsage: (projectId) => ipcRenderer.invoke('api:load-ai-usage', projectId),
     generateImage: (request) => ipcRenderer.invoke('api:generate-image', request),
     cancelImageGeneration: (requestId) => ipcRenderer.invoke('api:cancel-image-generation', requestId),
     generateText: (request) => ipcRenderer.invoke('api:generate-text', request),

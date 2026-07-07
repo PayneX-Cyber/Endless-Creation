@@ -36,6 +36,10 @@ interface ApiImageReferenceImage {
 
 interface ApiImageGenerationRequest {
   requestId: string;
+  channelId?: string;
+  channelLabel?: string;
+  projectId?: string;
+  requestType?: string;
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -67,6 +71,10 @@ interface ApiImageGenerationResult {
 
 interface ApiTextGenerationRequest {
   requestId: string;
+  channelId?: string;
+  channelLabel?: string;
+  projectId?: string;
+  requestType?: string;
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -80,6 +88,19 @@ interface ApiTextGenerationResult {
   status?: number;
   message: string;
   text?: string;
+}
+
+interface AiUsageRecord {
+  id: string;
+  projectId: string;
+  provider: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCost: number;
+  requestType: string;
+  success: boolean;
+  createdAt: string;
 }
 
 interface ChapterVersion {
@@ -227,6 +248,74 @@ async function hasMeaningfulLocalStorage(dir: string): Promise<boolean> {
 
 function getImageGenerationHistoryPath(): string {
   return path.join(app.getPath('userData'), 'image-generation-history.json');
+}
+
+function getAiUsagePath(): string {
+  return path.join(app.getPath('userData'), 'ai-usage-records.json');
+}
+
+function sanitizeAiUsageRecord(value: unknown): AiUsageRecord | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Record<string, unknown>;
+  return {
+    id: typeof candidate.id === 'string' ? candidate.id : randomUUID(),
+    projectId: typeof candidate.projectId === 'string' ? candidate.projectId : '',
+    provider: typeof candidate.provider === 'string' ? candidate.provider : '',
+    model: typeof candidate.model === 'string' ? candidate.model : '',
+    inputTokens: typeof candidate.inputTokens === 'number' && Number.isFinite(candidate.inputTokens) ? Math.max(0, Math.floor(candidate.inputTokens)) : 0,
+    outputTokens: typeof candidate.outputTokens === 'number' && Number.isFinite(candidate.outputTokens) ? Math.max(0, Math.floor(candidate.outputTokens)) : 0,
+    estimatedCost: typeof candidate.estimatedCost === 'number' && Number.isFinite(candidate.estimatedCost) ? Math.max(0, candidate.estimatedCost) : 0,
+    requestType: typeof candidate.requestType === 'string' ? candidate.requestType : 'unknown',
+    success: typeof candidate.success === 'boolean' ? candidate.success : false,
+    createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : new Date().toISOString(),
+  };
+}
+
+async function loadAiUsage(projectId?: unknown): Promise<{ ok: boolean; message: string; records: AiUsageRecord[] }> {
+  const filterProjectId = typeof projectId === 'string' ? projectId : '';
+  try {
+    const raw = await fs.readFile(getAiUsagePath(), 'utf-8');
+    const parsed = JSON.parse(raw) as { records?: unknown };
+    const records = Array.isArray(parsed.records) ? parsed.records.map(sanitizeAiUsageRecord).filter((item): item is AiUsageRecord => item !== null) : [];
+    return { ok: true, message: 'AI usage loaded.', records: filterProjectId ? records.filter((record) => record.projectId === filterProjectId) : records };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { ok: true, message: 'AI usage loaded.', records: [] };
+    return { ok: false, message: 'AI usage load failed.', records: [] };
+  }
+}
+
+async function appendAiUsage(record: Omit<AiUsageRecord, 'id' | 'createdAt'>): Promise<void> {
+  const current = await loadAiUsage();
+  const records = current.records;
+  records.push({ ...record, id: randomUUID(), createdAt: new Date().toISOString() });
+  await fs.writeFile(getAiUsagePath(), JSON.stringify({ version: 1, records }, null, 2), 'utf-8');
+}
+
+async function safeRecordAiUsage(request: { projectId?: string; channelId?: string; channelLabel?: string; baseUrl: string; model: string; requestType?: string }, usage: { inputTokens?: number; outputTokens?: number }, success: boolean): Promise<void> {
+  const projectId = request.projectId?.trim();
+  if (!projectId) return;
+  try {
+    let provider = request.channelLabel?.trim() || request.channelId?.trim() || '';
+    if (!provider) {
+      try {
+        provider = new URL(request.baseUrl).hostname;
+      } catch {
+        provider = 'unknown';
+      }
+    }
+    await appendAiUsage({
+      projectId,
+      provider,
+      model: request.model.trim(),
+      inputTokens: usage.inputTokens ?? 0,
+      outputTokens: usage.outputTokens ?? 0,
+      estimatedCost: 0,
+      requestType: request.requestType?.trim() || 'unknown',
+      success,
+    });
+  } catch {
+    // Cost tracking must not break generation.
+  }
 }
 
 async function loadImageGenerationHistory(): Promise<{ ok: boolean; items: unknown[] }> {
@@ -716,6 +805,8 @@ function registerIpcHandlers(): void {
     return testOpenAiCompatibleConnection(config);
   });
 
+  ipcMain.handle('api:load-ai-usage', (_event, projectId: unknown) => loadAiUsage(projectId));
+
   ipcMain.handle('api:generate-image', async (_event, request: unknown): Promise<ApiImageGenerationResult> => {
     return generateOpenAiCompatibleImage(request);
   });
@@ -829,6 +920,10 @@ function isApiImageGenerationRequest(request: unknown): request is ApiImageGener
 
   const candidate = request as Record<string, unknown>;
   return typeof candidate.requestId === 'string'
+    && (candidate.channelId === undefined || typeof candidate.channelId === 'string')
+    && (candidate.channelLabel === undefined || typeof candidate.channelLabel === 'string')
+    && (candidate.projectId === undefined || typeof candidate.projectId === 'string')
+    && (candidate.requestType === undefined || typeof candidate.requestType === 'string')
     && typeof candidate.baseUrl === 'string'
     && typeof candidate.apiKey === 'string'
     && typeof candidate.model === 'string'
@@ -846,6 +941,10 @@ function isApiTextGenerationRequest(request: unknown): request is ApiTextGenerat
   if (!request || typeof request !== 'object') return false;
   const candidate = request as Record<string, unknown>;
   return typeof candidate.requestId === 'string'
+    && (candidate.channelId === undefined || typeof candidate.channelId === 'string')
+    && (candidate.channelLabel === undefined || typeof candidate.channelLabel === 'string')
+    && (candidate.projectId === undefined || typeof candidate.projectId === 'string')
+    && (candidate.requestType === undefined || typeof candidate.requestType === 'string')
     && typeof candidate.baseUrl === 'string'
     && typeof candidate.apiKey === 'string'
     && typeof candidate.model === 'string'
@@ -906,11 +1005,14 @@ async function generateOpenAiCompatibleText(request: unknown): Promise<ApiTextGe
       signal: controller.signal,
     });
     const parsed = await readTextGenerationResponse(response, apiKey);
+    const usage = { inputTokens: parsed.inputTokens, outputTokens: parsed.outputTokens };
+    await safeRecordAiUsage(request, usage, response.ok && Boolean(parsed.text));
 
     if (!response.ok) return { ok: false, status: response.status, message: parsed.errorMessage ?? `文本生成失败：HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}。` };
     if (!parsed.text) return { ok: false, status: response.status, message: '文本生成接口返回了空结果。' };
     return { ok: true, status: response.status, message: '文本生成完成。', text: parsed.text };
   } catch (error) {
+    await safeRecordAiUsage(request, {}, false);
     if (error instanceof Error && error.name === 'AbortError') {
       return { ok: false, message: timedOutTextGenerationRequests.has(requestId) ? '文本生成请求超时，请稍后重试或检查服务状态。' : '文本生成请求已取消。' };
     }
@@ -1018,6 +1120,7 @@ async function generateOpenAiCompatibleImage(request: unknown): Promise<ApiImage
     }
 
     if (!response.ok) {
+      await safeRecordAiUsage(request, {}, false);
       return {
         ok: false,
         status: response.status,
@@ -1026,6 +1129,7 @@ async function generateOpenAiCompatibleImage(request: unknown): Promise<ApiImage
     }
 
     if (!parsed.images.length) {
+      await safeRecordAiUsage(request, {}, false);
       return {
         ok: false,
         status: response.status,
@@ -1034,6 +1138,7 @@ async function generateOpenAiCompatibleImage(request: unknown): Promise<ApiImage
     }
 
     const images = await saveGeneratedImagesLocally(parsed.images, request.saveDirectory);
+    await safeRecordAiUsage(request, {}, true);
 
     return {
       ok: true,
@@ -1042,6 +1147,7 @@ async function generateOpenAiCompatibleImage(request: unknown): Promise<ApiImage
       images,
     };
   } catch (error) {
+    await safeRecordAiUsage(request, {}, false);
     if (error instanceof Error && error.name === 'AbortError') {
       return { ok: false, message: controller.signal.aborted && requestId && !imageGenerationControllers.has(requestId) ? '生图请求已取消。' : '生图请求超时，请稍后重试或检查服务状态。' };
     }
@@ -1179,7 +1285,7 @@ async function readImageGenerationResponse(
   return { images, errorMessage };
 }
 
-async function readTextGenerationResponse(response: Response, apiKey: string): Promise<{ text?: string; errorMessage?: string }> {
+async function readTextGenerationResponse(response: Response, apiKey: string): Promise<{ text?: string; errorMessage?: string; inputTokens?: number; outputTokens?: number }> {
   const contentType = response.headers.get('content-type') ?? '';
   if (!contentType.includes('application/json')) return { errorMessage: '文本生成接口返回了非 JSON 响应。' };
 
@@ -1191,11 +1297,15 @@ async function readTextGenerationResponse(response: Response, apiKey: string): P
   }
 
   const errorMessage = readTextProviderErrorMessage(body, apiKey);
+  const usage = (body as { usage?: unknown }).usage;
+  const usageRecord = usage && typeof usage === 'object' ? usage as Record<string, unknown> : {};
+  const promptTokens = typeof usageRecord.prompt_tokens === 'number' ? usageRecord.prompt_tokens : 0;
+  const completionTokens = typeof usageRecord.completion_tokens === 'number' ? usageRecord.completion_tokens : 0;
   const choices = (body as { choices?: unknown }).choices;
-  if (!Array.isArray(choices)) return { errorMessage };
+  if (!Array.isArray(choices)) return { errorMessage, inputTokens: promptTokens, outputTokens: completionTokens };
   const first = choices[0] as { message?: { content?: unknown }; text?: unknown } | undefined;
   const text = typeof first?.message?.content === 'string' ? first.message.content : typeof first?.text === 'string' ? first.text : '';
-  return { text: text.trim(), errorMessage };
+  return { text: text.trim(), errorMessage, inputTokens: promptTokens, outputTokens: completionTokens };
 }
 
 async function saveGeneratedImagesLocally(images: ApiGeneratedImage[], saveDirectory?: string): Promise<ApiGeneratedImage[]> {

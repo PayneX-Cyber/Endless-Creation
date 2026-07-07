@@ -387,6 +387,8 @@ export function NovelCreation() {
       requestId,
       channelId: readyModel.channel.id,
       channelLabel: readyModel.channel.name,
+      projectId: currentNovel?.id,
+      requestType: `novel.inspiration.${kind}`,
       baseUrl: readyModel.baseUrl,
       apiKey: readyModel.apiKey,
       model: readyModel.model,

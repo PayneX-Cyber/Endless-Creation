@@ -1,5 +1,7 @@
 import type {
   ApiConnectionTestResult,
+  AiUsageListResult,
+  AiUsageRecord,
   ApiImageGenerationCancelResult,
   ApiImageGenerationRequest,
   ApiImageGenerationResult,
@@ -13,6 +15,7 @@ import type { ThemeMode } from '../types/workspace';
 
 const THEME_STORAGE_KEY = 'ec-theme';
 const WEB_NOVELS_STORAGE_KEY = 'endless-creation.novels';
+const WEB_AI_USAGE_STORAGE_KEY = 'endless-creation.ai-usage-records';
 
 /**
  * Renderer boundary for browser/Electron-renderer capabilities.
@@ -64,6 +67,13 @@ export const rendererBridge = {
     if (electronBridge) return electronBridge.app.saveProjectAssets(projectId, collection);
     writeWebProjectAssets(projectId, collection);
     return { ok: true, message: 'web fallback' };
+  },
+
+  async loadAiUsage(projectId?: string): Promise<AiUsageListResult> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) return electronBridge.api.loadAiUsage(projectId);
+    const records = readWebAiUsage().filter((record) => !projectId || record.projectId === projectId);
+    return { ok: true, message: 'web fallback', records };
   },
 
   async deleteProjectAssetFile(projectId: string, relativePath: string): Promise<{ ok: boolean; message: string }> {
@@ -313,6 +323,34 @@ function writeWebProjectAssets(projectId: string, collection: unknown): void {
   } catch {
     // Ignore storage failures in restricted renderer contexts.
   }
+}
+
+function readWebAiUsage(): AiUsageRecord[] {
+  try {
+    const raw = globalThis.localStorage?.getItem(WEB_AI_USAGE_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) as { records?: unknown } : { records: [] };
+    return Array.isArray(parsed.records) ? parsed.records.map(normalizeAiUsageRecord).filter((record): record is AiUsageRecord => record !== null) : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeAiUsageRecord(value: unknown): AiUsageRecord | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<AiUsageRecord>;
+  if (typeof candidate.id !== 'string' || typeof candidate.projectId !== 'string') return null;
+  return {
+    id: candidate.id,
+    projectId: candidate.projectId,
+    provider: typeof candidate.provider === 'string' ? candidate.provider : '',
+    model: typeof candidate.model === 'string' ? candidate.model : '',
+    inputTokens: typeof candidate.inputTokens === 'number' && Number.isFinite(candidate.inputTokens) ? candidate.inputTokens : 0,
+    outputTokens: typeof candidate.outputTokens === 'number' && Number.isFinite(candidate.outputTokens) ? candidate.outputTokens : 0,
+    estimatedCost: typeof candidate.estimatedCost === 'number' && Number.isFinite(candidate.estimatedCost) ? candidate.estimatedCost : 0,
+    requestType: typeof candidate.requestType === 'string' ? candidate.requestType : 'unknown',
+    success: typeof candidate.success === 'boolean' ? candidate.success : false,
+    createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : '',
+  };
 }
 
 function readWebNovels(): Novel[] {

@@ -21,6 +21,8 @@ export interface ApiImageGenerationRequest {
   requestId: string;
   channelId?: string;
   channelLabel?: string;
+  projectId?: string;
+  requestType?: string;
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -59,6 +61,8 @@ export interface ApiTextGenerationRequest {
   requestId: string;
   channelId?: string;
   channelLabel?: string;
+  projectId?: string;
+  requestType?: string;
   baseUrl: string;
   apiKey: string;
   model: string;
@@ -77,4 +81,23 @@ export interface ApiTextGenerationResult {
 export interface ApiTextGenerationCancelResult {
   ok: boolean;
   message: string;
+}
+
+export interface AiUsageRecord {
+  id: string;
+  projectId: string;
+  provider: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  estimatedCost: number;
+  requestType: string;
+  success: boolean;
+  createdAt: string;
+}
+
+export interface AiUsageListResult {
+  ok: boolean;
+  message: string;
+  records: AiUsageRecord[];
 }

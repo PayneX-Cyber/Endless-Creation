@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react';
+import { rendererBridge } from '../../services/rendererBridge';
+import type { AiUsageRecord } from '../../types/apiProvider';
 import type { Novel } from '../../types/novel';
 import { countWords } from './novelShared';
 
@@ -13,6 +16,7 @@ function formatNumber(value: number): string {
 }
 
 export function NovelStats({ novel }: { novel: Novel }) {
+  const [usageRecords, setUsageRecords] = useState<AiUsageRecord[]>([]);
   const ordered = [...novel.chapters].sort((a, b) => a.order - b.order);
   const totalChapters = ordered.length;
   const doneChapters = ordered
@@ -28,6 +32,20 @@ export function NovelStats({ novel }: { novel: Novel }) {
     if (longest && entry.words > longest.words) longest = entry;
     if (shortest && entry.words < shortest.words) shortest = entry;
   }
+  const successfulCalls = usageRecords.filter((record) => record.success);
+  const inputTokens = usageRecords.reduce((sum, record) => sum + record.inputTokens, 0);
+  const outputTokens = usageRecords.reduce((sum, record) => sum + record.outputTokens, 0);
+  const estimatedCost = usageRecords.reduce((sum, record) => sum + record.estimatedCost, 0);
+
+  useEffect(() => {
+    let cancelled = false;
+    void rendererBridge.loadAiUsage(novel.id).then((result) => {
+      if (!cancelled && result.ok) setUsageRecords(result.records);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [novel.id]);
 
   return (
     <section className="novel-stats" aria-label="创作概览">
@@ -46,6 +64,17 @@ export function NovelStats({ novel }: { novel: Novel }) {
       ) : (
         <p className="novel-stats__hint">完成首章后展示平均字数、最长章节和最短章节。</p>
       )}
+      <div className="novel-stats__usage" aria-label="AI 成本">
+        <div className="novel-stats__usage-head">
+          <h4>AI 成本</h4>
+          <span>{usageRecords.length} 次调用</span>
+        </div>
+        <div className="novel-stats__grid">
+          <div className="novel-stats__cell"><strong>{successfulCalls.length}</strong><span>成功调用</span></div>
+          <div className="novel-stats__cell"><strong>{formatNumber(inputTokens)} / {formatNumber(outputTokens)}</strong><span>输入 / 输出 tokens</span></div>
+          <div className="novel-stats__cell"><strong>¥{estimatedCost.toFixed(4)}</strong><span>估算成本</span></div>
+        </div>
+      </div>
     </section>
   );
 }
