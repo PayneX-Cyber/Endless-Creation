@@ -343,10 +343,11 @@
   display: grid;
   align-items: center;
   align-self: end;
+  gap: 10px;
   box-sizing: border-box;
   width: 100%;
   margin-top: auto;
-  height: 88px;
+  min-height: 88px;
   padding: 12px;
   border-top: 1px solid var(--sidebar-divider);
   color: var(--sidebar-text-muted);
@@ -725,7 +726,7 @@
   align-content: center;
   justify-items: center;
   align-self: end;
-  height: 152px;
+  height: 208px;
   padding: 12px 0;
 }
 
@@ -744,7 +745,32 @@
 }
 
 .canvasflow-sidebar--collapsed .canvasflow-nav {
-  padding-bottom: 170px;
+  padding-bottom: 226px;
+}
+
+.canvasflow-sidebar--collapsed .canvasflow-project-switch {
+  width: 40px;
+  padding: 0 0 8px;
+}
+
+.canvasflow-sidebar--collapsed .canvasflow-project-switch__caption,
+.canvasflow-sidebar--collapsed .canvasflow-project-switch__name {
+  display: none;
+}
+
+.canvasflow-sidebar--collapsed .canvasflow-project-switch__button {
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 13px;
+}
+
+.canvasflow-sidebar--collapsed .canvasflow-project-menu {
+  left: calc(100% + 12px);
+  right: auto;
+  bottom: 168px;
+  width: 232px;
 }
 
 .canvasflow-sidebar--collapsed .canvasflow-user-menu {
@@ -1191,7 +1217,8 @@
   transition: opacity 0.15s ease;
 }
 
-.project-card:hover .project-card__body {
+.project-card:hover .project-card__body,
+.project-card:focus-within .project-card__body {
   opacity: 0.12;
 }
 
@@ -1253,7 +1280,8 @@
   transition: opacity 0.15s ease;
 }
 
-.project-card:hover .project-card__hover {
+.project-card:hover .project-card__hover,
+.project-card:focus-within .project-card__hover {
   opacity: 1;
   pointer-events: auto;
 }
