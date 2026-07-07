@@ -15,7 +15,7 @@ const bridge: EndlessCreationBridge = {
     deleteProjectAssetFile: (projectId, relativePath) => ipcRenderer.invoke('app:delete-project-asset-file', projectId, relativePath),
     importProjectImageAsset: (projectId, input) => ipcRenderer.invoke('app:import-project-image-asset', projectId, input),
     readProjectAssetImageDataUrl: (projectId, relativePath) => ipcRenderer.invoke('app:read-project-asset-image-data-url', projectId, relativePath),
-    saveTextFile: (defaultName, content) => ipcRenderer.invoke('app:save-text-file', defaultName, content),
+    saveTextFile: (defaultName, content, format) => ipcRenderer.invoke('app:save-text-file', defaultName, content, format),
   },
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),

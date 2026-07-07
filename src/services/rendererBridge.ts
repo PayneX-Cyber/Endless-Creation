@@ -168,17 +168,19 @@ export const rendererBridge = {
     }
   },
 
-  async saveTextFile(defaultName: string, content: string): Promise<{ ok: boolean; message: string }> {
+  async saveTextFile(defaultName: string, content: string, format: 'md' | 'doc' = 'md'): Promise<{ ok: boolean; message: string }> {
     const electronBridge = getElectronBridge();
     if (electronBridge) {
-      const result = await electronBridge.app.saveTextFile(defaultName, content);
+      const result = await electronBridge.app.saveTextFile(defaultName, content, format);
       return { ok: result.ok, message: result.message };
     }
     // Web fallback: Blob 下载
     const document = globalThis.document;
     if (!document?.body) throw new Error('File export bridge is unavailable.');
-    const safeName = defaultName.replace(/[/\\:*?"<>|]/g, '_').trim() || '未命名小说.md';
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    const fallbackName = format === 'doc' ? '未命名小说.doc' : '未命名小说.md';
+    const safeName = defaultName.replace(/[/\\:*?"<>|]/g, '_').trim() || fallbackName;
+    const mimeType = format === 'doc' ? 'application/msword;charset=utf-8' : 'text/markdown;charset=utf-8';
+    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;

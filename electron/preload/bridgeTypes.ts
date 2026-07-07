@@ -159,7 +159,7 @@ export interface EndlessCreationBridge {
     deleteProjectAssetFile(projectId: string, relativePath: string): Promise<{ ok: boolean; message: string }>;
     importProjectImageAsset(projectId: string, input: { fileName: string; mimeType: string; dataUrl: string }): Promise<{ ok: boolean; message: string; assetData?: { fileName: string; relativePath: string; mimeType: string; bytes: number } }>;
     readProjectAssetImageDataUrl(projectId: string, relativePath: string): Promise<{ ok: boolean; message: string; dataUrl?: string }>;
-    saveTextFile(defaultName: string, content: string): Promise<{ ok: boolean; message: string; path?: string }>;
+    saveTextFile(defaultName: string, content: string, format?: 'md' | 'doc'): Promise<{ ok: boolean; message: string; path?: string }>;
   };
   window: {
     minimize(): Promise<void>;

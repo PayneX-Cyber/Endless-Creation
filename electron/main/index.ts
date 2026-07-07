@@ -716,6 +716,13 @@ function sanitizeExportFileName(name: string): string {
   return cleaned || '未命名小说';
 }
 
+function normalizeSaveFileFormat(format: unknown): { extension: string; filterName: string; dialogTitle: string } {
+  if (format === 'doc') {
+    return { extension: 'doc', filterName: 'Word 文档', dialogTitle: '导出 Word 分镜本' };
+  }
+  return { extension: 'md', filterName: 'Markdown', dialogTitle: '导出为 Markdown 文件' };
+}
+
 function registerIpcHandlers(): void {
   ipcMain.handle('app:get-version', () => app.getVersion());
   ipcMain.handle('app:get-platform', () => process.platform);
@@ -759,13 +766,14 @@ function registerIpcHandlers(): void {
     return { ok: true, message: '已更新保存位置。', path: result.filePaths[0] };
   });
 
-  ipcMain.handle('app:save-text-file', async (_event, defaultName: unknown, content: unknown): Promise<{ ok: boolean; message: string; path?: string }> => {
+  ipcMain.handle('app:save-text-file', async (_event, defaultName: unknown, content: unknown, format: unknown): Promise<{ ok: boolean; message: string; path?: string }> => {
     if (typeof content !== 'string') throw new Error('saveTextFile expects string content.');
-    const safeName = sanitizeExportFileName(typeof defaultName === 'string' ? defaultName : '未命名小说.md');
+    const fmt = normalizeSaveFileFormat(format);
+    const safeName = sanitizeExportFileName(typeof defaultName === 'string' ? defaultName : `未命名小说.${fmt.extension}`);
     const options: SaveDialogOptions = {
-      title: '导出为 Markdown 文件',
+      title: fmt.dialogTitle,
       defaultPath: safeName,
-      filters: [{ name: 'Markdown', extensions: ['md'] }],
+      filters: [{ name: fmt.filterName, extensions: [fmt.extension] }],
     };
     const result = mainWindow ? await dialog.showSaveDialog(mainWindow, options) : await dialog.showSaveDialog(options);
     if (result.canceled || !result.filePath) return { ok: false, message: '已取消导出。' };

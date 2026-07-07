@@ -733,6 +733,22 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     }
   }
 
+  async function exportStoryboardDocFile() {
+    const html = buildStoryboardDocHtml(novel);
+    if (!html) {
+      window.alert('暂无可导出的内容');
+      return;
+    }
+    const defaultName = `${novel.title.trim() || '未命名小说'}.doc`;
+    try {
+      const result = await rendererBridge.saveTextFile(defaultName, html, 'doc');
+      if (result.ok) window.alert('Word 分镜本已导出');
+      // 取消（ok:false）静默，不 alert
+    } catch {
+      window.alert('导出失败，请重试');
+    }
+  }
+
   function renderMain() {
     if (!chapters.length) {
       return (
@@ -897,6 +913,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
         </div>
         <button className="novel-flow__ghost" onClick={() => void copyWholeBookMarkdown()} type="button">复制全书 Markdown</button>
         <button className="novel-flow__ghost" onClick={() => void exportWholeBookMarkdownFile()} type="button">导出 .md 文件</button>
+        <button className="novel-flow__ghost" onClick={() => void exportStoryboardDocFile()} type="button">导出 Word 分镜本</button>
         <button className="novel-flow__ghost" onClick={() => setForeshadowOpen(true)} type="button">伏笔记录</button>
         <button className="novel-flow__ghost" disabled={busy} onClick={onOpenProjectView} type="button">项目详情</button>
       </header>
@@ -1129,6 +1146,58 @@ function statusLabel(status: ChapterStatus): string {
 function brief(text: string, max: number): string {
   const normalized = text.replace(/\s+/g, ' ').trim();
   return normalized.length > max ? `${Array.from(normalized).slice(0, max).join('')}…` : normalized;
+}
+
+function escapeDocHtml(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function docParagraphs(text: string): string {
+  return text
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => `<p>${escapeDocHtml(line)}</p>`)
+    .join('');
+}
+
+function buildStoryboardDocHtml(novel: Novel): string | null {
+  const title = novel.title.trim() || '未命名小说';
+  const chapters = novel.chapters.slice().sort((a, b) => a.order - b.order);
+  const chapterTitleById = new Map(chapters.map((chapter) => [chapter.id, chapter.title.trim() || '未命名章节']));
+  const filledChapters = chapters.filter((chapter) => chapter.content.trim() || chapter.outline?.trim());
+  const hasOverview = Boolean(novel.summary.trim() || novel.idea?.trim() || novel.blueprint?.trim());
+  if (!filledChapters.length && !hasOverview && !novel.foreshadowings.length) return null;
+
+  const sections: string[] = [`<h1>${escapeDocHtml(title)}</h1>`];
+
+  const overview: string[] = [];
+  if (novel.summary.trim()) overview.push(`<h3>概要</h3>${docParagraphs(novel.summary)}`);
+  if (novel.idea?.trim()) overview.push(`<h3>创意</h3>${docParagraphs(novel.idea)}`);
+  if (novel.blueprint?.trim()) overview.push(`<h3>蓝图</h3>${docParagraphs(novel.blueprint)}`);
+  if (overview.length) sections.push(overview.join(''));
+
+  for (const chapter of filledChapters) {
+    sections.push(`<h2>第 ${chapter.order + 1} 章 · ${escapeDocHtml(chapter.title.trim() || '未命名章节')}</h2>`);
+    if (chapter.outline?.trim()) sections.push(`<h4>大纲</h4>${docParagraphs(chapter.outline)}`);
+    if (chapter.content.trim()) sections.push(docParagraphs(chapter.content));
+  }
+
+  if (novel.foreshadowings.length) {
+    const rows = novel.foreshadowings
+      .map((item) => {
+        const statusText = item.status === 'paidOff' ? '已回收' : '埋设中';
+        const planted = item.plantedChapterId ? (chapterTitleById.get(item.plantedChapterId) ?? '（未知章节）') : '（未指定）';
+        const payoff = item.payoffChapterId ? (chapterTitleById.get(item.payoffChapterId) ?? '（未知章节）') : '—';
+        return `<tr><td>${escapeDocHtml(item.title)}</td><td>${statusText}</td><td>${escapeDocHtml(planted)}</td><td>${escapeDocHtml(payoff)}</td><td>${escapeDocHtml(item.note?.trim() || '')}</td></tr>`;
+      })
+      .join('');
+    sections.push(
+      `<h2>伏笔清单</h2><table border="1" cellspacing="0" cellpadding="6"><thead><tr><th>简述</th><th>状态</th><th>埋设章节</th><th>回收章节</th><th>备注</th></tr></thead><tbody>${rows}</tbody></table>`,
+    );
+  }
+
+  return `<!DOCTYPE html><html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>${escapeDocHtml(title)}</title></head><body>${sections.join('')}</body></html>`;
 }
 
 function buildWholeBookMarkdown(novel: Novel): string | null {
