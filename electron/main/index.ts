@@ -781,6 +781,23 @@ function registerIpcHandlers(): void {
     return { ok: true, message: '已导出。', path: result.filePath };
   });
 
+  ipcMain.handle('app:save-binary-file', async (_event, defaultName: unknown, data: unknown, kind: unknown): Promise<{ ok: boolean; message: string; path?: string }> => {
+    if (!(data instanceof Uint8Array)) throw new Error('saveBinaryFile expects Uint8Array data.');
+    const fmt = kind === 'zip'
+      ? { extension: 'zip', filterName: 'ZIP 离线包', dialogTitle: '导出离线包' }
+      : { extension: 'bin', filterName: '二进制文件', dialogTitle: '导出文件' };
+    const safeName = sanitizeExportFileName(typeof defaultName === 'string' ? defaultName : `未命名小说.${fmt.extension}`);
+    const options: SaveDialogOptions = {
+      title: fmt.dialogTitle,
+      defaultPath: safeName,
+      filters: [{ name: fmt.filterName, extensions: [fmt.extension] }],
+    };
+    const result = mainWindow ? await dialog.showSaveDialog(mainWindow, options) : await dialog.showSaveDialog(options);
+    if (result.canceled || !result.filePath) return { ok: false, message: '已取消导出。' };
+    await fs.writeFile(result.filePath, Buffer.from(data));
+    return { ok: true, message: '已导出。', path: result.filePath };
+  });
+
   ipcMain.handle('window:minimize', (event) => {
     BrowserWindow.fromWebContents(event.sender)?.minimize();
   });

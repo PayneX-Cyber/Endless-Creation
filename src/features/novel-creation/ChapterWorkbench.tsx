@@ -5,6 +5,7 @@ import type { Chapter, ChapterVersion, Foreshadowing, Novel } from '../../types/
 import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, buildChapterConsistencyPrompt, buildChapterRhythmPrompt, buildForeshadowingCandidatesPrompt, parseForeshadowingCandidates, buildForeshadowingPayoffCandidatesPrompt, parseForeshadowingPayoffCandidates, type OptimizeType, type TextMessage } from './novelPrompts';
 import { countWords, createId, formatTime, saveStatusLabel, type SaveStatus } from './novelShared';
 import { ForeshadowingPanel, type ForeshadowingDraft, type ForeshadowingAiCandidate, type ForeshadowingPayoffAiCandidate } from './ForeshadowingPanel';
+import { assertStoreZipSelfCheck, createStoreZip, textToBytes, type StoreZipEntry } from '../../services/storeZip';
 import './ChapterWorkbench.css';
 
 export type ReadyTextModel = { channelId: string; channelLabel?: string; baseUrl: string; apiKey: string; model: string };
@@ -749,6 +750,19 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
     }
   }
 
+  async function exportOfflinePackage() {
+    const defaultName = `${novel.title.trim() || '未命名小说'}.zip`;
+    try {
+      assertStoreZipSelfCheck();
+      const zip = createStoreZip(buildOfflinePackageFiles(novel));
+      const result = await rendererBridge.saveBinaryFile(defaultName, zip, 'zip');
+      if (result.ok) window.alert('离线包已导出');
+      // 取消（ok:false）静默，不 alert
+    } catch {
+      window.alert('导出失败，请重试');
+    }
+  }
+
   function renderMain() {
     if (!chapters.length) {
       return (
@@ -914,6 +928,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
         <button className="novel-flow__ghost" onClick={() => void copyWholeBookMarkdown()} type="button">复制全书 Markdown</button>
         <button className="novel-flow__ghost" onClick={() => void exportWholeBookMarkdownFile()} type="button">导出 .md 文件</button>
         <button className="novel-flow__ghost" onClick={() => void exportStoryboardDocFile()} type="button">导出 Word 分镜本</button>
+        <button className="novel-flow__ghost" onClick={() => void exportOfflinePackage()} type="button">导出离线包 ZIP</button>
         <button className="novel-flow__ghost" onClick={() => setForeshadowOpen(true)} type="button">伏笔记录</button>
         <button className="novel-flow__ghost" disabled={busy} onClick={onOpenProjectView} type="button">项目详情</button>
       </header>
@@ -1159,6 +1174,30 @@ function docParagraphs(text: string): string {
     .filter(Boolean)
     .map((line) => `<p>${escapeDocHtml(line)}</p>`)
     .join('');
+}
+
+function buildOfflinePackageFiles(novel: Novel): StoreZipEntry[] {
+  const title = novel.title.trim() || '未命名小说';
+  const indexHtml = buildStoryboardDocHtml(novel)
+    ?? `<!DOCTYPE html><html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"><title>${escapeDocHtml(title)}</title></head><body><h1>${escapeDocHtml(title)}</h1><p>暂无正文内容。</p></body></html>`;
+  const markdown = buildWholeBookMarkdown(novel) ?? `# ${title}\n\n暂无正文内容。`;
+  const readme = [
+    `${title} · 离线包`,
+    '',
+    '包含文件：',
+    '- index.html：双击可在浏览器中阅读全书',
+    '- novel.md：Markdown 全书正文',
+    '- novel.json：原始项目数据（可重新导入）',
+    '',
+    '资源说明：',
+    '当前小说未绑定图片/音频资源，离线包仅含文本内容。',
+  ].join('\n');
+  return [
+    { name: 'index.html', data: textToBytes(indexHtml) },
+    { name: 'novel.md', data: textToBytes(markdown) },
+    { name: 'novel.json', data: textToBytes(JSON.stringify(novel, null, 2)) },
+    { name: 'README.txt', data: textToBytes(readme) },
+  ];
 }
 
 function buildStoryboardDocHtml(novel: Novel): string | null {

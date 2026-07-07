@@ -192,6 +192,28 @@ export const rendererBridge = {
     return { ok: true, message: '已导出。' };
   },
 
+  async saveBinaryFile(defaultName: string, data: Uint8Array, kind: 'zip' = 'zip'): Promise<{ ok: boolean; message: string }> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) {
+      const result = await electronBridge.app.saveBinaryFile(defaultName, data, kind);
+      return { ok: result.ok, message: result.message };
+    }
+    // Web fallback: Blob 下载
+    const document = globalThis.document;
+    if (!document?.body) throw new Error('File export bridge is unavailable.');
+    const safeName = defaultName.replace(/[/\\:*?"<>|]/g, '_').trim() || '未命名小说.zip';
+    const blob = new Blob([new Uint8Array(data)], { type: 'application/zip' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = safeName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+    return { ok: true, message: '已导出。' };
+  },
+
   async testApiConnection(config: ApiProviderConfig): Promise<ApiConnectionTestResult> {
     const electronBridge = getElectronBridge();
 

@@ -160,6 +160,7 @@ export interface EndlessCreationBridge {
     importProjectImageAsset(projectId: string, input: { fileName: string; mimeType: string; dataUrl: string }): Promise<{ ok: boolean; message: string; assetData?: { fileName: string; relativePath: string; mimeType: string; bytes: number } }>;
     readProjectAssetImageDataUrl(projectId: string, relativePath: string): Promise<{ ok: boolean; message: string; dataUrl?: string }>;
     saveTextFile(defaultName: string, content: string, format?: 'md' | 'doc'): Promise<{ ok: boolean; message: string; path?: string }>;
+    saveBinaryFile(defaultName: string, data: Uint8Array, kind?: 'zip'): Promise<{ ok: boolean; message: string; path?: string }>;
   };
   window: {
     minimize(): Promise<void>;
