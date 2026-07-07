@@ -6,7 +6,6 @@ import appLogoUrl from '../assets/endless-creation-logo.png';
 import { AssetManagement } from '../features/asset-management';
 import { ImageWorkbench } from '../features/image-workbench';
 import { NovelCreation } from '../features/novel-creation';
-import { ProjectManagement } from '../features/project-management';
 import { CanvasWorkbench } from '../features/canvas-workbench';
 import { SettingsPage } from '../features/settings';
 import {
@@ -28,12 +27,20 @@ import {
   UserIcon,
   VideoIcon,
 } from './icons';
+import {
+  mockProjects,
+  getProjectById,
+  promoteRecentProject,
+  DEFAULT_ACTIVE_PROJECT_ID,
+  INITIAL_RECENT_PROJECT_IDS,
+} from './projectShellData';
+import { ProjectCenterModal } from './ProjectCenterModal';
 import './App.css';
 
 type SidebarIcon = ComponentType<SVGProps<SVGSVGElement>>;
 type ActiveNavId =
   | 'home'
-  | 'projects'
+  | 'canvas'
   | 'novel'
   | 'script-workbench'
   | 'image-workbench'
@@ -45,7 +52,7 @@ type PrimaryNavId = ActiveNavId;
 
 const sidebarNavItems: Array<{ id: PrimaryNavId; Icon: SidebarIcon; label: string }> = [
   { id: 'home', Icon: HomeIcon, label: '首页' },
-  { id: 'projects', Icon: ProjectIcon, label: '项目管理' },
+  { id: 'canvas', Icon: ProjectIcon, label: '无限画布' },
   { id: 'novel', Icon: PenBookIcon, label: '小说创作' },
   { id: 'script-workbench', Icon: ScriptIcon, label: '剧本工作台' },
   { id: 'image-workbench', Icon: ImageWorkbenchIcon, label: '生图工作台' },
@@ -64,7 +71,12 @@ export function App() {
   const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
   const [isUserMenuOpen, setUserMenuOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(DEFAULT_ACTIVE_PROJECT_ID);
+  const [recentProjectIds, setRecentProjectIds] = useState<string[]>(INITIAL_RECENT_PROJECT_IDS);
+  const [isProjectMenuOpen, setProjectMenuOpen] = useState(false);
+  const [isProjectCenterOpen, setProjectCenterOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const projectMenuRef = useRef<HTMLDivElement>(null);
   const ThemeIcon = theme === 'dark' ? SunIcon : MoonIcon;
   const isSidebarVisuallyCollapsed = isSidebarCollapsed;
 
@@ -80,6 +92,37 @@ export function App() {
     document.addEventListener('mousedown', closeOnOutsideClick);
     return () => document.removeEventListener('mousedown', closeOnOutsideClick);
   }, [isUserMenuOpen]);
+
+  useEffect(() => {
+    if (!isProjectMenuOpen) return;
+
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (!projectMenuRef.current?.contains(event.target as Node)) {
+        setProjectMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+  }, [isProjectMenuOpen]);
+
+  function switchProject(projectId: string) {
+    setActiveProjectId(projectId);
+    setRecentProjectIds((ids) => promoteRecentProject(ids, projectId));
+  }
+
+  function enterWorkbench(projectId: string, navId: ActiveNavId) {
+    switchProject(projectId);
+    setProjectCenterOpen(false);
+    setProjectMenuOpen(false);
+    if (navId === 'canvas') setActiveCanvasId(activeCanvasId ?? 'canvas-2');
+    setActiveNavId(navId);
+  }
+
+  const activeProject = getProjectById(activeProjectId);
+  const recentProjects = recentProjectIds
+    .map((id) => getProjectById(id))
+    .filter((project): project is NonNullable<typeof project> => Boolean(project));
 
   return (
     <div
@@ -127,8 +170,12 @@ export function App() {
                   aria-label={isSidebarVisuallyCollapsed ? item.label : undefined}
                   className={`canvasflow-nav__item ${isActive ? 'canvasflow-nav__item--active' : ''}`}
                   onClick={() => {
+                    if (item.id === 'canvas' && !activeProjectId) {
+                      setProjectCenterOpen(true);
+                      return;
+                    }
                     setActiveNavId(item.id);
-                    if (item.id !== 'projects') setActiveCanvasId(null);
+                    if (item.id !== 'canvas') setActiveCanvasId(null);
                   }}
                   type="button"
                 >
@@ -167,6 +214,62 @@ export function App() {
               <button className="canvasflow-user-menu__item canvasflow-user-menu__item--danger" type="button" role="menuitem"><LogoutIcon />退出登录</button>
             </div>
           )}
+
+          <div className="canvasflow-project-switch" ref={projectMenuRef}>
+            {isProjectMenuOpen && (
+              <div className="canvasflow-project-menu" role="menu" aria-label="最近项目">
+                {recentProjects.map((project) => {
+                  const isActive = project.id === activeProjectId;
+                  return (
+                    <button
+                      className={`canvasflow-project-menu__item ${isActive ? 'canvasflow-project-menu__item--active' : ''}`}
+                      key={project.id}
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        switchProject(project.id);
+                        setProjectMenuOpen(false);
+                      }}
+                    >
+                      <span className="canvasflow-project-menu__check" aria-hidden="true">{isActive ? '✓' : ''}</span>
+                      <span className="canvasflow-project-menu__name">{project.name}</span>
+                    </button>
+                  );
+                })}
+                <div className="canvasflow-project-menu__divider" />
+                <button
+                  className="canvasflow-project-menu__item"
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setProjectCenterOpen(true);
+                    setProjectMenuOpen(false);
+                  }}
+                >
+                  <span className="canvasflow-project-menu__check" aria-hidden="true" />
+                  <span className="canvasflow-project-menu__name">项目中心…</span>
+                </button>
+                <button className="canvasflow-project-menu__item" type="button" role="menuitem" onClick={() => window.alert('第一版暂未接入：新建项目')}>
+                  <span className="canvasflow-project-menu__check" aria-hidden="true" />
+                  <span className="canvasflow-project-menu__name">新建项目</span>
+                </button>
+                <button className="canvasflow-project-menu__item" type="button" role="menuitem" onClick={() => window.alert('第一版暂未接入：打开本地项目')}>
+                  <span className="canvasflow-project-menu__check" aria-hidden="true" />
+                  <span className="canvasflow-project-menu__name">打开本地项目</span>
+                </button>
+              </div>
+            )}
+            <span className="canvasflow-project-switch__caption">当前项目</span>
+            <button
+              aria-expanded={isProjectMenuOpen}
+              className="canvasflow-project-switch__button"
+              onClick={() => setProjectMenuOpen((current) => !current)}
+              type="button"
+            >
+              <span className="canvasflow-project-switch__name">{activeProject?.name ?? '未选择项目'}</span>
+              <span className="canvasflow-project-switch__chevron" aria-hidden="true"><ChevronDownIcon /></span>
+            </button>
+          </div>
 
           <div className="canvasflow-user-row">
             <button
@@ -210,10 +313,8 @@ export function App() {
         <NovelCreation />
       ) : activeNavId === 'assets' || activeNavId.startsWith('asset-') ? (
         <AssetManagement />
-      ) : activeNavId === 'projects' && activeCanvasId ? (
-        <CanvasWorkbench canvasId={activeCanvasId} onBack={() => setActiveCanvasId(null)} keyboardDisabled={isSettingsOpen} />
-      ) : activeNavId === 'projects' ? (
-        <ProjectManagement onOpenCanvas={setActiveCanvasId} />
+      ) : activeNavId === 'canvas' ? (
+        <CanvasWorkbench canvasId={activeCanvasId ?? 'canvas-2'} onBack={() => setProjectCenterOpen(true)} keyboardDisabled={isSettingsOpen} />
       ) : (
         <main className="blank-workspace" aria-label="空白工作区" />
       )}
@@ -225,6 +326,17 @@ export function App() {
           onClose={() => setSettingsOpen(false)}
         />
       )}
+
+      <ProjectCenterModal
+        open={isProjectCenterOpen}
+        projects={mockProjects}
+        activeProjectId={activeProjectId}
+        recentProjectIds={recentProjectIds}
+        onClose={() => setProjectCenterOpen(false)}
+        onSwitchProject={switchProject}
+        onEnterCanvas={(projectId) => enterWorkbench(projectId, 'canvas')}
+        onWriteNovel={(projectId) => enterWorkbench(projectId, 'novel')}
+      />
     </div>
   );
 }
