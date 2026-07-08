@@ -109,6 +109,7 @@ export function App() {
   function switchProject(projectId: string) {
     setActiveProjectId(projectId);
     setRecentProjectIds((ids) => promoteRecentProject(ids, projectId));
+    setActiveCanvasId(null);
   }
 
   function enterWorkbench(projectId: string, navId: ActiveNavId) {
@@ -137,9 +138,15 @@ export function App() {
           <span className="canvasflow-brand__mark" aria-hidden="true">
             <img src={appLogoUrl} alt="" />
           </span>
-          <span className="canvasflow-brand__name" aria-label="Endless Creation">
-            <span>Endless</span>
-            <span>Creation</span>
+          <span className="canvasflow-brand__name" aria-label={activeProject?.name ?? 'Endless Creation'}>
+            {activeProject?.name ? (
+              <span>{activeProject.name}</span>
+            ) : (
+              <>
+                <span>Endless</span>
+                <span>Creation</span>
+              </>
+            )}
           </span>
           <button
             aria-expanded={!isSidebarCollapsed}
@@ -308,13 +315,13 @@ export function App() {
       </aside>
 
       {activeNavId === 'image-workbench' ? (
-        <ImageWorkbench />
+        <ImageWorkbench projectId={activeProjectId ?? 'default'} />
       ) : activeNavId === 'novel' ? (
-        <NovelCreation />
+        <NovelCreation projectId={activeProjectId ?? 'default'} />
       ) : activeNavId === 'assets' || activeNavId.startsWith('asset-') ? (
-        <AssetManagement />
+        <AssetManagement projectId={activeProjectId ?? 'default'} />
       ) : activeNavId === 'canvas' ? (
-        <CanvasWorkbench canvasId={activeCanvasId ?? 'canvas-2'} onBack={() => setProjectCenterOpen(true)} keyboardDisabled={isSettingsOpen} />
+        <CanvasWorkbench key={activeProjectId ?? 'default'} projectId={activeProjectId ?? 'default'} projectName={activeProject?.name} canvasId={activeCanvasId ?? 'canvas-2'} onBack={() => setProjectCenterOpen(true)} keyboardDisabled={isSettingsOpen} />
       ) : (
         <main className="blank-workspace" aria-label="空白工作区" />
       )}

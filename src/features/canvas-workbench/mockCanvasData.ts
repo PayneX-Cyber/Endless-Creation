@@ -48,11 +48,12 @@ const documents: Record<string, Pick<CanvasDocument, 'title' | 'description' | '
   'new-canvas': { title: '新建画布', description: '画布项目 · 4 个节点 · 3 条连线', updatedAt: '刚刚' },
 };
 
-export function createMockCanvasDocument(canvasId: string): CanvasDocument {
+export function createMockCanvasDocument(canvasId: string, projectId: string, projectName?: string): CanvasDocument {
   const meta = documents[canvasId] || documents['canvas-2'];
+  const titlePrefix = projectName ? `${projectName} · ` : `${projectId} · `;
   return {
     id: canvasId,
-    title: meta.title,
+    title: titlePrefix + meta.title,
     description: meta.description,
     updatedAt: meta.updatedAt,
     viewport: { x: 130, y: 110, k: 1 },

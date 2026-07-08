@@ -5,8 +5,8 @@ export interface EndlessCreationBridge {
   app: {
     getVersion(): Promise<string>;
     getPlatform(): Promise<string>;
-    loadImageGenerationHistory(): Promise<{ ok: boolean; items: unknown[] }>;
-    saveImageGenerationHistory(items: unknown[]): Promise<{ ok: boolean; message: string }>;
+    loadImageGenerationHistory(projectId?: string): Promise<{ ok: boolean; items: unknown[] }>;
+    saveImageGenerationHistory(projectId: string | undefined, items: unknown[]): Promise<{ ok: boolean; message: string }>;
     readGeneratedImageDataUrl(localPath: string): Promise<{ ok: boolean; message: string; dataUrl?: string }>;
     openGeneratedImageLocation(localPath?: string): Promise<{ ok: boolean; message: string }>;
     selectGeneratedImagesDirectory(currentPath?: string): Promise<{ ok: boolean; message: string; path?: string }>;
@@ -35,8 +35,8 @@ export interface EndlessCreationBridge {
     cancelTextGeneration(requestId: string): Promise<ApiTextGenerationCancelResult>;
   };
   novel: {
-    listNovels(): Promise<NovelListResult>;
-    createNovel(input: { title: string; summary?: string; note?: string }): Promise<NovelResult>;
+    listNovels(projectId?: string): Promise<NovelListResult>;
+    createNovel(input: { title: string; summary?: string; note?: string; projectId?: string }): Promise<NovelResult>;
     loadNovel(id: string): Promise<NovelResult>;
     saveNovel(novel: Novel): Promise<NovelResult>;
     deleteNovel(id: string): Promise<{ ok: boolean; message: string }>;

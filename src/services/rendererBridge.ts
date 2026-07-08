@@ -32,12 +32,12 @@ export const rendererBridge = {
   },
 
 
-  async loadImageGenerationHistory(): Promise<{ ok: boolean; items: unknown[] }> {
-    return getElectronBridge()?.app.loadImageGenerationHistory() ?? Promise.resolve({ ok: true, items: [] });
+  async loadImageGenerationHistory(projectId?: string): Promise<{ ok: boolean; items: unknown[] }> {
+    return getElectronBridge()?.app.loadImageGenerationHistory(projectId) ?? Promise.resolve({ ok: true, items: [] });
   },
 
-  async saveImageGenerationHistory(items: unknown[]): Promise<{ ok: boolean; message: string }> {
-    return getElectronBridge()?.app.saveImageGenerationHistory(items) ?? Promise.resolve({ ok: true, message: 'web fallback' });
+  async saveImageGenerationHistory(projectId: string | undefined, items: unknown[]): Promise<{ ok: boolean; message: string }> {
+    return getElectronBridge()?.app.saveImageGenerationHistory(projectId, items) ?? Promise.resolve({ ok: true, message: 'web fallback' });
   },
 
   async readGeneratedImageDataUrl(localPath: string): Promise<{ ok: boolean; message: string; dataUrl?: string }> {
@@ -265,13 +265,16 @@ export const rendererBridge = {
     return electronBridge.api.cancelTextGeneration(requestId);
   },
 
-  async listNovels(): Promise<NovelListResult> {
+  async listNovels(projectId?: string): Promise<NovelListResult> {
     const electronBridge = getElectronBridge();
-    if (electronBridge) return electronBridge.novel.listNovels();
-    return { ok: true, novels: readWebNovels().map(toNovelSummary) };
+    if (electronBridge) return electronBridge.novel.listNovels(projectId);
+    const filterId = projectId?.trim() || null;
+    const all = readWebNovels();
+    const scoped = filterId ? all.filter((novel) => (novel.projectId ?? 'default') === filterId) : all;
+    return { ok: true, novels: scoped.map(toNovelSummary) };
   },
 
-  async createNovel(input: { title: string; summary?: string; note?: string }): Promise<NovelResult> {
+  async createNovel(input: { title: string; summary?: string; note?: string; projectId?: string }): Promise<NovelResult> {
     const electronBridge = getElectronBridge();
     if (electronBridge) return electronBridge.novel.createNovel(input);
     const now = new Date().toISOString();
@@ -280,6 +283,7 @@ export const rendererBridge = {
       title: input.title.trim() || '\u672a\u547d\u540d\u5c0f\u8bf4',
       summary: input.summary?.trim() ?? '',
       note: input.note?.trim() ?? '',
+      projectId: input.projectId?.trim() || 'default',
       chapters: [],
       foreshadowings: [],
       version: 4,

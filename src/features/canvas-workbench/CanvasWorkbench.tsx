@@ -11,6 +11,8 @@ import './CanvasWorkbench.css';
 
 interface CanvasWorkbenchProps {
   canvasId: string;
+  projectId: string;
+  projectName?: string;
   onBack: () => void;
   keyboardDisabled?: boolean;
 }
@@ -18,8 +20,8 @@ interface CanvasWorkbenchProps {
 type SaveState = 'saved' | 'dirty';
 type HistorySnapshot = Pick<CanvasDocument, 'nodes' | 'connections' | 'backgroundMode'>;
 
-export function CanvasWorkbench({ canvasId, onBack, keyboardDisabled = false }: CanvasWorkbenchProps) {
-  const initialDocument = useMemo(() => createMockCanvasDocument(canvasId), [canvasId]);
+export function CanvasWorkbench({ canvasId, projectId, projectName, onBack, keyboardDisabled = false }: CanvasWorkbenchProps) {
+  const initialDocument = useMemo(() => createMockCanvasDocument(canvasId, projectId, projectName), [canvasId, projectId, projectName]);
   const [document, setDocument] = useState<CanvasDocument>(initialDocument);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);

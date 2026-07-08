@@ -23,7 +23,7 @@ const API_PROVIDER_STORAGE_KEY = 'endless-creation.api-provider-config';
 const INSPIRATION_STAGES = ['灵感收集', '故事核心', '角色冲突', '蓝图确认'];
 const MAX_CHAT_TURNS = 8;
 
-export function NovelCreation() {
+export function NovelCreation({ projectId }: { projectId: string }) {
   const [summaries, setSummaries] = useState<NovelSummary[]>([]);
   const [currentNovel, setCurrentNovel] = useState<Novel | null>(null);
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
@@ -51,6 +51,7 @@ export function NovelCreation() {
   const inspirationRunRef = useRef(0);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const lastProjectIdRef = useRef(projectId);
 
   const chapters = useMemo(() => [...(currentNovel?.chapters ?? [])].sort((a, b) => a.order - b.order), [currentNovel]);
   const selectedTextModel = useMemo(() => resolveTextModel(modelPreferences, apiProviderStore), [apiProviderStore, modelPreferences]);
@@ -64,6 +65,26 @@ export function NovelCreation() {
   useEffect(() => {
     void loadSummaries();
   }, []);
+
+  useEffect(() => {
+    if (lastProjectIdRef.current === projectId) return;
+    lastProjectIdRef.current = projectId;
+    let active = true;
+    void (async () => {
+      const dirtyNovel = latestNovelRef.current;
+      if (dirtyNovel && latestSaveStatusRef.current !== 'saved') {
+        await novelService.saveNovel(dirtyNovel);
+        latestSaveStatusRef.current = 'saved';
+      }
+      if (!active) return;
+      setCurrentNovel(null);
+      setActiveChapterId(null);
+      setView('creationCenter');
+      setFeedback('');
+      await loadSummaries();
+    })();
+    return () => { active = false; };
+  }, [projectId]);
 
   useEffect(() => {
     function refreshModelStores() {
@@ -131,7 +152,7 @@ export function NovelCreation() {
 
   async function loadSummaries() {
     setLoading(true);
-    const result = await novelService.listNovels();
+    const result = await novelService.listNovels(projectId);
     setLoading(false);
     if (!result.ok) {
       setFeedback(result.message ?? '加载小说列表失败。');
@@ -200,7 +221,7 @@ export function NovelCreation() {
       return;
     }
     if (modalMode === 'create') {
-      const result = await novelService.createNovel(form);
+      const result = await novelService.createNovel({ ...form, projectId });
       if (!result.ok || !result.novel) {
         setFeedback(result.message);
         return;
@@ -387,7 +408,7 @@ export function NovelCreation() {
       requestId,
       channelId: readyModel.channel.id,
       channelLabel: readyModel.channel.name,
-      projectId: currentNovel?.id,
+      projectId,
       requestType: `novel.inspiration.${kind}`,
       baseUrl: readyModel.baseUrl,
       apiKey: readyModel.apiKey,
@@ -452,7 +473,7 @@ export function NovelCreation() {
       setBlueprintConfirmed(true);
       return;
     }
-    const result = await novelService.createNovel({ title: '' });
+    const result = await novelService.createNovel({ title: '', projectId });
     if (!result.ok || !result.novel) {
       setInspirationError(result.message || '创建小说失败，请稍后重试。');
       return;
@@ -728,6 +749,7 @@ export function NovelCreation() {
       {view === 'workbench' && currentNovel && (
         <ChapterWorkbench
           novel={currentNovel}
+          projectId={projectId}
           chapters={chapters}
           activeChapterId={activeChapterId}
           saveStatus={saveStatus}

@@ -29,6 +29,7 @@ const MAX_CHAPTER_VERSIONS = 5;
 
 interface ChapterWorkbenchProps {
   novel: Novel;
+  projectId: string;
   chapters: Chapter[];
   activeChapterId: string | null;
   saveStatus: SaveStatus;
@@ -68,7 +69,7 @@ function useAiCheck(config: {
       requestId,
       channelId: ctx.ready.channelId,
       channelLabel: ctx.ready.channelLabel,
-      projectId: ctx.novel.id,
+      projectId: ctx.novel.projectId ?? 'default',
       requestType: 'novel.aiCheck',
       baseUrl: ctx.ready.baseUrl,
       apiKey: ctx.ready.apiKey,
@@ -98,7 +99,7 @@ function useAiCheck(config: {
   return { busy, error, result, setError, setResult, setBusy, run, cancel };
 }
 
-export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus, onSelectChapter, onUpdateChapter, onUpdateChapterAndSave, onUpdateNovel, onRetrySave, onBackToProjects, onOpenProjectView, ensureTextModel }: ChapterWorkbenchProps) {
+export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, saveStatus, onSelectChapter, onUpdateChapter, onUpdateChapterAndSave, onUpdateNovel, onRetrySave, onBackToProjects, onOpenProjectView, ensureTextModel }: ChapterWorkbenchProps) {
   const [generatingChapterId, setGeneratingChapterId] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<{ chapterId: string; message: string } | null>(null);
   const [preview, setPreview] = useState<VersionPreviewState | null>(null);
@@ -226,7 +227,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
       requestId,
       channelId: ready.channelId,
       channelLabel: ready.channelLabel,
-      projectId: novel.id,
+      projectId,
       requestType: 'novel.optimizeSelection',
       baseUrl: ready.baseUrl,
       apiKey: ready.apiKey,
@@ -301,7 +302,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
       requestId,
       channelId: ready.channelId,
       channelLabel: ready.channelLabel,
-      projectId: novel.id,
+      projectId,
       requestType: 'novel.generateChapter',
       baseUrl: ready.baseUrl,
       apiKey: ready.apiKey,
@@ -404,7 +405,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
       requestId,
       channelId: ready.channelId,
       channelLabel: ready.channelLabel,
-      projectId: novel.id,
+      projectId,
       requestType: 'novel.generateOutlines',
       baseUrl: ready.baseUrl,
       apiKey: ready.apiKey,
@@ -506,7 +507,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
       requestId,
       channelId: ready.channelId,
       channelLabel: ready.channelLabel,
-      projectId: novel.id,
+      projectId,
       requestType: 'novel.foreshadowingCandidates',
       baseUrl: ready.baseUrl,
       apiKey: ready.apiKey,
@@ -584,7 +585,7 @@ export function ChapterWorkbench({ novel, chapters, activeChapterId, saveStatus,
       requestId,
       channelId: ready.channelId,
       channelLabel: ready.channelLabel,
-      projectId: novel.id,
+      projectId,
       requestType: 'novel.foreshadowingPayoffCandidates',
       baseUrl: ready.baseUrl,
       apiKey: ready.apiKey,

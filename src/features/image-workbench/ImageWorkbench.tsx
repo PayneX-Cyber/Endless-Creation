@@ -48,7 +48,7 @@ let idSeed = 0;
 function createId(prefix: string) { idSeed += 1; return `${prefix}-${Date.now()}-${idSeed}`; }
 function getReferenceMentionLabel(index: number) { return `@\u56fe${Math.max(index, 0) + 1}`; }
 
-export function ImageWorkbench() {
+export function ImageWorkbench({ projectId }: { projectId: string }) {
   const [modelPreferences, setModelPreferences] = useState<ModelPreferences>(() => readLocalStorage(MODEL_PREFERENCES_STORAGE_KEY, {}));
   const [apiProviderStore, setApiProviderStore] = useState<ApiProviderStore>(() => readLocalStorage(API_PROVIDER_STORAGE_KEY, {}));
   const [promptText, setPromptText] = useState('');
@@ -88,11 +88,11 @@ export function ImageWorkbench() {
 
   useEffect(() => {
     let active = true;
-    void rendererBridge.loadImageGenerationHistory().then((result) => {
+    void rendererBridge.loadImageGenerationHistory(projectId).then((result) => {
       if (active && result.ok) setHistory(sanitizeHistoryItems(result.items));
     });
     return () => { active = false; };
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     if (!isHistoryOpen) return;
@@ -197,6 +197,7 @@ export function ImageWorkbench() {
         requestId: request.id,
         channelId: channel!.id,
         channelLabel: channel!.name?.trim() || '未命名渠道',
+        projectId,
         baseUrl: channel!.baseUrl!,
         apiKey: channel!.apiKey!,
         model: decodedModel!.model,
@@ -247,8 +248,8 @@ export function ImageWorkbench() {
   function handleReferenceDrop(event: DragEvent<HTMLDivElement>) { event.preventDefault(); setReferenceDragging(false); uploadReferenceImages(event.dataTransfer.files); }
   function removeReference(id: string) { setReferences((current) => { const target = current.find((item) => item.id === id); if (target?.source === 'upload' && target.previewUrl) { URL.revokeObjectURL(target.previewUrl); uploadObjectUrlsRef.current = uploadObjectUrlsRef.current.filter((url) => url !== target.previewUrl); } return current.filter((item) => item.id !== id); }); setFeedback('已移除参考图。'); }
   async function copyText(text: string, success: string) { if (!text.trim()) { setFeedback('没有可复制的内容。'); return; } try { await rendererBridge.copyText(text); setFeedback(success); } catch { setFeedback('复制失败，请手动复制。'); } }
-  function persistHistory(nextItems: GenerationHistoryItem[]) { const sanitized = sanitizeHistoryItems(nextItems); setHistory(sanitized); void rendererBridge.saveImageGenerationHistory(sanitized); }
-  function prependHistoryItem(item: GenerationHistoryItem) { setHistory((current) => { const sanitized = sanitizeHistoryItems([item, ...current]); void rendererBridge.saveImageGenerationHistory(sanitized); return sanitized; }); }
+  function persistHistory(nextItems: GenerationHistoryItem[]) { const sanitized = sanitizeHistoryItems(nextItems); setHistory(sanitized); void rendererBridge.saveImageGenerationHistory(projectId, sanitized); }
+  function prependHistoryItem(item: GenerationHistoryItem) { setHistory((current) => { const sanitized = sanitizeHistoryItems([item, ...current]); void rendererBridge.saveImageGenerationHistory(projectId, sanitized); return sanitized; }); }
   function handleQuickAction(action: string) { if (action === '清空') { setPromptText(''); setNegativePrompt(''); setStatus('idle'); setFeedback('提示词已清空。'); return; } if (action === '复制') { void copyText(promptText, '提示词已复制。'); return; } setFeedback(`${action} 暂未接入真实功能。`); }
   async function chooseSaveDirectory() { const result = await rendererBridge.selectGeneratedImagesDirectory(config.saveDirectory); if (result.ok && result.path) { updateConfig({ saveDirectory: result.path }); writeLocalStorage(IMAGE_SAVE_DIRECTORY_STORAGE_KEY, result.path); } setFeedback(result.message); }
   async function copyResultConfig(result: GenerationResult) { if (!currentRequest) { setFeedback('暂无生成参数可复制。'); return; } await copyText(JSON.stringify({ resultId: result.id, prompt: currentRequest.prompt, negativePrompt: currentRequest.negativePrompt, config: currentRequest.config, localPath: result.localPath, fileName: result.fileName, mimeType: result.mimeType }, null, 2), '参数已复制。'); }

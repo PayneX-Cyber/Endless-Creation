@@ -28,7 +28,7 @@ export interface ProjectCardData extends Project {
 // Mock catalogue. First entry is the default active project.
 export const mockProjects: ProjectCardData[] = [
   {
-    id: 'star-chronicles',
+    id: 'default',
     name: '星港纪元',
     description: '科幻长篇，星际殖民与文明冲突。',
     type: 'mixed',

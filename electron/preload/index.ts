@@ -5,8 +5,8 @@ const bridge: EndlessCreationBridge = {
   app: {
     getVersion: () => ipcRenderer.invoke('app:get-version'),
     getPlatform: () => ipcRenderer.invoke('app:get-platform'),
-    loadImageGenerationHistory: () => ipcRenderer.invoke('app:load-image-generation-history'),
-    saveImageGenerationHistory: (items) => ipcRenderer.invoke('app:save-image-generation-history', items),
+    loadImageGenerationHistory: (projectId) => ipcRenderer.invoke('app:load-image-generation-history', projectId),
+    saveImageGenerationHistory: (projectId, items) => ipcRenderer.invoke('app:save-image-generation-history', projectId, items),
     readGeneratedImageDataUrl: (localPath) => ipcRenderer.invoke('app:read-generated-image-data-url', localPath),
     openGeneratedImageLocation: (localPath) => ipcRenderer.invoke('app:open-generated-image-location', localPath),
     selectGeneratedImagesDirectory: (currentPath) => ipcRenderer.invoke('app:select-generated-images-directory', currentPath),
@@ -35,7 +35,7 @@ const bridge: EndlessCreationBridge = {
     cancelTextGeneration: (requestId) => ipcRenderer.invoke('api:cancel-text-generation', requestId),
   },
   novel: {
-    listNovels: () => ipcRenderer.invoke('novel:list-novels'),
+    listNovels: (projectId) => ipcRenderer.invoke('novel:list-novels', projectId),
     createNovel: (input) => ipcRenderer.invoke('novel:create-novel', input),
     loadNovel: (id) => ipcRenderer.invoke('novel:load-novel', id),
     saveNovel: (novel) => ipcRenderer.invoke('novel:save-novel', novel),

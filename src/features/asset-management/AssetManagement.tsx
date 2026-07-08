@@ -3,13 +3,12 @@ import { projectAssetService } from '../../services/projectAssetService';
 import type { ImageAsset, ProjectAsset, ProjectAssetBase, TextAsset } from '../../types/projectAssets';
 import './AssetManagement.css';
 
-const PROJECT_ID = 'default';
 const emptyForm: AssetForm = { title: '', content: '', tags: '', note: '', source: 'manual' };
 const sourceOptions: Array<NonNullable<ProjectAssetBase['source']>> = ['manual', 'image-workbench', 'canvas', 'prompt-library'];
 
 type AssetForm = { title: string; content: string; tags: string; note: string; source: NonNullable<ProjectAssetBase['source']> };
 
-export function AssetManagement() {
+export function AssetManagement({ projectId }: { projectId: string }) {
   const [assets, setAssets] = useState<ProjectAsset[]>([]);
   const [query, setQuery] = useState('');
   const [form, setForm] = useState<AssetForm>(emptyForm);
@@ -24,12 +23,21 @@ export function AssetManagement() {
   const textAssets = useMemo(() => assets.filter((asset): asset is TextAsset => asset.kind === 'text'), [assets]);
 
   useEffect(() => {
+    setQuery('');
+    setForm(emptyForm);
+    setEditingId(null);
+    setPreviewMap({});
+    setPreviewAsset(null);
+    setFeedback('');
+  }, [projectId]);
+
+  useEffect(() => {
     let active = true;
     setLoading(true);
-    const request = query.trim() ? projectAssetService.searchAssets(PROJECT_ID, query) : projectAssetService.listAssets(PROJECT_ID);
+    const request = query.trim() ? projectAssetService.searchAssets(projectId, query) : projectAssetService.listAssets(projectId);
     void request.then((items) => { if (active) setAssets(items); }).catch((error) => { if (active) setFeedback(error instanceof Error ? error.message : '\u52a0\u8f7d\u8d44\u4ea7\u5931\u8d25\u3002'); }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [query]);
+  }, [query, projectId]);
 
   useEffect(() => {
     const targets = assets.filter((asset): asset is ImageAsset => asset.kind === 'image' && asset.status !== 'missing' && !previewMap[asset.id]);
@@ -37,9 +45,9 @@ export function AssetManagement() {
     let active = true;
     void Promise.all(targets.map(async (asset) => {
       try {
-        return [asset.id, await projectAssetService.readImageAssetDataUrl(PROJECT_ID, asset)] as const;
+        return [asset.id, await projectAssetService.readImageAssetDataUrl(projectId, asset)] as const;
       } catch {
-        await projectAssetService.updateAsset(PROJECT_ID, asset.id, { status: 'missing' });
+        await projectAssetService.updateAsset(projectId, asset.id, { status: 'missing' });
         return [asset.id, null] as const;
       }
     })).then((entries) => {
@@ -53,7 +61,7 @@ export function AssetManagement() {
   }, [assets, previewMap]);
 
   async function reload() {
-    const items = query.trim() ? await projectAssetService.searchAssets(PROJECT_ID, query) : await projectAssetService.listAssets(PROJECT_ID);
+    const items = query.trim() ? await projectAssetService.searchAssets(projectId, query) : await projectAssetService.listAssets(projectId);
     setAssets(items);
   }
 
@@ -61,10 +69,10 @@ export function AssetManagement() {
     if (!form.title.trim() && !form.content.trim()) { setFeedback('\u8bf7\u586b\u5199\u6807\u9898\u6216\u5185\u5bb9\u3002'); return; }
     if (editingAsset) {
       const patch = { title: form.title, tags: parseTags(form.tags), note: form.note, source: form.source, data: editingAsset.kind === 'text' ? { content: form.content } : undefined };
-      await projectAssetService.updateAsset(PROJECT_ID, editingAsset.id, patch);
+      await projectAssetService.updateAsset(projectId, editingAsset.id, patch);
       setFeedback(editingAsset.kind === 'image' ? '\u56fe\u7247\u8d44\u4ea7\u5df2\u66f4\u65b0\u3002' : '\u6587\u672c\u8d44\u4ea7\u5df2\u66f4\u65b0\u3002');
     } else {
-      await projectAssetService.createTextAsset(PROJECT_ID, { title: form.title, content: form.content, tags: parseTags(form.tags), note: form.note, source: form.source });
+      await projectAssetService.createTextAsset(projectId, { title: form.title, content: form.content, tags: parseTags(form.tags), note: form.note, source: form.source });
       setFeedback('\u6587\u672c\u8d44\u4ea7\u5df2\u65b0\u589e\u3002');
     }
     setForm(emptyForm);
@@ -75,7 +83,7 @@ export function AssetManagement() {
   async function importImage(file: File | undefined) {
     if (!file) return;
     try {
-      await projectAssetService.importImageAsset(PROJECT_ID, file);
+      await projectAssetService.importImageAsset(projectId, file);
       setFeedback('\u56fe\u7247\u8d44\u4ea7\u5df2\u5bfc\u5165\u3002');
       await reload();
     } catch (error) {
@@ -89,7 +97,7 @@ export function AssetManagement() {
   }
 
   async function deleteAsset(asset: ProjectAsset) {
-    await projectAssetService.deleteAsset(PROJECT_ID, asset.id);
+    await projectAssetService.deleteAsset(projectId, asset.id);
     setPreviewMap((current) => { const next = { ...current }; delete next[asset.id]; return next; });
     setFeedback('\u8d44\u4ea7\u5df2\u5220\u9664\u3002');
     if (editingId === asset.id) { setEditingId(null); setForm(emptyForm); }

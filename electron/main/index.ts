@@ -139,6 +139,7 @@ interface Novel {
   note: string;
   idea?: string;
   blueprint?: string;
+  projectId?: string;
   chapters: Chapter[];
   foreshadowings: Foreshadowing[];
   version: 4;
@@ -146,7 +147,7 @@ interface Novel {
   updatedAt: string;
 }
 
-type NovelSummary = Pick<Novel, 'id' | 'title' | 'summary' | 'createdAt' | 'updatedAt'> & {
+type NovelSummary = Pick<Novel, 'id' | 'title' | 'summary' | 'projectId' | 'createdAt' | 'updatedAt'> & {
   chapterCount: number;
   wordCount: number;
   filledChapterCount: number;
@@ -318,23 +319,60 @@ async function safeRecordAiUsage(request: { projectId?: string; channelId?: stri
   }
 }
 
-async function loadImageGenerationHistory(): Promise<{ ok: boolean; items: unknown[] }> {
+async function loadImageGenerationHistory(projectId?: string): Promise<{ ok: boolean; items: unknown[] }> {
   try {
     const raw = await fs.readFile(getImageGenerationHistoryPath(), 'utf-8');
-    const parsed = JSON.parse(raw) as { items?: unknown };
-    return { ok: true, items: Array.isArray(parsed.items) ? parsed.items.slice(0, 20) : [] };
+    const parsed = JSON.parse(raw) as { version?: number; items?: unknown; projects?: Record<string, unknown[]>; legacy?: unknown[] };
+
+    // v2: { projects: { [id]: [...] }, legacy?: [...] }
+    if (parsed.version === 2 && parsed.projects) {
+      if (!projectId) return { ok: true, items: (parsed.legacy ?? []).slice(0, 20) };
+      return { ok: true, items: (Array.isArray(parsed.projects[projectId]) ? parsed.projects[projectId] : []).slice(0, 20) };
+    }
+
+    // v1 or unversioned: when projectId='default', return legacy items; otherwise empty
+    const legacyItems = Array.isArray(parsed.items) ? parsed.items.slice(0, 20) : [];
+    if (projectId === 'default') return { ok: true, items: legacyItems };
+    return { ok: true, items: [] };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.warn('Failed to load image generation history:', error);
     return { ok: true, items: [] };
   }
 }
 
-async function saveImageGenerationHistory(items: unknown): Promise<{ ok: boolean; message: string }> {
+async function saveImageGenerationHistory(projectId: string | undefined, items: unknown): Promise<{ ok: boolean; message: string }> {
   try {
     const nextItems = Array.isArray(items) ? items.slice(0, 20) : [];
     const historyPath = getImageGenerationHistoryPath();
     await fs.mkdir(path.dirname(historyPath), { recursive: true });
-    await fs.writeFile(historyPath, JSON.stringify({ version: 1, items: nextItems }, null, 2), 'utf-8');
+
+    // Read existing
+    let existing: { version?: number; items?: unknown[]; projects?: Record<string, unknown[]>; legacy?: unknown[] } = {};
+    try {
+      const raw = await fs.readFile(historyPath, 'utf-8');
+      existing = JSON.parse(raw);
+    } catch {
+      // File doesn't exist or corrupt, start fresh
+    }
+
+    // Upgrade v1 → v2 on first save with projectId
+    if (existing.version !== 2) {
+      existing = {
+        version: 2,
+        projects: {},
+        legacy: Array.isArray(existing.items) ? existing.items.slice(0, 20) : [],
+      };
+    }
+
+    // Merge current project slice
+    if (projectId) {
+      existing.projects = existing.projects || {};
+      existing.projects[projectId] = nextItems;
+    } else {
+      existing.legacy = nextItems;
+    }
+
+    await fs.writeFile(historyPath, JSON.stringify(existing, null, 2), 'utf-8');
     return { ok: true, message: '生成历史已保存。' };
   } catch (error) {
     const message = error instanceof Error ? error.message : '未知错误';
@@ -555,6 +593,7 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
 
   return {
     id,
+    projectId: safeProjectId(candidate.projectId),
     title: typeof candidate.title === 'string' && candidate.title.trim() ? candidate.title : '\u672a\u547d\u540d\u5c0f\u8bf4',
     summary: typeof candidate.summary === 'string' ? candidate.summary : '',
     note: typeof candidate.note === 'string' ? candidate.note : '',
@@ -604,6 +643,7 @@ function sanitizeChapterVersions(value: unknown, fallbackTime: string): ChapterV
 function toNovelSummary(novel: Novel): NovelSummary {
   return {
     id: novel.id,
+    projectId: novel.projectId,
     title: novel.title,
     summary: novel.summary,
     createdAt: novel.createdAt,
@@ -614,7 +654,8 @@ function toNovelSummary(novel: Novel): NovelSummary {
   };
 }
 
-async function listNovels(): Promise<{ ok: boolean; message?: string; novels: NovelSummary[] }> {
+async function listNovels(projectId?: unknown): Promise<{ ok: boolean; message?: string; novels: NovelSummary[] }> {
+  const filterProjectId = typeof projectId === 'string' && projectId.trim() ? safeProjectId(projectId) : null;
   try {
     const entries = await fs.readdir(getNovelsDir(), { withFileTypes: true });
     const novels = await Promise.all(entries.filter((entry) => entry.isDirectory()).map(async (entry) => {
@@ -627,7 +668,9 @@ async function listNovels(): Promise<{ ok: boolean; message?: string; novels: No
         return null;
       }
     }));
-    return { ok: true, novels: novels.filter((novel): novel is NovelSummary => novel !== null).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) };
+    const all = novels.filter((novel): novel is NovelSummary => novel !== null);
+    const scoped = filterProjectId ? all.filter((novel) => (novel.projectId ?? 'default') === filterProjectId) : all;
+    return { ok: true, novels: scoped.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { ok: true, novels: [] };
     return { ok: false, message: '\u52a0\u8f7d\u5c0f\u8bf4\u5217\u8868\u5931\u8d25\u3002', novels: [] };
@@ -642,10 +685,11 @@ async function readNovelFile(id: string): Promise<Novel> {
 }
 
 async function createNovel(input: unknown): Promise<{ ok: boolean; message: string; novel?: Novel }> {
-  const candidate = input && typeof input === 'object' ? input as { title?: unknown; summary?: unknown; note?: unknown } : {};
+  const candidate = input && typeof input === 'object' ? input as { title?: unknown; summary?: unknown; note?: unknown; projectId?: unknown } : {};
   const now = new Date().toISOString();
   const novel: Novel = {
     id: `novel-${randomUUID()}`,
+    projectId: safeProjectId(candidate.projectId),
     title: typeof candidate.title === 'string' && candidate.title.trim() ? candidate.title.trim() : '\u672a\u547d\u540d\u5c0f\u8bf4',
     summary: typeof candidate.summary === 'string' ? candidate.summary : '',
     note: typeof candidate.note === 'string' ? candidate.note : '',
@@ -726,8 +770,8 @@ function normalizeSaveFileFormat(format: unknown): { extension: string; filterNa
 function registerIpcHandlers(): void {
   ipcMain.handle('app:get-version', () => app.getVersion());
   ipcMain.handle('app:get-platform', () => process.platform);
-  ipcMain.handle('app:load-image-generation-history', () => loadImageGenerationHistory());
-  ipcMain.handle('app:save-image-generation-history', (_event, items: unknown) => saveImageGenerationHistory(items));
+  ipcMain.handle('app:load-image-generation-history', (_event, projectId?: string) => loadImageGenerationHistory(projectId));
+  ipcMain.handle('app:save-image-generation-history', (_event, projectId: string | undefined, items: unknown) => saveImageGenerationHistory(projectId, items));
   ipcMain.handle('app:read-generated-image-data-url', (_event, localPath: unknown) => readGeneratedImageDataUrl(localPath));
   ipcMain.handle('app:open-generated-image-location', async (_event, localPath: unknown): Promise<{ ok: boolean; message: string }> => {
     if (typeof localPath === 'string' && localPath.trim()) {
@@ -745,7 +789,7 @@ function registerIpcHandlers(): void {
   ipcMain.handle('app:delete-project-asset-file', (_event, projectId: unknown, relativePath: unknown) => deleteProjectAssetFile(projectId, relativePath));
   ipcMain.handle('app:import-project-image-asset', (_event, projectId: unknown, input: unknown) => importProjectImageAsset(projectId, input));
   ipcMain.handle('app:read-project-asset-image-data-url', (_event, projectId: unknown, relativePath: unknown) => readProjectAssetImageDataUrl(projectId, relativePath));
-  ipcMain.handle('novel:list-novels', () => listNovels());
+  ipcMain.handle('novel:list-novels', (_event, projectId: unknown) => listNovels(projectId));
   ipcMain.handle('novel:create-novel', (_event, input: unknown) => createNovel(input));
   ipcMain.handle('novel:load-novel', (_event, id: unknown) => loadNovel(id));
   ipcMain.handle('novel:save-novel', (_event, novel: unknown) => saveNovel(novel));

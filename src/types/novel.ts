@@ -29,6 +29,7 @@ export interface Foreshadowing {
 
 export interface Novel {
   id: string;
+  projectId?: string;
   title: string;
   summary: string;
   note: string;
@@ -41,7 +42,7 @@ export interface Novel {
   updatedAt: string;
 }
 
-export type NovelSummary = Pick<Novel, 'id' | 'title' | 'summary' | 'createdAt' | 'updatedAt'> & {
+export type NovelSummary = Pick<Novel, 'id' | 'projectId' | 'title' | 'summary' | 'createdAt' | 'updatedAt'> & {
   chapterCount: number;
   wordCount: number;
   filledChapterCount: number;
