@@ -17,6 +17,7 @@ const bridge: EndlessCreationBridge = {
     readProjectAssetImageDataUrl: (projectId, relativePath) => ipcRenderer.invoke('app:read-project-asset-image-data-url', projectId, relativePath),
     saveTextFile: (defaultName, content, format) => ipcRenderer.invoke('app:save-text-file', defaultName, content, format),
     saveBinaryFile: (defaultName, data, kind) => ipcRenderer.invoke('app:save-binary-file', defaultName, data, kind),
+    openTextFile: () => ipcRenderer.invoke('app:open-text-file'),
   },
   window: {
     minimize: () => ipcRenderer.invoke('window:minimize'),

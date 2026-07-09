@@ -209,6 +209,54 @@ function cleanOutlineTitle(raw: string): string {
   return raw.replace(/[*#]+/g, '').replace(/^[\s:：、.．\-—·]+/, '').trim();
 }
 
+export interface ParsedImportedChapter {
+  title: string;
+  content: string;
+}
+
+export interface ParsedManuscript {
+  chapters: ParsedImportedChapter[];
+  splitByHeaders: boolean;
+}
+
+export function parseImportedManuscript(text: string): ParsedManuscript {
+  const lines = text.split(/\r?\n/);
+  const chapters: { title: string; bodyLines: string[] }[] = [];
+  const preambleLines: string[] = [];
+  let current: { title: string; bodyLines: string[] } | null = null;
+  for (const line of lines) {
+    const headerMatch = line.match(OUTLINE_HEADER_PATTERN);
+    if (headerMatch) {
+      if (current) chapters.push(current);
+      current = { title: cleanOutlineTitle(headerMatch[1]), bodyLines: [] };
+      continue;
+    }
+    if (!current) {
+      preambleLines.push(line);
+      continue;
+    }
+    current.bodyLines.push(line);
+  }
+  if (current) chapters.push(current);
+
+  if (!chapters.length) {
+    const body = text.replace(/^\s+|\s+$/g, '');
+    return { chapters: [{ title: '第 1 章', content: body }], splitByHeaders: false };
+  }
+
+  // 首个标题前的非空正文（序言/前言）收成开篇章节，不静默丢弃。
+  const preamble = preambleLines.join('\n').replace(/^\s+|\s+$/g, '');
+  const parsed: ParsedImportedChapter[] = [];
+  if (preamble) parsed.push({ title: '开篇', content: preamble });
+  chapters.forEach((chapter, index) => {
+    parsed.push({
+      title: chapter.title || `第 ${index + 1} 章`,
+      content: chapter.bodyLines.join('\n').replace(/^\s+|\s+$/g, ''),
+    });
+  });
+  return { chapters: parsed, splitByHeaders: true };
+}
+
 export function buildChapterReviewPrompt(novel: Novel, chapter: Chapter): TextMessage[] {
   return [
     {

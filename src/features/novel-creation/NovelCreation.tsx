@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, Novel, NovelSummary } from '../../types/novel';
-import { buildBlueprintFromConversationPrompt, buildInspirationChatPrompt, buildOutlinePrompt, INSPIRATION_OPENING_MESSAGE, parseOutlineText, type InspirationChatMessage, type TextMessage } from './novelPrompts';
+import { buildBlueprintFromConversationPrompt, buildInspirationChatPrompt, buildOutlinePrompt, INSPIRATION_OPENING_MESSAGE, parseImportedManuscript, parseOutlineText, type InspirationChatMessage, type TextMessage } from './novelPrompts';
 import { buildCharacterGraphPrompt, parseCharacterGraph, type CharacterGraph } from './characterGraph';
 import { NovelCharacterGraphPanel } from './NovelCharacterGraph';
 import { NovelErrorBanner, NovelListSkeleton } from './NovelSkeletons';
@@ -537,6 +537,52 @@ export function NovelCreation({ projectId }: { projectId: string }) {
     setModalMode('create');
   }
 
+  async function handleImportManuscript() {
+    const picked = await rendererBridge.openTextFile();
+    if (!picked.ok) {
+      if (!picked.canceled) setFeedback(picked.message || '导入失败。');
+      return;
+    }
+    const rawContent = picked.content ?? '';
+    if (!rawContent.trim()) {
+      setFeedback('文件内容为空，未导入。');
+      return;
+    }
+    const baseName = (picked.fileName ?? '').replace(/\.[^.]+$/, '').trim();
+    const title = baseName || '导入的小说';
+    const parsed = parseImportedManuscript(rawContent);
+    const createResult = await novelService.createNovel({ title, projectId });
+    if (!createResult.ok || !createResult.novel) {
+      setFeedback(createResult.message || '创建小说失败，请稍后重试。');
+      return;
+    }
+    const now = new Date().toISOString();
+    const chapters: Chapter[] = parsed.chapters.map((chapter, index) => ({
+      id: createId('chapter'),
+      title: chapter.title,
+      content: chapter.content,
+      order: index,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    const importedNovel: Novel = { ...createResult.novel, chapters, updatedAt: now };
+    const saveResult = await novelService.saveNovel(importedNovel);
+    if (!saveResult.ok) {
+      setFeedback(saveResult.message || '保存导入内容失败。');
+      return;
+    }
+    setCurrentNovel(importedNovel);
+    setActiveChapterId(null);
+    setSaveStatus('saved');
+    setProjectViewTab('overview');
+    setFeedback('');
+    setView('projectView');
+    await loadSummaries();
+    window.alert(parsed.splitByHeaders
+      ? `导入成功，共识别 ${chapters.length} 章。`
+      : '未识别到分章，已作为单章导入。');
+  }
+
   function projectProgress(summary: NovelSummary): number {
     return summary.chapterCount ? Math.round((summary.filledChapterCount / summary.chapterCount) * 100) : 0;
   }
@@ -638,6 +684,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
             </div>
             <nav>
               <button className="novel-flow__primary novel-flow__primary--compact" onClick={startNewProject} type="button">新建</button>
+              <button className="novel-flow__ghost" onClick={() => void handleImportManuscript()} type="button">导入</button>
               <button className="novel-flow__ghost" onClick={openCreationCenter} type="button">返回</button>
             </nav>
           </header>

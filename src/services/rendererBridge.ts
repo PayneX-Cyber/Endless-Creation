@@ -215,6 +215,62 @@ export const rendererBridge = {
     return { ok: true, message: '已导出。' };
   },
 
+  async openTextFile(): Promise<{ ok: boolean; canceled?: boolean; message: string; fileName?: string; content?: string }> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge?.app.openTextFile) return electronBridge.app.openTextFile();
+    // Web fallback: 隐藏 <input type="file"> + FileReader
+    const document = globalThis.document;
+    if (!document?.body) return { ok: false, message: '当前环境不支持导入文件。' };
+    return new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.txt,.md,.markdown,text/plain,text/markdown';
+      input.style.position = 'fixed';
+      input.style.inset = '0 auto auto -9999px';
+      let settled = false;
+      const cleanup = () => {
+        settled = true;
+        input.remove();
+      };
+      input.addEventListener('change', () => {
+        const file = input.files?.[0];
+        if (!file) {
+          cleanup();
+          resolve({ ok: false, canceled: true, message: '已取消导入。' });
+          return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          cleanup();
+          resolve({ ok: false, message: '文件超过 10MB，请拆分后再导入。' });
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          cleanup();
+          resolve({ ok: true, message: '已读取文件。', fileName: file.name, content: typeof reader.result === 'string' ? reader.result : '' });
+        };
+        reader.onerror = () => {
+          cleanup();
+          resolve({ ok: false, message: '读取文件失败。' });
+        };
+        reader.readAsText(file, 'utf-8');
+      });
+      // 兜底：窗口重新获得焦点但未选文件时视为取消（部分浏览器不触发 change）。
+      globalThis.setTimeout(() => {
+        window.addEventListener('focus', () => {
+          globalThis.setTimeout(() => {
+            if (!settled) {
+              cleanup();
+              resolve({ ok: false, canceled: true, message: '已取消导入。' });
+            }
+          }, 300);
+        }, { once: true });
+      }, 0);
+      document.body.appendChild(input);
+      input.click();
+    });
+  },
+
   async testApiConnection(config: ApiProviderConfig): Promise<ApiConnectionTestResult> {
     const electronBridge = getElectronBridge();
 

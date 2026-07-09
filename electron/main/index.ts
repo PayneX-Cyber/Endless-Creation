@@ -868,6 +868,25 @@ function registerIpcHandlers(): void {
     return { ok: true, message: '已更新保存位置。', path: result.filePaths[0] };
   });
 
+  ipcMain.handle('app:open-text-file', async (): Promise<{ ok: boolean; canceled?: boolean; message: string; fileName?: string; content?: string }> => {
+    const options: OpenDialogOptions = {
+      title: '导入稿件',
+      properties: ['openFile'],
+      filters: [{ name: '文本稿件', extensions: ['txt', 'md', 'markdown'] }],
+    };
+    const result = mainWindow ? await dialog.showOpenDialog(mainWindow, options) : await dialog.showOpenDialog(options);
+    if (result.canceled || !result.filePaths[0]) return { ok: false, canceled: true, message: '已取消导入。' };
+    const filePath = result.filePaths[0];
+    try {
+      const stat = await fs.stat(filePath);
+      if (stat.size > 10 * 1024 * 1024) return { ok: false, message: '文件超过 10MB，请拆分后再导入。' };
+      const content = await fs.readFile(filePath, 'utf-8');
+      return { ok: true, message: '已读取文件。', fileName: path.basename(filePath), content };
+    } catch {
+      return { ok: false, message: '读取文件失败。' };
+    }
+  });
+
   ipcMain.handle('app:save-text-file', async (_event, defaultName: unknown, content: unknown, format: unknown): Promise<{ ok: boolean; message: string; path?: string }> => {
     if (typeof content !== 'string') throw new Error('saveTextFile expects string content.');
     const fmt = normalizeSaveFileFormat(format);
