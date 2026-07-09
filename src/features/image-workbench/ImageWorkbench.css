@@ -143,5 +143,175 @@
 .image-reference-preview-modal strong { @apply truncate text-center text-sm font-black text-slate-800; }
 .image-workbench__statusbar { @apply hidden; }
 
+.app-shell[data-theme='dark'] .image-workbench {
+  color: #edf2fa;
+  background: linear-gradient(180deg, #111822 0%, #0f131a 100%);
+}
+
+.app-shell[data-theme='dark'] .image-workbench h1,
+.app-shell[data-theme='dark'] .image-workbench__card-head h2,
+.app-shell[data-theme='dark'] .image-studio__field strong,
+.app-shell[data-theme='dark'] .image-studio__stepper strong,
+.app-shell[data-theme='dark'] .image-studio__queue-inline strong,
+.app-shell[data-theme='dark'] .image-results__empty strong,
+.app-shell[data-theme='dark'] .image-results__loading strong,
+.app-shell[data-theme='dark'] .image-workbench__result-meta,
+.app-shell[data-theme='dark'] .image-workbench__status-card strong,
+.app-shell[data-theme='dark'] .image-history-modal__head h3,
+.app-shell[data-theme='dark'] .image-history__empty strong,
+.app-shell[data-theme='dark'] .image-history__text strong,
+.app-shell[data-theme='dark'] .image-reference-preview-modal strong {
+  color: #f5f7fb;
+}
+
+.app-shell[data-theme='dark'] .image-workbench__card,
+.app-shell[data-theme='dark'] .image-history-modal__panel,
+.app-shell[data-theme='dark'] .image-preview-modal > div,
+.app-shell[data-theme='dark'] .image-reference-preview-modal > div {
+  border-color: rgba(238, 243, 251, 0.12);
+  color: #edf2fa;
+  background: #171d27;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+}
+
+.app-shell[data-theme='dark'] .image-workbench__card--results {
+  border-color: rgba(91, 140, 255, 0.22);
+}
+
+.app-shell[data-theme='dark'] .image-studio__field,
+.app-shell[data-theme='dark'] .image-studio__prompt-area,
+.app-shell[data-theme='dark'] .image-studio__save-option,
+.app-shell[data-theme='dark'] .image-studio__queue-inline,
+.app-shell[data-theme='dark'] .image-studio__model-dropdown,
+.app-shell[data-theme='dark'] .image-studio__mention-menu,
+.app-shell[data-theme='dark'] .image-results__empty,
+.app-shell[data-theme='dark'] .image-results__loading,
+.app-shell[data-theme='dark'] .image-workbench__result-card,
+.app-shell[data-theme='dark'] .image-workbench__mock-image,
+.app-shell[data-theme='dark'] .image-workbench__status-card,
+.app-shell[data-theme='dark'] .image-history__empty,
+.app-shell[data-theme='dark'] .image-history__item {
+  border-color: rgba(238, 243, 251, 0.12);
+  color: #edf2fa;
+  background: rgba(17, 24, 34, 0.92);
+}
+
+.app-shell[data-theme='dark'] .image-studio__size-panel {
+  border-color: rgba(238, 243, 251, 0.16);
+  background: #111822;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.48);
+}
+
+.app-shell[data-theme='dark'] .image-studio__size-panel-head strong,
+.app-shell[data-theme='dark'] .image-studio__size-section-title {
+  color: #f5f7fb;
+}
+
+.app-shell[data-theme='dark'] .image-studio__field:hover,
+.app-shell[data-theme='dark'] .image-studio__field:focus-within,
+.app-shell[data-theme='dark'] .image-workbench__result-card:hover {
+  box-shadow: 0 0 0 2px rgba(91, 140, 255, 0.18);
+}
+
+.app-shell[data-theme='dark'] .image-workbench__card-head span,
+.app-shell[data-theme='dark'] .image-studio__field svg,
+.app-shell[data-theme='dark'] .image-studio__size-trigger svg,
+.app-shell[data-theme='dark'] .image-studio__save-option strong,
+.app-shell[data-theme='dark'] .image-studio__queue-inline > span,
+.app-shell[data-theme='dark'] .image-studio__prompt-area textarea::placeholder,
+.app-shell[data-theme='dark'] .image-studio__prompt-editor:empty::before,
+.app-shell[data-theme='dark'] .image-studio__count,
+.app-shell[data-theme='dark'] .image-studio__empty-inline,
+.app-shell[data-theme='dark'] .image-studio__reference button,
+.app-shell[data-theme='dark'] .image-results__empty p,
+.app-shell[data-theme='dark'] .image-results__loading p,
+.app-shell[data-theme='dark'] .image-workbench__result-meta span:last-child,
+.app-shell[data-theme='dark'] .image-results__actions button,
+.app-shell[data-theme='dark'] .image-workbench__status-card span,
+.app-shell[data-theme='dark'] .image-history-modal__head p,
+.app-shell[data-theme='dark'] .image-history__text span {
+  color: #9aa8bb;
+}
+
+.app-shell[data-theme='dark'] .image-studio__prompt-area textarea,
+.app-shell[data-theme='dark'] .image-studio__prompt-editor {
+  color: #edf2fa;
+}
+
+.app-shell[data-theme='dark'] .image-studio__quality-group,
+.app-shell[data-theme='dark'] .image-studio__prompt-footer,
+.app-shell[data-theme='dark'] .image-studio__upload-zone {
+  border-color: rgba(238, 243, 251, 0.12);
+  background: rgba(238, 243, 251, 0.06);
+}
+
+.app-shell[data-theme='dark'] .image-studio__quality,
+.app-shell[data-theme='dark'] .image-studio__model-option,
+.app-shell[data-theme='dark'] .image-studio__mention-option,
+.app-shell[data-theme='dark'] .image-studio__size-preset {
+  background: #252c38;
+  color: #9aa8bb;
+}
+
+.app-shell[data-theme='dark'] .image-studio__quality:hover,
+.app-shell[data-theme='dark'] .image-studio__model-option:hover,
+.app-shell[data-theme='dark'] .image-studio__mention-option:hover,
+.app-shell[data-theme='dark'] .image-studio__mention-option--active,
+.app-shell[data-theme='dark'] .image-studio__size-preset:hover,
+.app-shell[data-theme='dark'] .image-history__item:hover {
+  background: rgba(91, 140, 255, 0.16);
+  color: #8fb2ff;
+}
+
+.app-shell[data-theme='dark'] .image-studio__quality--active,
+.app-shell[data-theme='dark'] .image-studio__model-option--active,
+.app-shell[data-theme='dark'] .image-studio__size-preset--active {
+  background: rgba(91, 140, 255, 0.2);
+  color: #8fb2ff;
+}
+
+.app-shell[data-theme='dark'] .image-studio__stepper button,
+.app-shell[data-theme='dark'] .image-studio__upload-button,
+.app-shell[data-theme='dark'] .image-studio__reference,
+.app-shell[data-theme='dark'] .image-history-modal__head button,
+.app-shell[data-theme='dark'] .image-history__actions button:last-child,
+.app-shell[data-theme='dark'] .image-preview-modal button,
+.app-shell[data-theme='dark'] .image-reference-preview-modal button {
+  background: rgba(238, 243, 251, 0.08);
+  color: #8fb2ff;
+}
+
+.app-shell[data-theme='dark'] .image-results__empty::before {
+  background: rgba(238, 243, 251, 0.08);
+  color: #8fb2ff;
+}
+
+.app-shell[data-theme='dark'] .image-studio__size-ratio {
+  border-color: #9aa8bb;
+  background: rgba(238, 243, 251, 0.08);
+}
+
+.app-shell[data-theme='dark'] .image-studio__hint,
+.app-shell[data-theme='dark'] .image-studio__loading,
+.app-shell[data-theme='dark'] .image-workbench__history-trigger,
+.app-shell[data-theme='dark'] .image-history__actions button:first-child {
+  background: rgba(91, 140, 255, 0.14);
+  color: #8fb2ff;
+}
+
+.app-shell[data-theme='dark'] .image-studio__hint--error {
+  background: rgba(255, 138, 122, 0.14);
+  color: #ff8a7a;
+}
+
+.app-shell[data-theme='dark'] .image-workbench__generate {
+  background: #4b83ff;
+  box-shadow: 0 18px 34px rgba(75, 131, 255, 0.18);
+}
+
+.app-shell[data-theme='dark'] .image-workbench__generate:hover {
+  background: #3d74f0;
+}
+
 @media (max-width:1180px) { .image-workbench__card--image-studio,.image-workbench__right-column { @apply col-span-12; } }
 @media (max-width:760px) { .image-workbench { @apply p-4; } .image-studio__params,.image-studio__status-strip { @apply grid-cols-1; } .image-studio__prompt-footer { @apply flex-col items-stretch; } .image-studio__upload-button { @apply justify-center; } .image-studio__size-panel { @apply left-0 right-auto w-[calc(100vw-48px)]; } .image-history-modal { @apply items-end p-3; } .image-history-modal__panel { @apply max-h-[80vh] w-full rounded-b-none; } .image-history__item { @apply grid-cols-1; } }
