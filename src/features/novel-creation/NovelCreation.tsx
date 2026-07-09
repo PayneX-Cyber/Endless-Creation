@@ -3,13 +3,16 @@ import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, Novel, NovelSummary } from '../../types/novel';
 import { buildBlueprintFromConversationPrompt, buildInspirationChatPrompt, buildOutlinePrompt, INSPIRATION_OPENING_MESSAGE, parseOutlineText, type InspirationChatMessage, type TextMessage } from './novelPrompts';
+import { buildCharacterGraphPrompt, parseCharacterGraph, type CharacterGraph } from './characterGraph';
+import { NovelCharacterGraphPanel } from './NovelCharacterGraph';
+import { NovelListSkeleton } from './NovelSkeletons';
 import { ChapterWorkbench } from './ChapterWorkbench';
 import { NovelStats } from './NovelStats';
 import { countWords, createId, formatTime, type SaveStatus } from './novelShared';
 import './NovelCreation.css';
 
 type NovelView = 'creationCenter' | 'projectList' | 'projectView' | 'inspirationIntro' | 'inspirationPreparing' | 'inspirationChat' | 'inspirationBlueprint' | 'inspirationOutline' | 'workbench';
-type ProjectViewTab = 'overview' | 'outline' | 'chapters';
+type ProjectViewTab = 'overview' | 'outline' | 'chapters' | 'graph';
 type InspirationBusy = 'idle' | 'chat' | 'blueprint' | 'outline';
 type ChatBubble = InspirationChatMessage & { id: string };
 type NovelForm = { title: string; summary: string; note: string };
@@ -53,6 +56,11 @@ export function NovelCreation({ projectId }: { projectId: string }) {
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
   const projectBodyRef = useRef<HTMLDivElement | null>(null);
   const lastProjectIdRef = useRef(projectId);
+  const [graphData, setGraphData] = useState<CharacterGraph | null>(null);
+  const [graphBusy, setGraphBusy] = useState(false);
+  const [graphError, setGraphError] = useState('');
+  const graphRequestIdRef = useRef<string | null>(null);
+  const graphRunRef = useRef(0);
 
   const chapters = useMemo(() => [...(currentNovel?.chapters ?? [])].sort((a, b) => a.order - b.order), [currentNovel]);
   const selectedTextModel = useMemo(() => resolveTextModel(modelPreferences, apiProviderStore), [apiProviderStore, modelPreferences]);
@@ -524,6 +532,50 @@ export function NovelCreation({ projectId }: { projectId: string }) {
     return novel.blueprint?.trim() || novel.summary.trim() || novel.idea?.trim() || '';
   }
 
+  // 人物关系图谱 V0：AI 从蓝图 + 正文推演，仅 session 态展示，不落库、不建模。可重新推演。
+  async function deduceCharacterGraph() {
+    if (!currentNovel || graphBusy) return;
+    const readyModel = ensureTextModelReady(setGraphError);
+    if (!readyModel) return;
+    const requestId = createId('text-request');
+    const runId = graphRunRef.current + 1;
+    graphRunRef.current = runId;
+    graphRequestIdRef.current = requestId;
+    setGraphBusy(true);
+    setGraphError('');
+    const result = await rendererBridge.generateText({
+      requestId,
+      channelId: readyModel.channel.id,
+      channelLabel: readyModel.channel.name,
+      projectId,
+      requestType: 'novel.characterGraph',
+      baseUrl: readyModel.baseUrl,
+      apiKey: readyModel.apiKey,
+      model: readyModel.model,
+      messages: buildCharacterGraphPrompt(currentNovel),
+      temperature: 0.4,
+      maxTokens: 1400,
+    });
+    if (graphRunRef.current !== runId) return;
+    graphRequestIdRef.current = null;
+    setGraphBusy(false);
+    if (!result.ok || !result.text) {
+      setGraphError(result.message || 'AI 推演失败，请稍后重试。');
+      return;
+    }
+    const parsed = parseCharacterGraph(result.text, currentNovel);
+    if (parsed.kind === 'invalid') {
+      setGraphError('AI 返回的人物关系格式无法解析，请重新推演。');
+      return;
+    }
+    if (parsed.kind === 'empty') {
+      setGraphData({ characters: [], relationships: [] });
+      setGraphError('');
+      return;
+    }
+    setGraphData(parsed.graph);
+  }
+
   function updateProjectField(field: 'blueprint' | 'summary' | 'idea', value: string) {
     updateNovel((novel) => ({ ...novel, [field]: value, updatedAt: new Date().toISOString() }));
   }
@@ -562,7 +614,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
             <button className="novel-flow__ghost" onClick={openCreationCenter} type="button">返回</button>
           </header>
           {feedback && <p className="novel-flow__error">{feedback}</p>}
-          {isLoading ? <EmptyState title="正在加载小说…" /> : summaries.length ? (
+          {isLoading ? <NovelListSkeleton /> : summaries.length ? (
             <div className="novel-project-grid">
               {summaries.map((novel) => {
                 const progress = projectProgress(novel);
@@ -604,7 +656,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
           </header>
           <div className="novel-project-view__body" ref={projectBodyRef}>
             <aside className="novel-project-nav">
-              {(['overview', 'outline', 'chapters'] as ProjectViewTab[]).map((tab) => (
+              {(['overview', 'outline', 'chapters', 'graph'] as ProjectViewTab[]).map((tab) => (
                 <button className={projectViewTab === tab ? 'novel-project-nav__item novel-project-nav__item--active' : 'novel-project-nav__item'} key={tab} onClick={() => selectProjectViewTab(tab)} type="button">
                   {projectTabLabel(tab)}
                 </button>
@@ -647,6 +699,9 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                     </button>
                   ))}</div> : <EmptyState title="暂无章节内容" text="新增章节后，可以进入编辑器开始写正文。" />}
                 </>
+              )}
+              {projectViewTab === 'graph' && (
+                <NovelCharacterGraphPanel graph={graphData} busy={graphBusy} error={graphError} onDeduce={() => void deduceCharacterGraph()} />
               )}
             </section>
           </div>
@@ -780,6 +835,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
 function projectTabLabel(tab: ProjectViewTab): string {
   if (tab === 'outline') return '章节大纲';
   if (tab === 'chapters') return '章节内容';
+  if (tab === 'graph') return '人物关系';
   return '项目概览';
 }
 
