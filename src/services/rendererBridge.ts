@@ -9,6 +9,7 @@ import type {
   ApiTextGenerationCancelResult,
   ApiTextGenerationRequest,
   ApiTextGenerationResult,
+  TextStreamEvent,
 } from '../types/apiProvider';
 import type { Novel, NovelListResult, NovelResult } from '../types/novel';
 import type { ThemeMode } from '../types/workspace';
@@ -263,6 +264,13 @@ export const rendererBridge = {
     const electronBridge = getElectronBridge();
     if (!electronBridge?.api.cancelTextGeneration) return { ok: false, message: '\u5f53\u524d\u7248\u672c\u5c1a\u672a\u63a5\u5165\u6587\u672c\u751f\u6210\u53d6\u6d88\u3002' };
     return electronBridge.api.cancelTextGeneration(requestId);
+  },
+
+  // \u8ba2\u9605\u6d41\u5f0f\u6587\u672c\u589e\u91cf\u4e8b\u4ef6\uff1b\u8fd4\u56de\u9000\u8ba2\u51fd\u6570\u3002Web \u9884\u89c8\u6a21\u5f0f\u65e0 electron bridge \u65f6\u8fd4\u56de\u7a7a\u9000\u8ba2\uff08\u6d41\u5f0f\u4e0d\u53ef\u7528\uff0cUI \u5e94\u56de\u843d\u4e00\u6b21\u6027\uff09\u3002
+  onTextGenerationChunk(callback: (event: TextStreamEvent) => void): () => void {
+    const electronBridge = getElectronBridge();
+    if (!electronBridge?.api.onTextGenerationChunk) return () => {};
+    return electronBridge.api.onTextGenerationChunk(callback);
   },
 
   async listNovels(projectId?: string): Promise<NovelListResult> {

@@ -69,6 +69,7 @@ export interface ApiTextGenerationRequest {
   messages: Array<{ role: 'system' | 'user'; content: string }>;
   temperature?: number;
   maxTokens?: number;
+  stream?: boolean;
 }
 
 export interface ApiTextGenerationResult {
@@ -77,6 +78,12 @@ export interface ApiTextGenerationResult {
   message: string;
   text?: string;
 }
+
+export type TextStreamEvent =
+  | { type: 'delta'; requestId: string; delta: string }
+  | { type: 'done'; requestId: string; text: string; inputTokens: number; outputTokens: number }
+  | { type: 'error'; requestId: string; message: string }
+  | { type: 'aborted'; requestId: string; reason: 'cancel' | 'timeout' };
 
 export interface AiUsageRecord {
   id: string;
@@ -177,6 +184,7 @@ export interface EndlessCreationBridge {
     cancelImageGeneration(requestId: string): Promise<ApiImageGenerationCancelResult>;
     generateText(request: ApiTextGenerationRequest): Promise<ApiTextGenerationResult>;
     cancelTextGeneration(requestId: string): Promise<ApiImageGenerationCancelResult>;
+    onTextGenerationChunk(callback: (event: TextStreamEvent) => void): () => void;
   };
   novel: {
     listNovels(projectId?: string): Promise<{ ok: boolean; message?: string; novels: NovelSummary[] }>;

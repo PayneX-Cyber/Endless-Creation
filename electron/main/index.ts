@@ -81,6 +81,7 @@ interface ApiTextGenerationRequest {
   messages: Array<{ role: 'system' | 'user'; content: string }>;
   temperature?: number;
   maxTokens?: number;
+  stream?: boolean;
 }
 
 interface ApiTextGenerationResult {
@@ -89,6 +90,13 @@ interface ApiTextGenerationResult {
   message: string;
   text?: string;
 }
+
+// 流式文本事件信封（与 preload/renderer 侧 TextStreamEvent 保持结构一致）。
+type TextStreamEvent =
+  | { type: 'delta'; requestId: string; delta: string }
+  | { type: 'done'; requestId: string; text: string; inputTokens: number; outputTokens: number }
+  | { type: 'error'; requestId: string; message: string }
+  | { type: 'aborted'; requestId: string; reason: 'cancel' | 'timeout' };
 
 interface AiUsageRecord {
   id: string;
@@ -944,8 +952,8 @@ function registerIpcHandlers(): void {
     imageGenerationControllers.delete(requestId);
     return { ok: true, message: '已取消生图请求。' };
   });
-  ipcMain.handle('api:generate-text', async (_event, request: unknown): Promise<ApiTextGenerationResult> => {
-    return generateOpenAiCompatibleText(request);
+  ipcMain.handle('api:generate-text', async (event, request: unknown): Promise<ApiTextGenerationResult> => {
+    return generateOpenAiCompatibleText(request, event.sender);
   });
   ipcMain.handle('api:cancel-text-generation', (_event, requestId: unknown): { ok: boolean; message: string } => {
     if (typeof requestId !== 'string' || !requestId.trim()) return { ok: false, message: '取消请求缺少 requestId。' };
@@ -1077,7 +1085,7 @@ function isApiTextGenerationRequest(request: unknown): request is ApiTextGenerat
     && (candidate.maxTokens === undefined || typeof candidate.maxTokens === 'number');
 }
 
-async function generateOpenAiCompatibleText(request: unknown): Promise<ApiTextGenerationResult> {
+async function generateOpenAiCompatibleText(request: unknown, sender?: Electron.WebContents): Promise<ApiTextGenerationResult> {
   if (!isApiTextGenerationRequest(request)) return { ok: false, message: '文本生成请求格式无效。' };
 
   const requestId = request.requestId.trim();
@@ -1099,6 +1107,9 @@ async function generateOpenAiCompatibleText(request: unknown): Promise<ApiTextGe
     return { ok: false, message: 'Base URL 格式无效。' };
   }
 
+  // 流式仅在 stream:true 且拿得到 renderer sender 时启用；否则回落一次性路径（回归零变化）。
+  const streaming = request.stream === true && sender !== undefined && !sender.isDestroyed();
+
   textGenerationControllers.get(requestId)?.abort();
   const controller = new AbortController();
   textGenerationControllers.set(requestId, controller);
@@ -1107,22 +1118,54 @@ async function generateOpenAiCompatibleText(request: unknown): Promise<ApiTextGe
     controller.abort();
   }, 60_000);
 
+  // 仅当 sender 仍存活时推送流式事件，避免向已销毁的 webContents 发送。
+  const emit = (event: TextStreamEvent) => {
+    if (sender && !sender.isDestroyed()) sender.send('api:text-generation-chunk', event);
+  };
+
   try {
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        Accept: 'application/json',
+        Accept: streaming ? 'text/event-stream' : 'application/json',
       },
       body: JSON.stringify({
         model,
         messages,
         temperature: Number.isFinite(request.temperature) ? request.temperature : 0.8,
         max_tokens: Number.isFinite(request.maxTokens) ? request.maxTokens : 700,
+        ...(streaming ? { stream: true, stream_options: { include_usage: true } } : {}),
       }),
       signal: controller.signal,
     });
+
+    if (streaming) {
+      // HTTP 层错误：流式下也走一次性错误读取（body 是 JSON 错误体，不是 SSE）。
+      if (!response.ok || !response.body) {
+        const parsed = await readTextGenerationResponse(response, apiKey);
+        await safeRecordAiUsage(request, {}, false);
+        const message = parsed.errorMessage ?? `文本生成失败：HTTP ${response.status}${response.statusText ? ` ${response.statusText}` : ''}。`;
+        emit({ type: 'error', requestId, message });
+        return { ok: false, status: response.status, message };
+      }
+
+      const streamResult = await consumeTextEventStream(response.body, emit, requestId);
+      const text = streamResult.text.trim();
+      // usage 缺失时按字符估算（PO 拍板：不记 0）；prompt 侧用入参消息字符数估算。
+      const inputTokens = streamResult.inputTokens > 0 ? streamResult.inputTokens : estimateTokensFromText(messages.map((m) => m.content).join('\n'));
+      const outputTokens = streamResult.outputTokens > 0 ? streamResult.outputTokens : estimateTokensFromText(text);
+      await safeRecordAiUsage({ ...request, model }, { inputTokens, outputTokens }, Boolean(text));
+
+      if (!text) {
+        emit({ type: 'error', requestId, message: '文本生成接口返回了空结果。' });
+        return { ok: false, status: response.status, message: '文本生成接口返回了空结果。' };
+      }
+      emit({ type: 'done', requestId, text, inputTokens, outputTokens });
+      return { ok: true, status: response.status, message: '文本生成完成。', text };
+    }
+
     const parsed = await readTextGenerationResponse(response, apiKey);
     const usage = { inputTokens: parsed.inputTokens, outputTokens: parsed.outputTokens };
     await safeRecordAiUsage(request, usage, response.ok && Boolean(parsed.text));
@@ -1133,14 +1176,77 @@ async function generateOpenAiCompatibleText(request: unknown): Promise<ApiTextGe
   } catch (error) {
     await safeRecordAiUsage(request, {}, false);
     if (error instanceof Error && error.name === 'AbortError') {
-      return { ok: false, message: timedOutTextGenerationRequests.has(requestId) ? '文本生成请求超时，请稍后重试或检查服务状态。' : '文本生成请求已取消。' };
+      const aborted = timedOutTextGenerationRequests.has(requestId);
+      if (streaming) emit({ type: 'aborted', requestId, reason: aborted ? 'timeout' : 'cancel' });
+      return { ok: false, message: aborted ? '文本生成请求超时，请稍后重试或检查服务状态。' : '文本生成请求已取消。' };
     }
-    return { ok: false, message: error instanceof Error ? `文本生成失败：${redactSecret(error.message, apiKey)}` : '文本生成失败：未知错误。' };
+    const message = error instanceof Error ? `文本生成失败：${redactSecret(error.message, apiKey)}` : '文本生成失败：未知错误。';
+    if (streaming) emit({ type: 'error', requestId, message });
+    return { ok: false, message };
   } finally {
     clearTimeout(timeout);
     if (textGenerationControllers.get(requestId) === controller) textGenerationControllers.delete(requestId);
     timedOutTextGenerationRequests.delete(requestId);
   }
+}
+
+// 粗略 token 估算：usage 缺失时的兜底（中英文混排按 ~2 字符/token）。仅用于成本估算量级，非精确账单。
+function estimateTokensFromText(text: string): number {
+  const length = text?.length ?? 0;
+  return length > 0 ? Math.ceil(length / 2) : 0;
+}
+
+// 消费 OpenAI 兼容的 text/event-stream：处理 TCP 分包、data: 行、[DONE] 哨兵，累积 delta 与 usage。
+async function consumeTextEventStream(
+  body: ReadableStream<Uint8Array>,
+  emit: (event: TextStreamEvent) => void,
+  requestId: string,
+): Promise<{ text: string; inputTokens: number; outputTokens: number }> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let text = '';
+  let inputTokens = 0;
+  let outputTokens = 0;
+
+  const handleData = (payload: string) => {
+    if (payload === '[DONE]') return;
+    let json: unknown;
+    try {
+      json = JSON.parse(payload);
+    } catch {
+      return; // 半行/非法 JSON 由 buffer 逻辑保证不会到这（只处理完整行），保险起见忽略。
+    }
+    const record = json as { choices?: Array<{ delta?: { content?: unknown } }>; usage?: Record<string, unknown> };
+    const delta = record.choices?.[0]?.delta?.content;
+    if (typeof delta === 'string' && delta.length > 0) {
+      text += delta;
+      emit({ type: 'delta', requestId, delta });
+    }
+    const usage = record.usage;
+    if (usage && typeof usage === 'object') {
+      if (typeof usage.prompt_tokens === 'number') inputTokens = usage.prompt_tokens;
+      if (typeof usage.completion_tokens === 'number') outputTokens = usage.completion_tokens;
+    }
+  };
+
+  // 逐行拆分：SSE 事件以空行分隔，data 字段以 "data:" 开头；一个 chunk 可能含半行或多行。
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let newlineIndex: number;
+    while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+      const line = buffer.slice(0, newlineIndex).replace(/\r$/, '').trim();
+      buffer = buffer.slice(newlineIndex + 1);
+      if (line.startsWith('data:')) handleData(line.slice(5).trim());
+    }
+  }
+  // 冲刷残留缓冲（末尾可能无换行）。
+  const tail = buffer.replace(/\r$/, '').trim();
+  if (tail.startsWith('data:')) handleData(tail.slice(5).trim());
+
+  return { text, inputTokens, outputTokens };
 }
 
 async function generateOpenAiCompatibleImage(request: unknown): Promise<ApiImageGenerationResult> {

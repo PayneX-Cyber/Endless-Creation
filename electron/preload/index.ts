@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { EndlessCreationBridge } from './bridgeTypes';
+import type { EndlessCreationBridge, TextStreamEvent } from './bridgeTypes';
 
 const bridge: EndlessCreationBridge = {
   app: {
@@ -33,6 +33,11 @@ const bridge: EndlessCreationBridge = {
     cancelImageGeneration: (requestId) => ipcRenderer.invoke('api:cancel-image-generation', requestId),
     generateText: (request) => ipcRenderer.invoke('api:generate-text', request),
     cancelTextGeneration: (requestId) => ipcRenderer.invoke('api:cancel-text-generation', requestId),
+    onTextGenerationChunk: (callback) => {
+      const handler = (_event: unknown, payload: unknown) => callback(payload as TextStreamEvent);
+      ipcRenderer.on('api:text-generation-chunk', handler);
+      return () => ipcRenderer.removeListener('api:text-generation-chunk', handler);
+    },
   },
   novel: {
     listNovels: (projectId) => ipcRenderer.invoke('novel:list-novels', projectId),

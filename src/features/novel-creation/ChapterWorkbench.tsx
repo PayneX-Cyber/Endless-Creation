@@ -101,6 +101,8 @@ function useAiCheck(config: {
 
 export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, saveStatus, onSelectChapter, onUpdateChapter, onUpdateChapterAndSave, onUpdateNovel, onRetrySave, onBackToProjects, onOpenProjectView, ensureTextModel }: ChapterWorkbenchProps) {
   const [generatingChapterId, setGeneratingChapterId] = useState<string | null>(null);
+  const [streamingText, setStreamingText] = useState('');
+  const [cancelledVersionId, setCancelledVersionId] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<{ chapterId: string; message: string } | null>(null);
   const [preview, setPreview] = useState<VersionPreviewState | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -124,12 +126,26 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
   const requestIdRef = useRef<string | null>(null);
   const runRef = useRef(0);
   const confirmBusyRef = useRef(false);
+  const streamTextRef = useRef('');
 
   useEffect(() => () => {
     const requestId = requestIdRef.current;
     runRef.current += 1;
     requestIdRef.current = null;
     if (requestId) void rendererBridge.cancelTextGeneration(requestId);
+  }, []);
+
+  // 订阅流式增量：只处理当前活跃流（requestId 匹配）的 delta，防止旧流/切章节串线。
+  // 增量累积到 ref（权威值，供取消时保留半截），并镜像到 state 驱动打字机渲染。
+  useEffect(() => {
+    const unsubscribe = rendererBridge.onTextGenerationChunk((event) => {
+      if (event.requestId !== requestIdRef.current) return;
+      if (event.type === 'delta') {
+        streamTextRef.current += event.delta;
+        setStreamingText(streamTextRef.current);
+      }
+    });
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -167,8 +183,13 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
   function locateFirstPending() {
     if (firstPendingIndex < 0) return;
     const chapter = chapters[firstPendingIndex];
-    onSelectChapter(chapter.id);
+    selectChapter(chapter.id);
     window.setTimeout(() => document.getElementById(`workbench-chapter-${chapter.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0);
+  }
+
+  function selectChapter(chapterId: string) {
+    if (chapterId === activeChapterId) return;
+    onSelectChapter(chapterId);
   }
 
   function recordSelection(target: HTMLTextAreaElement) {
@@ -297,6 +318,8 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     requestIdRef.current = requestId;
     setGeneratingChapterId(chapter.id);
     setGenerationError(null);
+    streamTextRef.current = '';
+    setStreamingText('');
     const contentSnapshot = chapter.content;
     const result = await rendererBridge.generateText({
       requestId,
@@ -310,6 +333,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
       messages: buildChapterFromOutlinePrompt(novel, chapter, previousChapter),
       temperature: 0.8,
       maxTokens: 1500,
+      stream: true,
     });
     if (runRef.current !== runId) return;
     requestIdRef.current = null;
@@ -318,6 +342,9 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
       setGenerationError({ chapterId: chapter.id, message: result.message || '生成章节正文失败，请稍后重试。' });
       return;
     }
+    streamTextRef.current = '';
+    setStreamingText('');
+    setCancelledVersionId(null);
     const version: ChapterVersion = { id: createId('version'), content: result.text, createdAt: new Date().toISOString() };
     const updatedVersions = [...(chapter.versions ?? []), version].slice(-MAX_CHAPTER_VERSIONS);
     onUpdateChapterAndSave(chapter.id, { versions: updatedVersions });
@@ -326,6 +353,8 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
 
   function cancelGeneration() {
     const requestId = requestIdRef.current;
+    const cancelledChapterId = generatingChapterId;
+    const halfText = streamTextRef.current;
     runRef.current += 1;
     requestIdRef.current = null;
     setGeneratingChapterId(null);
@@ -339,6 +368,17 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     setForeshadowAiRawText('');
     setForeshadowAiError('');
     if (requestId) void rendererBridge.cancelTextGeneration(requestId);
+    // PO 拍板：取消后保留已流式生成的半截正文（不回滚），落为一个草稿版本并标记“已取消”，用户可继续编辑或手动清空。
+    const cancelledChapter = cancelledChapterId ? chapters.find((chapter) => chapter.id === cancelledChapterId) : undefined;
+    if (cancelledChapter && halfText.trim()) {
+      const version: ChapterVersion = { id: createId('version'), content: halfText, createdAt: new Date().toISOString() };
+      const updatedVersions = [...(cancelledChapter.versions ?? []), version].slice(-MAX_CHAPTER_VERSIONS);
+      onUpdateChapterAndSave(cancelledChapter.id, { versions: updatedVersions });
+      setCancelledVersionId(version.id);
+      setPreview({ chapterId: cancelledChapter.id, activeVersionId: version.id, contentSnapshot: cancelledChapter.content });
+    }
+    streamTextRef.current = '';
+    setStreamingText('');
   }
 
   async function confirmPreviewWrite() {
@@ -799,17 +839,23 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
           <p className={activeChapter.outline?.trim() ? 'novel-workbench__outline' : 'novel-workbench__outline novel-workbench__outline--empty'}>{activeChapter.outline?.trim() || '本章暂无大纲'}</p>
         </header>
         {status === 'generating' ? (
-          <div className="novel-workbench__state">
-            <span className="novel-workbench__spinner" aria-hidden="true" />
-            <strong>正在生成章节正文…</strong>
-            <span>生成完成后会先展示草稿版本，确认后才会写入正文。</span>
+          <div className="novel-workbench__state novel-workbench__state--streaming">
+            <div className="novel-workbench__stream-head">
+              <span className="novel-workbench__spinner" aria-hidden="true" />
+              <strong>正在生成章节正文…</strong>
+            </div>
+            {streamingText ? (
+              <p className="novel-workbench__stream-text">{streamingText}</p>
+            ) : (
+              <span>生成完成后会先展示草稿版本，确认后才会写入正文。</span>
+            )}
             <button className="novel-flow__ghost" onClick={cancelGeneration} type="button">取消生成</button>
           </div>
         ) : chapterPreview && activeVersion ? (
           <div className="novel-workbench__draft">
             <div className="novel-workbench__draft-head">
-              <strong>正文草稿</strong>
-              <span>{countWords(activeVersion.content)} 字 · 确认后写入本章正文</span>
+              <strong>正文草稿{activeVersion.id === cancelledVersionId ? '（已取消）' : ''}</strong>
+              <span>{countWords(activeVersion.content)} 字 · {activeVersion.id === cancelledVersionId ? '已取消生成，可编辑后写入或另生成一版' : '确认后写入本章正文'}</span>
             </div>
             <div className="novel-workbench__versions">
               {versions.map((version, index) => (
@@ -895,11 +941,10 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
           </div>
         ) : isFirstPending ? (
           <div className="novel-workbench__state">
-            <strong>开始创作</strong>
+            <button className="novel-workbench__start-button" disabled={busy || !hasOutline || atVersionCap} onClick={() => void generateChapterBody()} type="button">{chapterError ? '重试生成' : '开始创作'}</button>
             <span>{hasOutline ? '前面的章节都已完成，可以按顺序生成本章正文。' : '本章还没有大纲，请先通过左侧「生成后续大纲」补齐本章大纲。'}</span>
             {chapterError && <p className="novel-flow__error">{chapterError}</p>}
             {atVersionCap && <span className="novel-workbench__hint">已达 {MAX_CHAPTER_VERSIONS} 个版本上限，请从已有草稿版本中选定写入。</span>}
-            <button className="novel-flow__primary" disabled={busy || !hasOutline || atVersionCap} onClick={() => void generateChapterBody()} type="button">{chapterError ? '重试生成' : '按顺序生成'}</button>
             {versions.length > 0 && (
               <button className="novel-flow__ghost" onClick={() => setPreview({ chapterId: activeChapter.id, activeVersionId: versions[versions.length - 1].id, contentSnapshot: activeChapter.content })} type="button">
                 查看草稿版本（{versions.length}）
@@ -908,7 +953,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
           </div>
         ) : (
           <div className="novel-workbench__state">
-            <strong>开始创作</strong>
+            <button className="novel-workbench__start-button" disabled type="button">开始创作</button>
             <span>请先完成前面的章节，才能生成此章节。</span>
           </div>
         )}
@@ -953,7 +998,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
               {chapters.map((chapter, index) => {
                 const status = chapterStatus(chapter);
                 return (
-                  <button className={chapter.id === activeChapterId ? 'novel-workbench__chapter novel-workbench__chapter--active' : 'novel-workbench__chapter'} disabled={busy} id={`workbench-chapter-${chapter.id}`} key={chapter.id} onClick={() => onSelectChapter(chapter.id)} type="button">
+                  <button className={chapter.id === activeChapterId ? 'novel-workbench__chapter novel-workbench__chapter--active' : 'novel-workbench__chapter'} disabled={busy && generatingChapterId === null} id={`workbench-chapter-${chapter.id}`} key={chapter.id} onClick={() => selectChapter(chapter.id)} type="button">
                     <span className="novel-workbench__chapter-row">
                       <strong>第 {index + 1} 章 · {chapter.title || '未命名章节'}</strong>
                       <span className={`novel-workbench__pill novel-workbench__pill--${status}`}>{statusLabel(status)}</span>

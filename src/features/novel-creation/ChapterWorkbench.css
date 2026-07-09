@@ -287,6 +287,27 @@
   font-size: 18px;
 }
 
+.novel-workbench__start-button {
+  border: 0;
+  border-radius: 16px;
+  padding: 0;
+  color: #172033;
+  background: transparent;
+  font: inherit;
+  font-size: 18px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.novel-workbench__start-button:disabled {
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.novel-workbench__start-button:not(:disabled):hover {
+  color: #1f4fb8;
+}
+
 .novel-workbench__state > span {
   max-width: 420px;
   color: #94a3b8;
@@ -303,6 +324,38 @@
   height: 14px;
   border-radius: 50%;
   background: #7c5cff;
+  animation: novel-pulse 1.1s ease-in-out infinite;
+}
+
+/* 流式生成态：正文边生成边显示（打字机），左对齐可滚动，区别于居中的静态提示态。 */
+.novel-workbench__state--streaming {
+  align-content: start;
+  justify-items: stretch;
+  text-align: left;
+  padding: 24px;
+}
+
+.novel-workbench__stream-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.novel-workbench__stream-text {
+  align-self: stretch;
+  max-height: 360px;
+  overflow-y: auto;
+  margin: 0;
+  color: #172033;
+  font-size: 15px;
+  line-height: 1.9;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.novel-workbench__stream-text::after {
+  content: '▋';
+  color: #7c5cff;
   animation: novel-pulse 1.1s ease-in-out infinite;
 }
 
@@ -519,14 +572,25 @@
 
 .app-shell[data-theme='dark'] .novel-workbench__chapter-row strong,
 .app-shell[data-theme='dark'] .novel-workbench__state strong,
+.app-shell[data-theme='dark'] .novel-workbench__start-button,
 .app-shell[data-theme='dark'] .novel-workbench__side-empty strong,
 .app-shell[data-theme='dark'] .novel-workbench__preview-list strong,
 .app-shell[data-theme='dark'] .novel-workbench__editor textarea {
   color: #edf2fa;
 }
 
+.app-shell[data-theme='dark'] .novel-workbench__start-button:disabled {
+  color: #64748b;
+}
+
 .app-shell[data-theme='dark'] .novel-workbench__editor textarea:focus {
   background: #111822;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__stream-text {
+  background: #0b111a;
+  border-color: #1b2536;
+  color: #edf2fa;
 }
 
 .app-shell[data-theme='dark'] .novel-workbench__editor-meta span {
