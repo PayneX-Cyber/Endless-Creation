@@ -292,6 +292,53 @@ async function appendAiUsage(record: Omit<AiUsageRecord, 'id' | 'createdAt'>): P
   await fs.writeFile(getAiUsagePath(), JSON.stringify({ version: 1, records }, null, 2), 'utf-8');
 }
 
+// 本地 provider/model 价格表：单位为「人民币元 / 每百万 token」，与成本看板的 ¥ 展示一致。
+// OpenAI 系为官方美元价 × ≈7.2 的估算折算（注释标注美元源价）；国产模型直接采用官方人民币价。
+// 仅用于本地成本估算，非实时汇率、非精确账单；新增/调整模型直接改这张表即可。
+const AI_MODEL_PRICING_CNY_PER_MILLION: Record<string, { input: number; output: number }> = {
+  // OpenAI（美元官方价折算）
+  'gpt-4o-mini': { input: 1.08, output: 4.32 }, // $0.15 / $0.60
+  'gpt-4o': { input: 18, output: 72 }, // $2.50 / $10.00
+  'gpt-4.1-nano': { input: 0.72, output: 2.88 }, // $0.10 / $0.40
+  'gpt-4.1-mini': { input: 2.88, output: 11.52 }, // $0.40 / $1.60
+  'gpt-4.1': { input: 14.4, output: 57.6 }, // $2.00 / $8.00
+  'o3-mini': { input: 7.92, output: 31.68 }, // $1.10 / $4.40
+  'o1-mini': { input: 7.92, output: 31.68 }, // $1.10 / $4.40
+  // DeepSeek（官方人民币价）
+  'deepseek-reasoner': { input: 4, output: 16 },
+  'deepseek-chat': { input: 2, output: 8 },
+  // 通义千问（官方人民币价）
+  'qwen-max': { input: 2.4, output: 9.6 },
+  'qwen-plus': { input: 0.8, output: 2 },
+  // 智谱 GLM（官方人民币价）
+  'glm-4-air': { input: 0.5, output: 0.5 },
+  'glm-4': { input: 5, output: 5 },
+};
+
+// 未知模型时的兜底单价（人民币元 / 每百万 token），取一个保守的中小模型量级，避免估算恒为 0。
+const AI_FALLBACK_PRICING_CNY_PER_MILLION = { input: 1, output: 3 };
+
+function resolveModelPricing(model: string): { input: number; output: number } {
+  const normalized = model.trim().toLowerCase();
+  if (!normalized) return AI_FALLBACK_PRICING_CNY_PER_MILLION;
+  // 先按 key 长度降序做前缀匹配，避免 `gpt-4o-mini` 被更短的 `gpt-4o` 抢先命中；
+  // 同时兼容带日期/版本后缀的模型名（如 gpt-4o-mini-2024-07-18）。
+  const keys = Object.keys(AI_MODEL_PRICING_CNY_PER_MILLION).sort((a, b) => b.length - a.length);
+  const prefixHit = keys.find((key) => normalized.startsWith(key));
+  if (prefixHit) return AI_MODEL_PRICING_CNY_PER_MILLION[prefixHit];
+  const includeHit = keys.find((key) => normalized.includes(key));
+  if (includeHit) return AI_MODEL_PRICING_CNY_PER_MILLION[includeHit];
+  return AI_FALLBACK_PRICING_CNY_PER_MILLION;
+}
+
+function estimateAiCost(model: string, inputTokens: number, outputTokens: number): number {
+  const pricing = resolveModelPricing(model);
+  const input = Number.isFinite(inputTokens) ? Math.max(0, inputTokens) : 0;
+  const output = Number.isFinite(outputTokens) ? Math.max(0, outputTokens) : 0;
+  const cost = (input / 1_000_000) * pricing.input + (output / 1_000_000) * pricing.output;
+  return Number.isFinite(cost) ? Math.max(0, cost) : 0;
+}
+
 async function safeRecordAiUsage(request: { projectId?: string; channelId?: string; channelLabel?: string; baseUrl: string; model: string; requestType?: string }, usage: { inputTokens?: number; outputTokens?: number }, success: boolean): Promise<void> {
   const projectId = request.projectId?.trim();
   if (!projectId) return;
@@ -304,13 +351,16 @@ async function safeRecordAiUsage(request: { projectId?: string; channelId?: stri
         provider = 'unknown';
       }
     }
+    const model = request.model.trim();
+    const inputTokens = usage.inputTokens ?? 0;
+    const outputTokens = usage.outputTokens ?? 0;
     await appendAiUsage({
       projectId,
       provider,
-      model: request.model.trim(),
-      inputTokens: usage.inputTokens ?? 0,
-      outputTokens: usage.outputTokens ?? 0,
-      estimatedCost: 0,
+      model,
+      inputTokens,
+      outputTokens,
+      estimatedCost: estimateAiCost(model, inputTokens, outputTokens),
       requestType: request.requestType?.trim() || 'unknown',
       success,
     });

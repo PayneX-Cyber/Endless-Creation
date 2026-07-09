@@ -17,6 +17,7 @@ function formatNumber(value: number): string {
 
 export function NovelStats({ novel }: { novel: Novel }) {
   const [usageRecords, setUsageRecords] = useState<AiUsageRecord[]>([]);
+  const usageProjectId = novel.projectId ?? 'default';
   const ordered = [...novel.chapters].sort((a, b) => a.order - b.order);
   const totalChapters = ordered.length;
   const doneChapters = ordered
@@ -39,13 +40,13 @@ export function NovelStats({ novel }: { novel: Novel }) {
 
   useEffect(() => {
     let cancelled = false;
-    void rendererBridge.loadAiUsage(novel.id).then((result) => {
+    void rendererBridge.loadAiUsage(usageProjectId).then((result) => {
       if (!cancelled && result.ok) setUsageRecords(result.records);
     });
     return () => {
       cancelled = true;
     };
-  }, [novel.id]);
+  }, [usageProjectId]);
 
   return (
     <section className="novel-stats" aria-label="创作概览">
