@@ -575,11 +575,14 @@ export function NovelCreation({ projectId }: { projectId: string }) {
       return;
     }
     if (parsed.kind === 'empty') {
-      setGraphData({ characters: [], relationships: [] });
+      const emptyGraph = { characters: [], relationships: [] };
+      setGraphData(emptyGraph);
+      saveCharacterGraph(currentNovel.id, emptyGraph);
       setGraphError('');
       return;
     }
     setGraphData(parsed.graph);
+    saveCharacterGraph(currentNovel.id, parsed.graph);
   }
 
   function updateProjectField(field: 'blueprint' | 'summary' | 'idea', value: string) {
