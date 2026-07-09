@@ -963,3 +963,14 @@
   background: #111822;
   color: #cbd5e1;
 }
+
+/* 章节切换过渡：key=activeChapterId 触发 remount，淡入避免硬切（Phase 3 演示体验包收尾）。 */
+.novel-workbench__main-inner {
+  display: contents;
+  animation: novel-workbench-fade 0.26s ease both;
+}
+
+@keyframes novel-workbench-fade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}

@@ -1023,7 +1023,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
           )}
         </aside>
         <section className="novel-workbench__main" aria-label="章节创作区">
-          {renderMain()}
+          <div className="novel-workbench__main-inner" key={activeChapterId ?? 'none'}>{renderMain()}</div>
         </section>
       </div>
       {outlinePreview && (

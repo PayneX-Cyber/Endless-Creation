@@ -5,7 +5,7 @@ import type { Chapter, Novel, NovelSummary } from '../../types/novel';
 import { buildBlueprintFromConversationPrompt, buildInspirationChatPrompt, buildOutlinePrompt, INSPIRATION_OPENING_MESSAGE, parseOutlineText, type InspirationChatMessage, type TextMessage } from './novelPrompts';
 import { buildCharacterGraphPrompt, parseCharacterGraph, type CharacterGraph } from './characterGraph';
 import { NovelCharacterGraphPanel } from './NovelCharacterGraph';
-import { NovelListSkeleton } from './NovelSkeletons';
+import { NovelErrorBanner, NovelListSkeleton } from './NovelSkeletons';
 import { ChapterWorkbench } from './ChapterWorkbench';
 import { NovelStats } from './NovelStats';
 import { countWords, createId, formatTime, type SaveStatus } from './novelShared';
@@ -23,6 +23,7 @@ interface ApiProviderStore { channels?: ApiProviderChannel[]; activeChannelId?: 
 const emptyForm: NovelForm = { title: '', summary: '', note: '' };
 const MODEL_PREFERENCES_STORAGE_KEY = 'endless-creation.model-preferences';
 const API_PROVIDER_STORAGE_KEY = 'endless-creation.api-provider-config';
+const CHARACTER_GRAPH_STORAGE_KEY = 'endless-creation.novel-character-graphs';
 const INSPIRATION_STAGES = ['灵感收集', '故事核心', '角色冲突', '蓝图确认'];
 const MAX_CHAT_TURNS = 8;
 
@@ -74,6 +75,11 @@ export function NovelCreation({ projectId }: { projectId: string }) {
   useEffect(() => {
     void loadSummaries();
   }, []);
+
+  useEffect(() => {
+    setGraphData(currentNovel ? readCharacterGraph(currentNovel.id) : null);
+    setGraphError('');
+  }, [currentNovel?.id]);
 
   useEffect(() => {
     if (lastProjectIdRef.current === projectId) return;
@@ -613,7 +619,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
             </div>
             <button className="novel-flow__ghost" onClick={openCreationCenter} type="button">返回</button>
           </header>
-          {feedback && <p className="novel-flow__error">{feedback}</p>}
+          {feedback && <NovelErrorBanner message={feedback} onRetry={() => void loadSummaries()} />}
           {isLoading ? <NovelListSkeleton /> : summaries.length ? (
             <div className="novel-project-grid">
               {summaries.map((novel) => {
@@ -662,7 +668,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                 </button>
               ))}
             </aside>
-            <section className="novel-project-panel">
+            <section className="novel-project-panel novel-project-panel--animated" key={projectViewTab}>
               {projectViewTab === 'overview' && (
                 <>
                   <div className="novel-project-panel__head"><h2>项目概览</h2><button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void openProjectWorkbench(currentNovel.id)} type="button">开始创作</button></div>
@@ -870,5 +876,19 @@ function readLocalStorage<T>(key: string, fallback: T): T {
     return rawValue ? JSON.parse(rawValue) as T : fallback;
   } catch {
     return fallback;
+  }
+}
+
+function readCharacterGraph(novelId: string): CharacterGraph | null {
+  const graphs = readLocalStorage<Record<string, CharacterGraph>>(CHARACTER_GRAPH_STORAGE_KEY, {});
+  return graphs[novelId] ?? null;
+}
+
+function saveCharacterGraph(novelId: string, graph: CharacterGraph) {
+  try {
+    const graphs = readLocalStorage<Record<string, CharacterGraph>>(CHARACTER_GRAPH_STORAGE_KEY, {});
+    window.localStorage.setItem(CHARACTER_GRAPH_STORAGE_KEY, JSON.stringify({ ...graphs, [novelId]: graph }));
+  } catch {
+    return;
   }
 }
