@@ -683,7 +683,7 @@
 
 .novel-project-view {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
   gap: 24px;
 }
 
@@ -691,7 +691,7 @@
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
   gap: 22px;
-  min-height: 0;
+  min-height: max-content;
 }
 
 .novel-project-nav {
@@ -715,7 +715,7 @@
 .novel-project-panel {
   display: grid;
   gap: 16px;
-  min-height: 0;
+  align-content: start;
   padding: 24px;
 }
 

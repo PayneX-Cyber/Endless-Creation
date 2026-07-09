@@ -51,6 +51,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
   const inspirationRunRef = useRef(0);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const projectBodyRef = useRef<HTMLDivElement | null>(null);
   const lastProjectIdRef = useRef(projectId);
 
   const chapters = useMemo(() => [...(currentNovel?.chapters ?? [])].sort((a, b) => a.order - b.order), [currentNovel]);
@@ -514,6 +515,11 @@ export function NovelCreation({ projectId }: { projectId: string }) {
     return summary.filledChapterCount > 0 ? '连载中' : '蓝图';
   }
 
+  function selectProjectViewTab(tab: ProjectViewTab) {
+    setProjectViewTab(tab);
+    requestAnimationFrame(() => projectBodyRef.current?.scrollIntoView({ block: 'start' }));
+  }
+
   function projectSummary(novel: Novel): string {
     return novel.blueprint?.trim() || novel.summary.trim() || novel.idea?.trim() || '';
   }
@@ -596,10 +602,10 @@ export function NovelCreation({ projectId }: { projectId: string }) {
               <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void openProjectWorkbench(currentNovel.id, activeChapterId ?? undefined)} type="button">开始创作</button>
             </nav>
           </header>
-          <div className="novel-project-view__body">
+          <div className="novel-project-view__body" ref={projectBodyRef}>
             <aside className="novel-project-nav">
               {(['overview', 'outline', 'chapters'] as ProjectViewTab[]).map((tab) => (
-                <button className={projectViewTab === tab ? 'novel-project-nav__item novel-project-nav__item--active' : 'novel-project-nav__item'} key={tab} onClick={() => setProjectViewTab(tab)} type="button">
+                <button className={projectViewTab === tab ? 'novel-project-nav__item novel-project-nav__item--active' : 'novel-project-nav__item'} key={tab} onClick={() => selectProjectViewTab(tab)} type="button">
                   {projectTabLabel(tab)}
                 </button>
               ))}
