@@ -769,7 +769,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     try {
       const result = await rendererBridge.saveTextFile(defaultName, markdown);
       if (result.ok) window.alert('全书 Markdown 已导出');
-      // 取消（ok:false）静默，不 alert
+      else window.alert(result.message || '已取消导出');
     } catch {
       window.alert('导出失败，请重试');
     }
@@ -785,7 +785,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     try {
       const result = await rendererBridge.saveTextFile(defaultName, html, 'doc');
       if (result.ok) window.alert('Word 分镜本已导出');
-      // 取消（ok:false）静默，不 alert
+      else window.alert(result.message || '已取消导出');
     } catch {
       window.alert('导出失败，请重试');
     }
@@ -798,7 +798,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
       const zip = createStoreZip(buildOfflinePackageFiles(novel));
       const result = await rendererBridge.saveBinaryFile(defaultName, zip, 'zip');
       if (result.ok) window.alert('离线包已导出');
-      // 取消（ok:false）静默，不 alert
+      else window.alert(result.message || '已取消导出');
     } catch {
       window.alert('导出失败，请重试');
     }
