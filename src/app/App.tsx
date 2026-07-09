@@ -6,7 +6,7 @@ import appLogoUrl from '../assets/endless-creation-logo.png';
 import { AssetManagement } from '../features/asset-management';
 import { ImageWorkbench } from '../features/image-workbench';
 import { NovelCreation } from '../features/novel-creation';
-import { CanvasWorkbench } from '../features/canvas-workbench';
+import { CanvasLibrary, CanvasWorkbench } from '../features/canvas-workbench';
 import { SettingsPage } from '../features/settings';
 import {
   BillingIcon,
@@ -68,7 +68,7 @@ export function App() {
   const [theme, setTheme] = usePersistentTheme();
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [activeNavId, setActiveNavId] = useState<ActiveNavId>('home');
-  const [activeCanvasId, setActiveCanvasId] = useState<string | null>(null);
+  const [activeCanvasIdsByProject, setActiveCanvasIdsByProject] = useState<Record<string, string>>({});
   const [isUserMenuOpen, setUserMenuOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(DEFAULT_ACTIVE_PROJECT_ID);
@@ -109,18 +109,31 @@ export function App() {
   function switchProject(projectId: string) {
     setActiveProjectId(projectId);
     setRecentProjectIds((ids) => promoteRecentProject(ids, projectId));
-    setActiveCanvasId(null);
   }
 
   function enterWorkbench(projectId: string, navId: ActiveNavId) {
     switchProject(projectId);
     setProjectCenterOpen(false);
     setProjectMenuOpen(false);
-    if (navId === 'canvas') setActiveCanvasId(activeCanvasId ?? 'canvas-2');
+    if (navId === 'canvas') setActiveCanvasIdsByProject((ids) => ({ ...ids, [projectId]: ids[projectId] ?? 'canvas-2' }));
     setActiveNavId(navId);
   }
 
+  function openCanvas(canvasId: string) {
+    const projectId = activeProjectId ?? 'default';
+    setActiveCanvasIdsByProject((ids) => ({ ...ids, [projectId]: canvasId }));
+  }
+
+  function closeCanvas() {
+    const projectId = activeProjectId ?? 'default';
+    setActiveCanvasIdsByProject((ids) => {
+      const { [projectId]: _current, ...rest } = ids;
+      return rest;
+    });
+  }
+
   const activeProject = getProjectById(activeProjectId);
+  const activeCanvasId = activeProjectId ? activeCanvasIdsByProject[activeProjectId] ?? null : null;
   const recentProjects = recentProjectIds
     .map((id) => getProjectById(id))
     .filter((project): project is NonNullable<typeof project> => Boolean(project));
@@ -138,15 +151,9 @@ export function App() {
           <span className="canvasflow-brand__mark" aria-hidden="true">
             <img src={appLogoUrl} alt="" />
           </span>
-          <span className="canvasflow-brand__name" aria-label={activeProject?.name ?? 'Endless Creation'}>
-            {activeProject?.name ? (
-              <span>{activeProject.name}</span>
-            ) : (
-              <>
-                <span>Endless</span>
-                <span>Creation</span>
-              </>
-            )}
+          <span className="canvasflow-brand__name" aria-label="Endless Creation">
+            <span>Endless</span>
+            <span>Creation</span>
           </span>
           <button
             aria-expanded={!isSidebarCollapsed}
@@ -182,7 +189,6 @@ export function App() {
                       return;
                     }
                     setActiveNavId(item.id);
-                    if (item.id !== 'canvas') setActiveCanvasId(null);
                   }}
                   type="button"
                 >
@@ -321,7 +327,11 @@ export function App() {
       ) : activeNavId === 'assets' || activeNavId.startsWith('asset-') ? (
         <AssetManagement projectId={activeProjectId ?? 'default'} />
       ) : activeNavId === 'canvas' ? (
-        <CanvasWorkbench key={activeProjectId ?? 'default'} projectId={activeProjectId ?? 'default'} projectName={activeProject?.name} canvasId={activeCanvasId ?? 'canvas-2'} onBack={() => setProjectCenterOpen(true)} keyboardDisabled={isSettingsOpen} />
+        activeCanvasId ? (
+          <CanvasWorkbench key={`${activeProjectId ?? 'default'}:${activeCanvasId}`} projectId={activeProjectId ?? 'default'} projectName={activeProject?.name} canvasId={activeCanvasId} onBack={closeCanvas} keyboardDisabled={isSettingsOpen} />
+        ) : (
+          <CanvasLibrary canvasCount={activeProject?.stats.canvasCount ?? 0} projectName={activeProject?.name} onOpenCanvas={openCanvas} onCreateCanvas={() => openCanvas('new-canvas')} onImportCanvas={() => window.alert('第一版暂未接入：导入画布')} onClearAll={() => window.alert('第一版暂未接入：删除全部画布')} />
+        )
       ) : (
         <main className="blank-workspace" aria-label="空白工作区" />
       )}

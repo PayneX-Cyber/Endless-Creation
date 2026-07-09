@@ -52,7 +52,7 @@ export function createMockCanvasDocument(canvasId: string, projectId: string, pr
   const meta = documents[canvasId] || documents['canvas-2'];
   const titlePrefix = projectName ? `${projectName} · ` : `${projectId} · `;
   return {
-    id: canvasId,
+    id: `${projectId}:${canvasId}`,
     title: titlePrefix + meta.title,
     description: meta.description,
     updatedAt: meta.updatedAt,

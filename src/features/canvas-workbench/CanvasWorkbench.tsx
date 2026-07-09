@@ -321,7 +321,7 @@ export function CanvasWorkbench({ canvasId, projectId, projectName, onBack, keyb
     >
       <header className="canvas-workbench__topbar">
         <div className="canvas-workbench__title-area">
-          <button className="canvas-workbench__back" onClick={onBack} type="button">返回项目管理</button>
+          <button className="canvas-workbench__back" onClick={onBack} type="button">返回画布库</button>
           <div>
             <h1>{document.title}</h1>
             <p>{document.description || '暂无描述'}</p>
