@@ -205,6 +205,22 @@ export function NovelCreation({ projectId }: { projectId: string }) {
     setView('workbench');
   }
 
+  async function deleteProject(novel: NovelSummary) {
+    if (!window.confirm(`确定删除小说项目「${novel.title || '未命名小说'}」吗？项目章节与正文将一并删除，不可恢复。`)) return;
+    const result = await novelService.deleteNovel(novel.id);
+    if (!result.ok) {
+      setFeedback(result.message || '删除小说失败。');
+      return;
+    }
+    if (currentNovel?.id === novel.id) {
+      setCurrentNovel(null);
+      setActiveChapterId(null);
+      setSaveStatus('saved');
+    }
+    setFeedback('');
+    await loadSummaries();
+  }
+
   function updateNovel(update: (novel: Novel) => Novel) {
     setCurrentNovel((current) => {
       if (!current) return current;
@@ -620,7 +636,10 @@ export function NovelCreation({ projectId }: { projectId: string }) {
               <p>Novel Studio</p>
               <h1>我的小说项目</h1>
             </div>
-            <button className="novel-flow__ghost" onClick={openCreationCenter} type="button">返回</button>
+            <nav>
+              <button className="novel-flow__primary novel-flow__primary--compact" onClick={startNewProject} type="button">新建</button>
+              <button className="novel-flow__ghost" onClick={openCreationCenter} type="button">返回</button>
+            </nav>
           </header>
           {feedback && <NovelErrorBanner message={feedback} onRetry={() => void loadSummaries()} />}
           {isLoading ? <NovelListSkeleton /> : summaries.length ? (
@@ -637,7 +656,10 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                     <p>{novel.chapterCount} 章 · {novel.wordCount} 字</p>
                     <div className="novel-project-progress" aria-label={`完成度 ${progress}%`}><span style={{ width: `${progress}%` }} /></div>
                     <footer>
-                      <button className="novel-flow__ghost" onClick={() => void openProjectView(novel.id)} type="button">查看</button>
+                      <span className="novel-project-card__actions">
+                        <button className="novel-flow__ghost" onClick={() => void openProjectView(novel.id)} type="button">查看</button>
+                        <button className="novel-flow__ghost novel-flow__ghost--danger" onClick={() => void deleteProject(novel)} type="button">删除</button>
+                      </span>
                       <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void openProjectWorkbench(novel.id)} type="button">创作</button>
                     </footer>
                   </article>
@@ -645,10 +667,6 @@ export function NovelCreation({ projectId }: { projectId: string }) {
               })}
             </div>
           ) : <EmptyState title="暂无小说项目" text="创建一个新项目后，它会显示在这里。" />}
-          <button className="novel-project-create" onClick={startNewProject} type="button">
-            <strong>创建新项目</strong>
-            <span>从一个标题开始，后续再补蓝图、章节大纲和正文。</span>
-          </button>
         </section>
       )}
       {view === 'projectView' && currentNovel && (
