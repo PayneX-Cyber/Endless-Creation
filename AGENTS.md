@@ -8,6 +8,7 @@
 - Keep commits coherent, but do not slow development by turning every sub-step into a separate dispatch or handoff.
 - Ask for a scope decision only when options are genuinely mutually exclusive or risky; otherwise pick the shortest safe path and execute.
 - Do not end a turn by asking whether to "fill the remaining pieces" of an already-chosen package; finish the package unless blocked.
+- Do not treat a design/plan as a separate delivery step unless the user explicitly asks for design-only work; once direction is accepted, implement the whole coherent package end-to-end.
 - 中文口径：不要再把项目开发拆得过细；路线已定时默认一次跑完整包，不要反复用“下一刀/要不要补齐/由你定”拖慢节奏。
 
 ## Validation
