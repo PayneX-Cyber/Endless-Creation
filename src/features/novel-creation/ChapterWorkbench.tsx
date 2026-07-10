@@ -4,6 +4,8 @@ import { novelService } from '../../services/novelService';
 import type { Chapter, ChapterVersion, Foreshadowing, Novel } from '../../types/novel';
 import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, buildChapterConsistencyPrompt, buildChapterRhythmPrompt, buildForeshadowingCandidatesPrompt, parseForeshadowingCandidates, buildForeshadowingPayoffCandidatesPrompt, parseForeshadowingPayoffCandidates, type OptimizeType, type TextMessage } from './novelPrompts';
 import { countWords, createId, formatTime, saveStatusLabel, type SaveStatus } from './novelShared';
+import { CHAPTER_STATUS_LABEL, CHAPTER_STATUS_ORDER, PROGRESS_LABELS, SOFT_GATE_HINTS, resolveChapterStatus } from './novelProgress';
+import type { ChapterStatus as NovelChapterStatus } from '../../types/novel';
 import { ForeshadowingPanel, type ForeshadowingDraft, type ForeshadowingAiCandidate, type ForeshadowingPayoffAiCandidate } from './ForeshadowingPanel';
 import { assertStoreZipSelfCheck, createStoreZip, textToBytes, type StoreZipEntry } from '../../services/storeZip';
 import './ChapterWorkbench.css';
@@ -34,8 +36,8 @@ interface ChapterWorkbenchProps {
   activeChapterId: string | null;
   saveStatus: SaveStatus;
   onSelectChapter: (chapterId: string) => void;
-  onUpdateChapter: (chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId'>>) => void;
-  onUpdateChapterAndSave: (chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId'>>) => void;
+  onUpdateChapter: (chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId' | 'status' | 'wordTarget'>>) => void;
+  onUpdateChapterAndSave: (chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId' | 'status' | 'wordTarget'>>) => void;
   onUpdateNovel: (update: (novel: Novel) => Novel) => void;
   onRetrySave: () => void;
   onBackToProjects: () => void;
@@ -928,6 +930,47 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
             {consistency.error && <p className="novel-flow__error">{consistency.error}</p>}
             {rhythm.error && <p className="novel-flow__error">{rhythm.error}</p>}
             {optimizeError && <p className="novel-flow__error">{optimizeError}</p>}
+            <div className="novel-workbench__progress-bar">
+              <label className="novel-workbench__progress-field">
+                <span>{PROGRESS_LABELS.statusCompletion.slice(0, 2)}</span>
+                <select
+                  value={resolveChapterStatus(activeChapter)}
+                  disabled={busy}
+                  onChange={(event) => onUpdateChapterAndSave(activeChapter.id, { status: event.target.value as NovelChapterStatus })}
+                >
+                  {CHAPTER_STATUS_ORDER.map((status) => (
+                    <option key={status} value={status}>{CHAPTER_STATUS_LABEL[status]}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="novel-workbench__progress-field">
+                <span>{PROGRESS_LABELS.chapterTarget}</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={100}
+                  value={activeChapter.wordTarget ?? ''}
+                  disabled={busy}
+                  placeholder={PROGRESS_LABELS.targetPlaceholder}
+                  onChange={(event) => {
+                    const raw = Number(event.target.value);
+                    const next = Number.isFinite(raw) && raw > 0 ? Math.round(raw) : undefined;
+                    onUpdateChapterAndSave(activeChapter.id, { wordTarget: next });
+                  }}
+                />
+              </label>
+              <span className="novel-workbench__progress-count">
+                {countWords(activeChapter.content)}{activeChapter.wordTarget ? ` / ${activeChapter.wordTarget}` : ''}
+              </span>
+            </div>
+            {(() => {
+              const words = countWords(activeChapter.content);
+              const target = activeChapter.wordTarget;
+              if (target && words < target) return <p className="novel-workbench__soft-hint">{SOFT_GATE_HINTS.belowTarget(target - words)}</p>;
+              if (target && words >= target && resolveChapterStatus(activeChapter) !== 'done') return <p className="novel-workbench__soft-hint">{SOFT_GATE_HINTS.reachedTarget}</p>;
+              if (!target && words >= 1000 && resolveChapterStatus(activeChapter) !== 'done') return <p className="novel-workbench__soft-hint">{SOFT_GATE_HINTS.markDone}</p>;
+              return null;
+            })()}
             <textarea
               ref={textareaRef}
               value={activeChapter.content}

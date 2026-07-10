@@ -3,6 +3,7 @@ import { rendererBridge } from '../../services/rendererBridge';
 import type { AiUsageRecord } from '../../types/apiProvider';
 import type { Novel } from '../../types/novel';
 import { countWords } from './novelShared';
+import { CHAPTER_STATUS_LABEL, CHAPTER_STATUS_ORDER, PROGRESS_LABELS, formatPercent, summarizeProgress } from './novelProgress';
 
 function briefTitle(title: string, max: number): string {
   const normalized = title.replace(/\s+/g, ' ').trim();
@@ -33,6 +34,7 @@ export function NovelStats({ novel }: { novel: Novel }) {
     if (longest && entry.words > longest.words) longest = entry;
     if (shortest && entry.words < shortest.words) shortest = entry;
   }
+  const progressSummary = summarizeProgress(novel);
   const successfulCalls = usageRecords.filter((record) => record.success);
   const inputTokens = usageRecords.reduce((sum, record) => sum + record.inputTokens, 0);
   const outputTokens = usageRecords.reduce((sum, record) => sum + record.outputTokens, 0);
@@ -54,7 +56,7 @@ export function NovelStats({ novel }: { novel: Novel }) {
       <div className="novel-stats__grid">
         <div className="novel-stats__cell"><strong>{formatNumber(totalWords)}</strong><span>总字数</span></div>
         <div className="novel-stats__cell"><strong>{doneCount} / {totalChapters}</strong><span>章节进度</span></div>
-        <div className="novel-stats__cell"><strong>{progress}%</strong><span>完成度</span></div>
+        <div className="novel-stats__cell novel-stats__cell--muted"><strong>{progress}%</strong><span>{PROGRESS_LABELS.contentCompletion}</span></div>
       </div>
       {doneCount > 0 && longest && shortest && avgDoneWords !== null ? (
         <div className="novel-stats__grid">
@@ -65,6 +67,27 @@ export function NovelStats({ novel }: { novel: Novel }) {
       ) : (
         <p className="novel-stats__hint">完成首章后展示平均字数、最长章节和最短章节。</p>
       )}
+      <div className="novel-stats__longform" aria-label={PROGRESS_LABELS.sectionTitle}>
+        <div className="novel-stats__usage-head">
+          <h4>{PROGRESS_LABELS.sectionTitle}</h4>
+        </div>
+        <div className="novel-stats__grid">
+          <div className="novel-stats__cell"><strong>{formatPercent(progressSummary.statusCompletionRate)}</strong><span>{PROGRESS_LABELS.statusCompletion}</span></div>
+          <div className="novel-stats__cell">
+            <strong>{progressSummary.wordCompletionRate !== undefined ? formatPercent(progressSummary.wordCompletionRate) : PROGRESS_LABELS.noTarget}</strong>
+            <span>{PROGRESS_LABELS.wordCompletion}{progressSummary.novelWordTarget ? ` · ${formatNumber(progressSummary.totalWords)}/${formatNumber(progressSummary.novelWordTarget)}` : ''}</span>
+          </div>
+          <div className="novel-stats__cell"><strong>{progressSummary.doneCount} / {progressSummary.totalChapters}</strong><span>完成章节</span></div>
+        </div>
+        <div className="novel-stats__status-dist">
+          <span className="novel-stats__status-dist-label">{PROGRESS_LABELS.statusDistribution}</span>
+          {CHAPTER_STATUS_ORDER.map((status) => (
+            <span key={status} className={`novel-stats__status-chip novel-stats__status-chip--${status}`}>
+              {CHAPTER_STATUS_LABEL[status]} {progressSummary.statusCounts[status]}
+            </span>
+          ))}
+        </div>
+      </div>
       <div className="novel-stats__usage" aria-label="AI 成本">
         <div className="novel-stats__usage-head">
           <h4>AI 成本</h4>

@@ -117,6 +117,8 @@ interface ChapterVersion {
   createdAt: string;
 }
 
+type ChapterStatus = 'draft' | 'inProgress' | 'done';
+
 interface Chapter {
   id: string;
   title: string;
@@ -124,6 +126,8 @@ interface Chapter {
   outline?: string;
   versions?: ChapterVersion[];
   selectedVersionId?: string;
+  status?: ChapterStatus;
+  wordTarget?: number;
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -147,6 +151,7 @@ interface Novel {
   note: string;
   idea?: string;
   blueprint?: string;
+  wordTarget?: number;
   projectId?: string;
   chapters: Chapter[];
   foreshadowings: Foreshadowing[];
@@ -643,6 +648,8 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
       outline: typeof item.outline === 'string' ? item.outline : undefined,
       versions: sanitizeChapterVersions(item.versions, now),
       selectedVersionId: typeof item.selectedVersionId === 'string' ? item.selectedVersionId : undefined,
+      status: item.status === 'draft' || item.status === 'inProgress' || item.status === 'done' ? item.status : undefined,
+      wordTarget: typeof item.wordTarget === 'number' && Number.isFinite(item.wordTarget) && item.wordTarget > 0 ? item.wordTarget : undefined,
       order: Number.isFinite(item.order) ? Number(item.order) : index,
       createdAt: typeof item.createdAt === 'string' ? item.createdAt : now,
       updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : now,
@@ -657,6 +664,7 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
     note: typeof candidate.note === 'string' ? candidate.note : '',
     idea: typeof candidate.idea === 'string' ? candidate.idea : undefined,
     blueprint: typeof candidate.blueprint === 'string' ? candidate.blueprint : undefined,
+    wordTarget: typeof candidate.wordTarget === 'number' && Number.isFinite(candidate.wordTarget) && candidate.wordTarget > 0 ? candidate.wordTarget : undefined,
     chapters,
     foreshadowings: sanitizeForeshadowings(candidate.foreshadowings, now),
     version: 4,

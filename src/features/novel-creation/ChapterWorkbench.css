@@ -232,6 +232,69 @@
   font-size: 12px;
 }
 
+.novel-workbench__progress-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #f8fafc;
+}
+
+.novel-workbench__progress-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.novel-workbench__progress-field select,
+.novel-workbench__progress-field input {
+  padding: 4px 8px;
+  border: 1px solid #d5dce6;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 12px;
+  color: #1f2937;
+}
+
+.novel-workbench__progress-field input {
+  width: 96px;
+}
+
+.novel-workbench__progress-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.novel-workbench__soft-hint {
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: #fff7ed;
+  color: #b45309;
+  font-size: 12px;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__progress-bar {
+  background: #111822;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__progress-field select,
+.app-shell[data-theme='dark'] .novel-workbench__progress-field input {
+  background: #0b111a;
+  border-color: #1e293b;
+  color: inherit;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__soft-hint {
+  background: rgba(180, 83, 9, 0.15);
+  color: #fbbf24;
+}
+
 .novel-workbench__main {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);

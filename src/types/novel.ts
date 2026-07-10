@@ -4,6 +4,8 @@ export interface ChapterVersion {
   createdAt: string;
 }
 
+export type ChapterStatus = 'draft' | 'inProgress' | 'done';
+
 export interface Chapter {
   id: string;
   title: string;
@@ -11,6 +13,8 @@ export interface Chapter {
   outline?: string;
   versions?: ChapterVersion[];
   selectedVersionId?: string;
+  status?: ChapterStatus;
+  wordTarget?: number;
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -35,6 +39,7 @@ export interface Novel {
   note: string;
   idea?: string;
   blueprint?: string;
+  wordTarget?: number;
   chapters: Chapter[];
   foreshadowings: Foreshadowing[];
   version: 4;

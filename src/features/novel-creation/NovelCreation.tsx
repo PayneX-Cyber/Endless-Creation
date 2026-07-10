@@ -9,6 +9,8 @@ import { NovelErrorBanner, NovelListSkeleton } from './NovelSkeletons';
 import { ChapterWorkbench } from './ChapterWorkbench';
 import { NovelStats } from './NovelStats';
 import { countWords, createId, formatTime, type SaveStatus } from './novelShared';
+import { CHAPTER_STATUS_LABEL, CHAPTER_STATUS_ORDER, PROGRESS_LABELS, resolveChapterStatus } from './novelProgress';
+import type { ChapterStatus as NovelChapterStatus } from '../../types/novel';
 import './NovelCreation.css';
 
 type NovelView = 'creationCenter' | 'projectList' | 'projectView' | 'inspirationIntro' | 'inspirationPreparing' | 'inspirationChat' | 'inspirationBlueprint' | 'inspirationOutline' | 'workbench';
@@ -276,7 +278,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
     setActiveChapterId(chapter.id);
   }
 
-  function updateChapterById(chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId'>>) {
+  function updateChapterById(chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId' | 'status' | 'wordTarget'>>) {
     const now = new Date().toISOString();
     updateNovel((novel) => ({
       ...novel,
@@ -285,7 +287,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
     }));
   }
 
-  function updateChapterByIdAndSave(chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId'>>) {
+  function updateChapterByIdAndSave(chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId' | 'status' | 'wordTarget'>>) {
     if (!currentNovel) return;
     const now = new Date().toISOString();
     const nextNovel: Novel = {
@@ -651,6 +653,12 @@ export function NovelCreation({ projectId }: { projectId: string }) {
     updateNovel((novel) => ({ ...novel, [field]: value, updatedAt: new Date().toISOString() }));
   }
 
+  function updateNovelWordTarget(value: string) {
+    const raw = Number(value);
+    const next = Number.isFinite(raw) && raw > 0 ? Math.round(raw) : undefined;
+    updateNovel((novel) => ({ ...novel, wordTarget: next, updatedAt: new Date().toISOString() }));
+  }
+
   return (
     <main className="novel-creation novel-creation--flow" aria-label="小说创作">
       {view === 'creationCenter' && (
@@ -741,6 +749,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                 <>
                   <div className="novel-project-panel__head"><h2>项目概览</h2><button className="novel-flow__primary novel-flow__primary--compact" onClick={() => void openProjectWorkbench(currentNovel.id)} type="button">开始创作</button></div>
                   <NovelStats novel={currentNovel} />
+                  <label>{PROGRESS_LABELS.novelTarget}<input type="number" min={0} step={1000} value={currentNovel.wordTarget ?? ''} onChange={(event) => updateNovelWordTarget(event.target.value)} placeholder={PROGRESS_LABELS.targetPlaceholder} /></label>
                   <label>核心摘要<textarea value={projectSummary(currentNovel)} onChange={(event) => updateProjectField('blueprint', event.target.value)} placeholder="写下这本小说的核心设定、主线冲突和整体梗概。" /></label>
                   <label>简介<textarea value={currentNovel.summary} onChange={(event) => updateProjectField('summary', event.target.value)} placeholder="一句话介绍这本小说。" /></label>
                   <label>创意源<textarea value={currentNovel.idea ?? ''} onChange={(event) => updateProjectField('idea', event.target.value)} placeholder="最初的灵感、主题或想表达的情绪。" /></label>
@@ -756,6 +765,10 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                         <button className="novel-flow__ghost" onClick={() => deleteChapterById(chapter.id)} type="button">删除</button>
                       </div>
                       <input value={chapter.title} onChange={(event) => updateChapterById(chapter.id, { title: event.target.value })} placeholder="未命名章节" />
+                      <div className="novel-outline-card__progress">
+                        <label><span>{PROGRESS_LABELS.statusCompletion.slice(0, 2)}</span><select value={resolveChapterStatus(chapter)} onChange={(event) => updateChapterByIdAndSave(chapter.id, { status: event.target.value as NovelChapterStatus })}>{CHAPTER_STATUS_ORDER.map((status) => <option key={status} value={status}>{CHAPTER_STATUS_LABEL[status]}</option>)}</select></label>
+                        <label><span>{PROGRESS_LABELS.chapterTarget}</span><input type="number" min={0} step={100} value={chapter.wordTarget ?? ''} onChange={(event) => { const raw = Number(event.target.value); updateChapterByIdAndSave(chapter.id, { wordTarget: Number.isFinite(raw) && raw > 0 ? Math.round(raw) : undefined }); }} placeholder={PROGRESS_LABELS.targetPlaceholder} /></label>
+                      </div>
                       <textarea value={chapter.outline ?? ''} onChange={(event) => updateChapterById(chapter.id, { outline: event.target.value })} placeholder="本章故事结构规划…" />
                     </article>
                   ))}</div> : <EmptyState title="暂无章节大纲" text="新增章节后，可以在这里补充每章的故事规划。" />}
@@ -767,7 +780,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                   {chapters.length ? <div className="novel-content-list">{chapters.map((chapter, index) => (
                     <button className="novel-content-card" key={chapter.id} onClick={() => void openProjectWorkbench(currentNovel.id, chapter.id)} type="button">
                       <strong>第 {index + 1} 章 · {chapter.title || '未命名章节'}</strong>
-                      <span>{countWords(chapter.content)} 字</span>
+                      <span>{countWords(chapter.content)} 字 · {CHAPTER_STATUS_LABEL[resolveChapterStatus(chapter)]}</span>
                       <p>{chapter.outline?.trim() || '暂无章节大纲'}</p>
                       <small>{chapter.content.trim() ? chapter.content.trim().slice(0, 120) : '暂无正文'}</small>
                     </button>
