@@ -14,6 +14,7 @@ const timedOutImageGenerationRequests = new Set<string>();
 const textGenerationControllers = new Map<string, AbortController>();
 const timedOutTextGenerationRequests = new Set<string>();
 const novelSaveQueues = new Map<string, Promise<unknown>>();
+let aiUsageAppendQueue: Promise<void> = Promise.resolve();
 
 interface ApiProviderConfig {
   type: 'openai-compatible';
@@ -311,10 +312,17 @@ async function loadAiUsage(projectId?: unknown): Promise<{ ok: boolean; message:
 }
 
 async function appendAiUsage(record: Omit<AiUsageRecord, 'id' | 'createdAt'>): Promise<void> {
-  const current = await loadAiUsage();
-  const records = current.records;
-  records.push({ ...record, id: randomUUID(), createdAt: new Date().toISOString() });
-  await fs.writeFile(getAiUsagePath(), JSON.stringify({ version: 1, records }, null, 2), 'utf-8');
+  const next = aiUsageAppendQueue.catch(() => undefined).then(async () => {
+    const current = await loadAiUsage();
+    const records = current.records;
+    records.push({ ...record, id: randomUUID(), createdAt: new Date().toISOString() });
+    const target = getAiUsagePath();
+    const temp = `${target}.tmp`;
+    await fs.writeFile(temp, JSON.stringify({ version: 1, records }, null, 2), 'utf-8');
+    await fs.rename(temp, target);
+  });
+  aiUsageAppendQueue = next.catch(() => undefined);
+  await next;
 }
 
 // 本地 provider/model 价格表：单位为「人民币元 / 每百万 token」，与成本看板的 ¥ 展示一致。
