@@ -32,20 +32,24 @@ interface ForeshadowingPanelProps {
   onEdit: (id: string, draft: ForeshadowingDraft) => void;
   onToggleStatus: (id: string) => void;
   onDelete: (id: string) => void;
-  onClose: () => void;
-  aiCandidates: ForeshadowingAiCandidate[];
-  aiPayoffCandidates: ForeshadowingPayoffAiCandidate[];
-  aiBusy: boolean;
-  aiError: string;
-  aiRawText: string;
-  aiGenerateDisabledReason: string;
-  aiPayoffGenerateDisabledReason: string;
-  onGenerateAiCandidates: () => void;
-  onAcceptAiCandidate: (candidateId: string) => void;
-  onDismissAiCandidate: (candidateId: string) => void;
-  onGenerateAiPayoffCandidates: () => void;
-  onAcceptAiPayoffCandidate: (candidateId: string) => void;
-  onDismissAiPayoffCandidate: (candidateId: string) => void;
+  onClose?: () => void;
+  variant?: 'modal' | 'embedded';
+  title?: string;
+  description?: string;
+  showAiSuggestions?: boolean;
+  aiCandidates?: ForeshadowingAiCandidate[];
+  aiPayoffCandidates?: ForeshadowingPayoffAiCandidate[];
+  aiBusy?: boolean;
+  aiError?: string;
+  aiRawText?: string;
+  aiGenerateDisabledReason?: string;
+  aiPayoffGenerateDisabledReason?: string;
+  onGenerateAiCandidates?: () => void;
+  onAcceptAiCandidate?: (candidateId: string) => void;
+  onDismissAiCandidate?: (candidateId: string) => void;
+  onGenerateAiPayoffCandidates?: () => void;
+  onAcceptAiPayoffCandidate?: (candidateId: string) => void;
+  onDismissAiPayoffCandidate?: (candidateId: string) => void;
 }
 
 const emptyDraft: ForeshadowingDraft = { title: '', plantedChapterId: '', payoffChapterId: '', note: '' };
@@ -58,13 +62,17 @@ export function ForeshadowingPanel({
   onToggleStatus,
   onDelete,
   onClose,
-  aiCandidates,
-  aiPayoffCandidates,
-  aiBusy,
-  aiError,
-  aiRawText,
-  aiGenerateDisabledReason,
-  aiPayoffGenerateDisabledReason,
+  variant = 'modal',
+  title = '伏笔记录',
+  description = '手动记录伏笔的埋设与回收，跨章追踪。删除章节不会清理引用，悬空引用显示为「章节已删除」，可编辑改挂。',
+  showAiSuggestions = true,
+  aiCandidates = [],
+  aiPayoffCandidates = [],
+  aiBusy = false,
+  aiError = '',
+  aiRawText = '',
+  aiGenerateDisabledReason = '',
+  aiPayoffGenerateDisabledReason = '',
   onGenerateAiCandidates,
   onAcceptAiCandidate,
   onDismissAiCandidate,
@@ -130,12 +138,17 @@ export function ForeshadowingPanel({
   const isForm = mode === 'create' || typeof mode === 'object';
   const pendingCount = foreshadowings.filter((item) => item.status === 'planted').length;
   const paidOffCount = foreshadowings.length - pendingCount;
+  const plantedCount = foreshadowings.filter((item) => Boolean(item.plantedChapterId)).length;
 
-  return (
-    <div className="novel-modal" role="dialog" aria-modal="true" aria-label="伏笔记录" onClick={onClose}>
-      <div className="novel-workbench__preview novel-foreshadow" onClick={(event) => event.stopPropagation()}>
-        <h2>伏笔记录</h2>
-        <p className="novel-workbench__preview-sub">手动记录伏笔的埋设与回收，跨章追踪。删除章节不会清理引用，悬空引用显示为「章节已删除」，可编辑改挂。</p>
+  const panel = (
+    <div className={variant === 'embedded' ? 'novel-foreshadow novel-foreshadow--embedded' : 'novel-workbench__preview novel-foreshadow'} onClick={(event) => event.stopPropagation()}>
+        <div className={variant === 'embedded' ? 'novel-project-panel__head' : undefined}>
+          <div className={variant === 'embedded' ? 'novel-project-panel__heading' : undefined}>
+            <h2>{title}</h2>
+            <p className="novel-workbench__preview-sub">{description}</p>
+          </div>
+          {variant === 'embedded' && !isForm && <button className="novel-flow__primary novel-flow__primary--compact" onClick={openCreate} type="button">新增伏笔</button>}
+        </div>
 
         {isForm ? (
           <div className="novel-foreshadow__form">
@@ -193,10 +206,19 @@ export function ForeshadowingPanel({
           </div>
         ) : (
           <>
-            <div className="novel-foreshadow__summary">
-              <span>待回收 {pendingCount}</span>
-              <span>已回收 {paidOffCount}</span>
-            </div>
+            {variant === 'embedded' ? (
+              <div className="novel-foreshadow__metrics" aria-label="伏笔统计">
+                <span><small>总伏笔</small><strong>{foreshadowings.length}</strong></span>
+                <span><small>已埋设</small><strong>{plantedCount}</strong></span>
+                <span><small>已回收</small><strong>{paidOffCount}</strong></span>
+                <span><small>待回收</small><strong>{pendingCount}</strong></span>
+              </div>
+            ) : (
+              <div className="novel-foreshadow__summary">
+                <span>待回收 {pendingCount}</span>
+                <span>已回收 {paidOffCount}</span>
+              </div>
+            )}
             {foreshadowings.length ? (
               <div className="novel-foreshadow__list">
                 {foreshadowings.map((item) => (
@@ -228,7 +250,7 @@ export function ForeshadowingPanel({
                 <span>点下面的「新增伏笔」，把埋设的线索记下来，方便后续回收。</span>
               </div>
             )}
-            <section className="novel-foreshadow__ai">
+            {showAiSuggestions && <section className="novel-foreshadow__ai">
               <div className="novel-foreshadow__ai-head">
                 <strong>AI 建议</strong>
                 <div className="novel-foreshadow__ai-actions">
@@ -263,8 +285,8 @@ export function ForeshadowingPanel({
                         <strong>{candidate.title}</strong>
                         {candidate.note && <p className="novel-foreshadow__note">{candidate.note}</p>}
                         <div className="novel-foreshadow__item-actions">
-                          <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => onAcceptAiCandidate(candidate.id)} type="button">加入记录</button>
-                          <button className="novel-flow__ghost" onClick={() => onDismissAiCandidate(candidate.id)} type="button">忽略</button>
+                          <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => onAcceptAiCandidate?.(candidate.id)} type="button">加入记录</button>
+                          <button className="novel-flow__ghost" onClick={() => onDismissAiCandidate?.(candidate.id)} type="button">忽略</button>
                         </div>
                       </article>
                     ))}
@@ -280,8 +302,8 @@ export function ForeshadowingPanel({
                         <strong>{candidate.title}</strong>
                         {candidate.note && <p className="novel-foreshadow__note">{candidate.note}</p>}
                         <div className="novel-foreshadow__item-actions">
-                          <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => onAcceptAiPayoffCandidate(candidate.id)} type="button">标记回收</button>
-                          <button className="novel-flow__ghost" onClick={() => onDismissAiPayoffCandidate(candidate.id)} type="button">忽略</button>
+                          <button className="novel-flow__primary novel-flow__primary--compact" onClick={() => onAcceptAiPayoffCandidate?.(candidate.id)} type="button">标记回收</button>
+                          <button className="novel-flow__ghost" onClick={() => onDismissAiPayoffCandidate?.(candidate.id)} type="button">忽略</button>
                         </div>
                       </article>
                     ))}
@@ -295,14 +317,16 @@ export function ForeshadowingPanel({
                   <pre>{aiRawText}</pre>
                 </div>
               )}
-            </section>
+            </section>}
             <footer>
-              <button className="novel-flow__ghost" onClick={onClose} type="button">关闭</button>
-              <button className="novel-flow__primary novel-flow__primary--compact" onClick={openCreate} type="button">新增伏笔</button>
+              {onClose && <button className="novel-flow__ghost" onClick={onClose} type="button">关闭</button>}
+              {variant !== 'embedded' && <button className="novel-flow__primary novel-flow__primary--compact" onClick={openCreate} type="button">新增伏笔</button>}
             </footer>
           </>
         )}
-      </div>
     </div>
   );
+
+  if (variant === 'embedded') return panel;
+  return <div className="novel-modal" role="dialog" aria-modal="true" aria-label={title} onClick={onClose}>{panel}</div>;
 }

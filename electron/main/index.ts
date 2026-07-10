@@ -144,6 +144,17 @@ interface Foreshadowing {
   updatedAt: string;
 }
 
+type SettingType = 'character' | 'location' | 'organization' | 'item' | 'term' | 'rule' | 'other';
+
+interface SettingEntry {
+  id: string;
+  type: SettingType;
+  title: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface Novel {
   id: string;
   title: string;
@@ -155,6 +166,7 @@ interface Novel {
   projectId?: string;
   chapters: Chapter[];
   foreshadowings: Foreshadowing[];
+  settings?: SettingEntry[];
   version: 4;
   createdAt: string;
   updatedAt: string;
@@ -667,6 +679,7 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
     wordTarget: typeof candidate.wordTarget === 'number' && Number.isFinite(candidate.wordTarget) && candidate.wordTarget > 0 ? candidate.wordTarget : undefined,
     chapters,
     foreshadowings: sanitizeForeshadowings(candidate.foreshadowings, now),
+    settings: sanitizeSettings(candidate.settings, now),
     version: 4,
     createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : now,
     updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : now,
@@ -690,6 +703,25 @@ function sanitizeForeshadowings(value: unknown, now: string): Foreshadowing[] {
       updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : now,
     };
   }).filter((entry): entry is Foreshadowing => entry !== null);
+}
+
+const SETTING_TYPES: SettingType[] = ['character', 'location', 'organization', 'item', 'term', 'rule', 'other'];
+
+function sanitizeSettings(value: unknown, now: string): SettingEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((entry): SettingEntry | null => {
+    if (!entry || typeof entry !== 'object') return null;
+    const item = entry as Partial<SettingEntry>;
+    if (typeof item.title !== 'string' || !item.title.trim()) return null;
+    return {
+      id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : randomUUID(),
+      type: SETTING_TYPES.includes(item.type as SettingType) ? (item.type as SettingType) : 'other',
+      title: item.title,
+      body: typeof item.body === 'string' ? item.body : '',
+      createdAt: typeof item.createdAt === 'string' ? item.createdAt : now,
+      updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : now,
+    };
+  }).filter((entry): entry is SettingEntry => entry !== null);
 }
 
 function sanitizeChapterVersions(value: unknown, fallbackTime: string): ChapterVersion[] | undefined {
@@ -761,6 +793,7 @@ async function createNovel(input: unknown): Promise<{ ok: boolean; message: stri
     note: typeof candidate.note === 'string' ? candidate.note : '',
     chapters: [],
     foreshadowings: [],
+    settings: [],
     version: 4,
     createdAt: now,
     updatedAt: now,

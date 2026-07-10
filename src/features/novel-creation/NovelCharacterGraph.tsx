@@ -117,7 +117,10 @@ export function NovelCharacterGraphPanel({ graph, busy, error, onDeduce }: Novel
   return (
     <>
       <div className="novel-project-panel__head">
-        <h2>人物关系</h2>
+        <div className="novel-project-panel__heading">
+          <h2>人物关系</h2>
+          <p>梳理角色之间的纽带、冲突与关键关系</p>
+        </div>
         <button className="novel-flow__primary novel-flow__primary--compact" disabled={busy} onClick={onDeduce} type="button">
           {busy ? '推演中…' : hasGraph ? '重新推演' : 'AI 推演关系'}
         </button>

@@ -227,6 +227,58 @@
   width: 100%;
 }
 
+.novel-workbench__settings {
+  display: grid;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid #e6ebf3;
+}
+
+.novel-workbench__settings-list {
+  display: grid;
+  gap: 12px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.novel-workbench__settings-group {
+  display: grid;
+  gap: 6px;
+}
+
+.novel-workbench__settings-type {
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.novel-workbench__settings-item {
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: #f8fafc;
+}
+
+.novel-workbench__settings-item strong {
+  font-size: 13px;
+  color: #1f2937;
+}
+
+.novel-workbench__settings-item p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__settings {
+  border-top-color: #1e293b;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__settings-item {
+  background: #111822;
+}
+
 .novel-workbench__hint {
   color: #94a3b8;
   font-size: 12px;

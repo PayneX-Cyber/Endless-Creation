@@ -5,6 +5,7 @@ import type { Chapter, ChapterVersion, Foreshadowing, Novel } from '../../types/
 import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, buildChapterConsistencyPrompt, buildChapterRhythmPrompt, buildForeshadowingCandidatesPrompt, parseForeshadowingCandidates, buildForeshadowingPayoffCandidatesPrompt, parseForeshadowingPayoffCandidates, type OptimizeType, type TextMessage } from './novelPrompts';
 import { countWords, createId, formatTime, saveStatusLabel, type SaveStatus } from './novelShared';
 import { CHAPTER_STATUS_LABEL, CHAPTER_STATUS_ORDER, PROGRESS_LABELS, SOFT_GATE_HINTS, resolveChapterStatus } from './novelProgress';
+import { SETTING_LABELS, groupSettingsByType } from './novelSettings';
 import type { ChapterStatus as NovelChapterStatus } from '../../types/novel';
 import { ForeshadowingPanel, type ForeshadowingDraft, type ForeshadowingAiCandidate, type ForeshadowingPayoffAiCandidate } from './ForeshadowingPanel';
 import { assertStoreZipSelfCheck, createStoreZip, textToBytes, type StoreZipEntry } from '../../services/storeZip';
@@ -169,6 +170,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
   const progress = chapters.length ? Math.round((doneCount / chapters.length) * 100) : 0;
   const firstPendingIndex = chapters.findIndex((chapter) => chapter.content.trim() === '');
   const missingOutlineCount = chapters.filter((chapter) => !chapter.outline?.trim()).length;
+  const settingGroups = groupSettingsByType(novel.settings ?? []);
   const otherAiBusy = generatingChapterId !== null || outlineBusy || review.busy || consistency.busy || rhythm.busy || optimizeTypeOpen || optimizeJob !== null;
   const busy = otherAiBusy || foreshadowAiBusy;
   const plantedForeshadowings = novel.foreshadowings.filter((item) => item.status === 'planted');
@@ -1064,6 +1066,26 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
               {outlineError && <p className="novel-flow__error">{outlineError}</p>}
             </div>
           )}
+          <section className="novel-workbench__settings" aria-label={SETTING_LABELS.sidebarTitle}>
+            <div className="novel-workbench__list-head"><h3>{SETTING_LABELS.sidebarTitle}</h3></div>
+            {settingGroups.length ? (
+              <div className="novel-workbench__settings-list">
+                {settingGroups.map((group) => (
+                  <div className="novel-workbench__settings-group" key={group.type}>
+                    <span className="novel-workbench__settings-type">{group.label}</span>
+                    {group.entries.map((entry) => (
+                      <div className="novel-workbench__settings-item" key={entry.id}>
+                        <strong>{entry.title}</strong>
+                        {entry.body && <p>{entry.body}</p>}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <span className="novel-workbench__hint">{SETTING_LABELS.sidebarEmpty}</span>
+            )}
+          </section>
         </aside>
         <section className="novel-workbench__main" aria-label="章节创作区">
           <div className="novel-workbench__main-inner" key={activeChapterId ?? 'none'}>{renderMain()}</div>

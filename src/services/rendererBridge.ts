@@ -350,6 +350,7 @@ export const rendererBridge = {
       projectId: input.projectId?.trim() || 'default',
       chapters: [],
       foreshadowings: [],
+      settings: [],
       version: 4,
       createdAt: now,
       updatedAt: now,
@@ -473,6 +474,7 @@ function normalizeWebNovel(value: unknown): Novel | null {
     ...value,
     chapters: Array.isArray(value.chapters) ? value.chapters : [],
     foreshadowings: Array.isArray(value.foreshadowings) ? value.foreshadowings : [],
+    settings: Array.isArray(value.settings) ? value.settings : [],
     version: 4,
   };
 }

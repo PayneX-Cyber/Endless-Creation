@@ -20,6 +20,17 @@ export interface Chapter {
   updatedAt: string;
 }
 
+export type SettingType = 'character' | 'location' | 'organization' | 'item' | 'term' | 'rule' | 'other';
+
+export interface SettingEntry {
+  id: string;
+  type: SettingType;
+  title: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Foreshadowing {
   id: string;
   title: string;                 // 伏笔简述（必需，空则不落库）
@@ -42,6 +53,7 @@ export interface Novel {
   wordTarget?: number;
   chapters: Chapter[];
   foreshadowings: Foreshadowing[];
+  settings?: SettingEntry[];
   version: 4;
   createdAt: string;
   updatedAt: string;

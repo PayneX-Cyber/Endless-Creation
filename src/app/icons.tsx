@@ -169,6 +169,57 @@ export function ChevronRightIcon(props: IconProps) {
   );
 }
 
+export function ArrowLeftIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <path d="m14.5 6-6 6 6 6M9 12h10" />
+    </SvgIcon>
+  );
+}
+
+export function GlobeIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17M12 3.5c2.4 2.3 3.7 5.1 3.7 8.5S14.4 18.2 12 20.5C9.6 18.2 8.3 15.4 8.3 12S9.6 5.8 12 3.5Z" />
+    </SvgIcon>
+  );
+}
+
+export function UsersIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <circle cx="9" cy="8" r="3" />
+      <path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.5a3 3 0 0 1 0 5.8M17 14a5 5 0 0 1 3.5 5" />
+    </SvgIcon>
+  );
+}
+
+export function ListIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <path d="M8 6h11M8 12h11M8 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01" />
+    </SvgIcon>
+  );
+}
+
+export function ChartIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <rect x="4" y="4" width="16" height="16" rx="3" />
+      <path d="m7 15 3.2-3.2 2.6 2.4 4.2-5M16 9h1v1" />
+    </SvgIcon>
+  );
+}
+
+export function BoltIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <path d="m13.5 2.8-8 11.2h6l-1 7.2 8-11.2h-6l1-7.2Z" />
+    </SvgIcon>
+  );
+}
+
 
 export function BillingIcon(props: IconProps) {
   return (
