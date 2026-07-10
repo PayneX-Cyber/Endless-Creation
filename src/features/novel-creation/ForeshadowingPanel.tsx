@@ -37,6 +37,9 @@ interface ForeshadowingPanelProps {
   title?: string;
   description?: string;
   showAiSuggestions?: boolean;
+  onAnalyzeChapter?: () => void;
+  analyzeDisabled?: boolean;
+  analyzeDisabledHint?: string;
   aiCandidates?: ForeshadowingAiCandidate[];
   aiPayoffCandidates?: ForeshadowingPayoffAiCandidate[];
   aiBusy?: boolean;
@@ -66,6 +69,9 @@ export function ForeshadowingPanel({
   title = '伏笔记录',
   description = '手动记录伏笔的埋设与回收，跨章追踪。删除章节不会清理引用，悬空引用显示为「章节已删除」，可编辑改挂。',
   showAiSuggestions = true,
+  onAnalyzeChapter,
+  analyzeDisabled = false,
+  analyzeDisabledHint = '',
   aiCandidates = [],
   aiPayoffCandidates = [],
   aiBusy = false,
@@ -147,7 +153,12 @@ export function ForeshadowingPanel({
             <h2>{title}</h2>
             <p className="novel-workbench__preview-sub">{description}</p>
           </div>
-          {variant === 'embedded' && !isForm && <button className="novel-flow__primary novel-flow__primary--compact" onClick={openCreate} type="button">新增伏笔</button>}
+          {variant === 'embedded' && !isForm && (
+            <div className="novel-project-panel__head-actions">
+              {onAnalyzeChapter && <button className="novel-flow__ghost" disabled={analyzeDisabled} title={analyzeDisabled ? analyzeDisabledHint : undefined} onClick={onAnalyzeChapter} type="button">AI 分析章节</button>}
+              <button className="novel-flow__primary novel-flow__primary--compact" onClick={openCreate} type="button">新增伏笔</button>
+            </div>
+          )}
         </div>
 
         {isForm ? (

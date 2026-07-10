@@ -139,6 +139,88 @@
   gap: 10px;
 }
 
+.novel-modal > .novel-chapter-picker {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  width: min(700px, 92vw);
+  max-height: min(720px, 90vh);
+  overflow: hidden;
+}
+
+.novel-chapter-picker .novel-workbench__preview-sub {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.novel-chapter-picker__list {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+  padding-right: 4px;
+  overflow: auto;
+}
+
+.novel-chapter-picker__item {
+  display: grid;
+  grid-template-columns: 18px 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  border: 1px solid #dbe5f1;
+  border-radius: 10px;
+  padding: 12px;
+  color: #334155;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.novel-chapter-picker__item:has(input:checked) {
+  border-color: #8db4ff;
+  background: #eef4ff;
+}
+
+.novel-chapter-picker__item input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+  accent-color: #3f7cf4;
+}
+
+.novel-chapter-picker__index {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 50%;
+  color: #3f63b8;
+  background: #e6efff;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.novel-chapter-picker__title {
+  min-width: 0;
+  overflow: hidden;
+  color: #172033;
+  font-size: 14px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.novel-chapter-picker__meta {
+  color: #64748b;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.novel-chapter-picker__item--disabled {
+  opacity: 0.58;
+  cursor: not-allowed;
+}
+
 .novel-creation--flow {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -884,6 +966,26 @@
   background: #171d27;
 }
 
+.app-shell[data-theme='dark'] .novel-chapter-picker__item {
+  border-color: #344156;
+  color: #dce4ef;
+  background: #171d27;
+}
+
+.app-shell[data-theme='dark'] .novel-chapter-picker__item:has(input:checked) {
+  border-color: #5c8df2;
+  background: #1d3a63;
+}
+
+.app-shell[data-theme='dark'] .novel-chapter-picker__title {
+  color: #edf2fa;
+}
+
+.app-shell[data-theme='dark'] .novel-chapter-picker__meta,
+.app-shell[data-theme='dark'] .novel-chapter-picker .novel-workbench__preview-sub {
+  color: #94a3b8;
+}
+
 .app-shell[data-theme='dark'] .novel-creation--flow > section {
   background: transparent;
 }
@@ -1607,6 +1709,49 @@
   background: #316ee6;
 }
 
+.novel-project-view__export {
+  position: relative;
+}
+
+.novel-project-view__export .novel-project-view__action svg {
+  width: 16px;
+  height: 16px;
+}
+
+.novel-project-view__export-menu {
+  position: absolute;
+  z-index: 12;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  width: max-content;
+  min-width: 210px;
+  padding: 6px;
+  border: 1px solid #dbe2ec;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 16px 34px rgba(23, 32, 51, 0.16);
+}
+
+.novel-creation .novel-project-view__export-menu button {
+  justify-content: flex-start;
+  min-height: 38px;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #334155;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.novel-creation .novel-project-view__export-menu button:hover,
+.novel-creation .novel-project-view__export-menu button:focus-visible {
+  color: #1f4fb8;
+  background: #eef4ff;
+}
+
 .novel-project-view__body {
   grid-template-columns: 258px minmax(0, 1fr);
   gap: 0;
@@ -1765,6 +1910,13 @@
 
 .novel-project-panel__head {
   align-items: flex-start;
+}
+
+.novel-project-panel__head-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .novel-project-panel__heading {
@@ -2081,45 +2233,6 @@
   font-size: 13px;
 }
 
-.novel-emotion-empty {
-  display: grid;
-  min-height: 360px;
-  place-items: center;
-  align-content: center;
-  gap: 10px;
-  border: 1px dashed #ccd7e5;
-  border-radius: 14px;
-  color: #64748b;
-  background: #f8fafc;
-  text-align: center;
-}
-
-.novel-emotion-empty__icon {
-  display: grid;
-  width: 54px;
-  height: 54px;
-  place-items: center;
-  border-radius: 50%;
-  color: #28578f;
-  background: #dbeafe;
-}
-
-.novel-emotion-empty__icon svg {
-  width: 26px;
-  height: 26px;
-}
-
-.novel-emotion-empty strong {
-  color: #334155;
-  font-size: 16px;
-}
-
-.novel-emotion-empty > span:last-child {
-  max-width: 460px;
-  font-size: 13px;
-  line-height: 1.6;
-}
-
 .novel-foreshadow--embedded {
   display: grid;
   min-height: 100%;
@@ -2256,6 +2369,22 @@
   background: #3f7cf4;
 }
 
+.app-shell[data-theme='dark'] .novel-project-view__export-menu {
+  border-color: #344156;
+  background: #171d27;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.34);
+}
+
+.app-shell[data-theme='dark'] .novel-creation .novel-project-view__export-menu button {
+  color: #dce4ef;
+}
+
+.app-shell[data-theme='dark'] .novel-creation .novel-project-view__export-menu button:hover,
+.app-shell[data-theme='dark'] .novel-creation .novel-project-view__export-menu button:focus-visible {
+  color: #fff;
+  background: #1d3a63;
+}
+
 .app-shell[data-theme='dark'] .novel-project-panel,
 .app-shell[data-theme='dark'] .novel-overview__summary,
 .app-shell[data-theme='dark'] .novel-overview__fields label,
@@ -2275,8 +2404,7 @@
 .app-shell[data-theme='dark'] .novel-content-card__copy > strong,
 .app-shell[data-theme='dark'] .novel-setting__group-head,
 .app-shell[data-theme='dark'] .novel-setting__item-head strong,
-.app-shell[data-theme='dark'] .novel-outline-card > input,
-.app-shell[data-theme='dark'] .novel-emotion-empty strong {
+.app-shell[data-theme='dark'] .novel-outline-card > input {
   color: #edf2fa;
 }
 
@@ -2286,11 +2414,6 @@
 
 .app-shell[data-theme='dark'] .novel-overview__summary textarea {
   color: #edf2fa;
-}
-
-.app-shell[data-theme='dark'] .novel-emotion-empty {
-  border-color: #334155;
-  background: #111822;
 }
 
 @media (max-width: 1100px) {
@@ -2371,6 +2494,15 @@
     min-height: 40px;
     padding: 8px 13px;
     font-size: 13px;
+  }
+
+  .novel-chapter-picker__item {
+    grid-template-columns: 18px 30px minmax(0, 1fr);
+  }
+
+  .novel-chapter-picker__meta {
+    grid-column: 3;
+    white-space: normal;
   }
 
   .novel-project-view__body {

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowLeftIcon, BoltIcon, BookIcon, ChartIcon, GlobeIcon, ListIcon, PenBookIcon, ProjectIcon, ScriptIcon, UserIcon, UsersIcon } from '../../app/icons';
+import { ArrowLeftIcon, BoltIcon, BookIcon, ChevronDownIcon, GlobeIcon, ListIcon, PenBookIcon, ProjectIcon, ScriptIcon, UserIcon, UsersIcon } from '../../app/icons';
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, Foreshadowing, Novel, NovelSummary, SettingEntry, SettingType } from '../../types/novel';
@@ -15,10 +15,11 @@ import type { SettingDraft } from './novelSettings';
 import { countWords, createId, formatTime, type SaveStatus } from './novelShared';
 import { CHAPTER_STATUS_LABEL, CHAPTER_STATUS_ORDER, PROGRESS_LABELS, resolveChapterStatus } from './novelProgress';
 import type { ChapterStatus as NovelChapterStatus } from '../../types/novel';
+import { copyWholeBookMarkdown, exportOfflinePackage, exportStoryboardDocFile, exportWholeBookMarkdownFile } from './novelExport';
 import './NovelCreation.css';
 
 type NovelView = 'creationCenter' | 'projectList' | 'projectView' | 'inspirationIntro' | 'inspirationPreparing' | 'inspirationChat' | 'inspirationBlueprint' | 'inspirationOutline' | 'workbench';
-type ProjectViewTab = 'overview' | 'world' | 'characters' | 'graph' | 'outline' | 'chapters' | 'emotion' | 'foreshadowing';
+type ProjectViewTab = 'overview' | 'world' | 'characters' | 'graph' | 'outline' | 'chapters' | 'foreshadowing';
 type InspirationBusy = 'idle' | 'chat' | 'blueprint' | 'outline';
 type ChatBubble = InspirationChatMessage & { id: string };
 type NovelForm = { title: string; summary: string; note: string };
@@ -41,7 +42,6 @@ const PROJECT_VIEW_TABS = [
   { id: 'graph', label: '人物关系', description: '角色之间的关系', Icon: UsersIcon },
   { id: 'outline', label: '章节大纲', description: '故事结构规划', Icon: ListIcon },
   { id: 'chapters', label: '章节内容', description: '生成状态与摘要', Icon: BookIcon },
-  { id: 'emotion', label: '情感曲线', description: '追踪章节情感变化', Icon: ChartIcon },
   { id: 'foreshadowing', label: '伏笔管理', description: '故事线索与回收', Icon: BoltIcon },
 ] as const satisfies readonly { id: ProjectViewTab; label: string; description: string; Icon: typeof ProjectIcon }[];
 
@@ -58,6 +58,11 @@ export function NovelCreation({ projectId }: { projectId: string }) {
   const [apiProviderStore, setApiProviderStore] = useState<ApiProviderStore>(() => readLocalStorage(API_PROVIDER_STORAGE_KEY, {}));
   const [view, setView] = useState<NovelView>('creationCenter');
   const [projectViewTab, setProjectViewTab] = useState<ProjectViewTab>('overview');
+  const [initialForeshadowPanel, setInitialForeshadowPanel] = useState(false);
+  const [workbenchReturnTab, setWorkbenchReturnTab] = useState<ProjectViewTab | null>(null);
+  const [chapterPickerOpen, setChapterPickerOpen] = useState(false);
+  const [analyzeChapterId, setAnalyzeChapterId] = useState<string | null>(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatBubble[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [inspirationBusy, setInspirationBusy] = useState<InspirationBusy>('idle');
@@ -75,6 +80,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
   const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
   const projectPanelRef = useRef<HTMLElement | null>(null);
   const lastProjectIdRef = useRef(projectId);
+  const lastValidChapterRef = useRef(new Map<string, string>());
   const [graphData, setGraphData] = useState<CharacterGraph | null>(null);
   const [graphBusy, setGraphBusy] = useState(false);
   const [graphError, setGraphError] = useState('');
@@ -112,6 +118,10 @@ export function NovelCreation({ projectId }: { projectId: string }) {
       if (!active) return;
       setCurrentNovel(null);
       setActiveChapterId(null);
+      setInitialForeshadowPanel(false);
+      setWorkbenchReturnTab(null);
+      setChapterPickerOpen(false);
+      setExportMenuOpen(false);
       setView('creationCenter');
       setFeedback('');
       await loadSummaries();
@@ -213,13 +223,27 @@ export function NovelCreation({ projectId }: { projectId: string }) {
 
   async function openProjectView(id: string) {
     if (!await openNovel(id)) return;
+    setInitialForeshadowPanel(false);
+    setWorkbenchReturnTab(null);
+    setExportMenuOpen(false);
     setProjectViewTab('overview');
     setView('projectView');
   }
 
-  async function openProjectWorkbench(id: string, chapterId?: string) {
-    if (!await openNovel(id)) return;
+  async function openProjectWorkbench(id: string, chapterId?: string, intent?: { foreshadowPanel?: boolean; returnTab?: ProjectViewTab }) {
+    const previousNovel = currentNovel;
+    const previousActiveChapterId = activeChapterId;
+    if (!await openNovel(id)) {
+      setCurrentNovel(previousNovel);
+      setActiveChapterId(previousActiveChapterId);
+      setInitialForeshadowPanel(false);
+      setWorkbenchReturnTab(null);
+      return;
+    }
     setActiveChapterId(chapterId ?? null);
+    setInitialForeshadowPanel(Boolean(intent?.foreshadowPanel));
+    setWorkbenchReturnTab(intent?.returnTab ?? null);
+    setExportMenuOpen(false);
     setView('workbench');
   }
 
@@ -616,6 +640,15 @@ export function NovelCreation({ projectId }: { projectId: string }) {
     });
   }
 
+  function openAnalyzeChapterPicker() {
+    if (!currentNovel) return;
+    const lastValidId = lastValidChapterRef.current.get(currentNovel.id);
+    const selected = chapters.find((chapter) => chapter.id === lastValidId && chapter.content.trim())
+      ?? chapters.find((chapter) => chapter.content.trim());
+    setAnalyzeChapterId(selected?.id ?? null);
+    setChapterPickerOpen(true);
+  }
+
   function projectSummary(novel: Novel): string {
     return novel.blueprint?.trim() || novel.summary.trim() || novel.idea?.trim() || '';
   }
@@ -819,10 +852,31 @@ export function NovelCreation({ projectId }: { projectId: string }) {
               <span>最近更新 {formatTime(currentNovel.updatedAt)}</span>
             </div>
             <nav aria-label="项目操作">
-              <button className="novel-project-view__action novel-project-view__action--back" onClick={() => setView('projectList')} type="button">
+              <button className="novel-project-view__action novel-project-view__action--back" onClick={() => {
+                setExportMenuOpen(false);
+                setView('projectList');
+              }} type="button">
                 <ArrowLeftIcon />
                 <span>返回列表</span>
               </button>
+              <button className="novel-project-view__action" onClick={() => {
+                setForm({ title: currentNovel.title, summary: currentNovel.summary, note: currentNovel.note });
+                setModalMode('edit');
+              }} type="button"><span>编辑信息</span></button>
+              <div className="novel-project-view__export">
+                <button aria-expanded={exportMenuOpen} aria-haspopup="menu" className="novel-project-view__action" onClick={() => setExportMenuOpen((open) => !open)} type="button">
+                  <span>导出作品</span>
+                  <ChevronDownIcon />
+                </button>
+                {exportMenuOpen && (
+                  <div className="novel-project-view__export-menu" onMouseLeave={() => setExportMenuOpen(false)} role="menu">
+                    <button onClick={() => { setExportMenuOpen(false); void copyWholeBookMarkdown(currentNovel); }} role="menuitem" type="button">复制全书 Markdown</button>
+                    <button onClick={() => { setExportMenuOpen(false); void exportWholeBookMarkdownFile(currentNovel); }} role="menuitem" type="button">导出 .md 文件</button>
+                    <button onClick={() => { setExportMenuOpen(false); void exportStoryboardDocFile(currentNovel); }} role="menuitem" type="button">导出 Word 分镜本</button>
+                    <button onClick={() => { setExportMenuOpen(false); void exportOfflinePackage(currentNovel); }} role="menuitem" type="button">导出离线包 ZIP</button>
+                  </div>
+                )}
+              </div>
               <button className="novel-project-view__action novel-project-view__action--start" onClick={() => void openProjectWorkbench(currentNovel.id, activeChapterId ?? undefined)} type="button">
                 <PenBookIcon />
                 <span>开始创作</span>
@@ -937,18 +991,6 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                     ))}</div> : <EmptyState title="暂无章节内容" text="新增章节后，可以进入编辑器开始写正文。" />}
                   </>
                 )}
-                {projectViewTab === 'emotion' && (
-                  <>
-                    <div className="novel-project-panel__head">
-                      <div className="novel-project-panel__heading"><h2>情感曲线</h2><p>追踪章节情感变化</p></div>
-                    </div>
-                    <div className="novel-emotion-empty">
-                      <span className="novel-emotion-empty__icon"><ChartIcon /></span>
-                      <strong>暂无情感曲线数据</strong>
-                      <span>当前项目没有持久化的章节情绪数据，因此暂时无法绘制曲线。</span>
-                    </div>
-                  </>
-                )}
                 {projectViewTab === 'foreshadowing' && (
                   <ForeshadowingPanel
                     variant="embedded"
@@ -961,6 +1003,9 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                     onEdit={editForeshadowing}
                     onToggleStatus={toggleForeshadowingStatus}
                     onDelete={deleteForeshadowing}
+                    onAnalyzeChapter={openAnalyzeChapterPicker}
+                    analyzeDisabled={!chapters.some((chapter) => chapter.content.trim())}
+                    analyzeDisabledHint="请先完成章节正文"
                   />
                 )}
               </section>
@@ -1080,13 +1125,54 @@ export function NovelCreation({ projectId }: { projectId: string }) {
           onUpdateChapterAndSave={updateChapterByIdAndSave}
           onUpdateNovel={updateNovel}
           onRetrySave={() => void saveCurrentNovel()}
-          onBackToProjects={() => setView('projectList')}
-          onOpenProjectView={() => { setProjectViewTab('overview'); setView('projectView'); }}
+          onBackToProjects={() => {
+            setInitialForeshadowPanel(false);
+            setWorkbenchReturnTab(null);
+            setView('projectList');
+          }}
+          onOpenProjectView={() => {
+            setProjectViewTab(workbenchReturnTab ?? 'overview');
+            setWorkbenchReturnTab(null);
+            setExportMenuOpen(false);
+            setView('projectView');
+          }}
+          initialForeshadowPanel={initialForeshadowPanel}
+          onConsumeInitialPanel={() => setInitialForeshadowPanel(false)}
+          onValidChapter={(chapterId) => lastValidChapterRef.current.set(currentNovel.id, chapterId)}
           ensureTextModel={(onIssue) => {
             const ready = ensureTextModelReady(onIssue);
             return ready ? { channelId: ready.channel.id, channelLabel: ready.channel.name, baseUrl: ready.baseUrl, apiKey: ready.apiKey, model: ready.model } : null;
           }}
         />
+      )}
+      {chapterPickerOpen && currentNovel && (
+        <div className="novel-modal" role="dialog" aria-modal="true" aria-label="选择要分析的章节" onClick={() => setChapterPickerOpen(false)}>
+          <div className="novel-chapter-picker" onClick={(event) => event.stopPropagation()}>
+            <h2>选择要分析的章节</h2>
+            <p className="novel-workbench__preview-sub">伏笔 AI 会分析所选章节的正文，识别新埋线索与可回收伏笔。</p>
+            <div className="novel-chapter-picker__list">
+              {chapters.map((chapter, index) => {
+                const empty = chapter.content.trim() === '';
+                return (
+                  <label className={empty ? 'novel-chapter-picker__item novel-chapter-picker__item--disabled' : 'novel-chapter-picker__item'} key={chapter.id}>
+                    <input checked={chapter.id === analyzeChapterId} disabled={empty} name="analyze-chapter" onChange={() => setAnalyzeChapterId(chapter.id)} type="radio" value={chapter.id} />
+                    <span className="novel-chapter-picker__index">{index + 1}</span>
+                    <span className="novel-chapter-picker__title">{chapter.title || '未命名章节'}</span>
+                    <span className="novel-chapter-picker__meta">{countWords(chapter.content)} 字 · {CHAPTER_STATUS_LABEL[resolveChapterStatus(chapter)]}{empty ? ' · 暂无正文' : ''}</span>
+                  </label>
+                );
+              })}
+            </div>
+            <footer>
+              <button className="novel-flow__ghost" onClick={() => setChapterPickerOpen(false)} type="button">取消</button>
+              <button className="novel-flow__primary novel-flow__primary--compact" disabled={!analyzeChapterId} onClick={() => {
+                if (!analyzeChapterId) return;
+                setChapterPickerOpen(false);
+                void openProjectWorkbench(currentNovel.id, analyzeChapterId, { foreshadowPanel: true, returnTab: 'foreshadowing' });
+              }} type="button">进入工作台分析</button>
+            </footer>
+          </div>
+        </div>
       )}
       {modalMode && <div className="novel-modal" role="dialog" aria-modal="true" aria-label={modalMode === 'create' ? '新建小说' : '编辑小说信息'} onClick={() => setModalMode(null)}><div onClick={(event) => event.stopPropagation()}><h2>{modalMode === 'create' ? '新建小说' : '编辑小说信息'}</h2><label>标题<input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} /></label><label>简介<textarea value={form.summary} onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))} /></label><label>备注<input value={form.note} onChange={(event) => setForm((current) => ({ ...current, note: event.target.value }))} /></label><footer><button onClick={() => setModalMode(null)} type="button">取消</button><button onClick={() => void submitNovelForm()} type="button">保存</button></footer></div></div>}
     </main>
