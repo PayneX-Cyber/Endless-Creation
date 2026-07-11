@@ -54,7 +54,7 @@
   - `upsertEmotionPoints(novel: Novel, points: EmotionPointCandidate[]): { ok: boolean; arc?: EmotionArc; message?: string }`
   - `assertEmotionArcSelfCheck(): void`
 
-- [ ] **Step 1: 写类型 + 常量 + clamp/round 工具**
+- [x] **Step 1: 写类型 + 常量 + clamp/round 工具**
 
 新建 `src/features/novel-creation/emotionArc.ts`：
 
@@ -88,7 +88,7 @@ function normalizeScore(value: unknown): number | null {
 }
 ```
 
-- [ ] **Step 2: 纯函数 mergeEmotionPoints（全部落库护栏在此）**
+- [x] **Step 2: 纯函数 mergeEmotionPoints（全部落库护栏在此）**
 
 追加：
 
@@ -118,7 +118,7 @@ export function mergeEmotionPoints(
 }
 ```
 
-- [ ] **Step 3: read（严格读取护栏，越界过滤不 clamp）**
+- [x] **Step 3: read（严格读取护栏，越界过滤不 clamp）**
 
 追加：
 
@@ -156,7 +156,7 @@ export function readEmotionArc(novelId: string): EmotionArc | null {
 }
 ```
 
-- [ ] **Step 4: upsert（IO 层，spread 保留其他小说）**
+- [x] **Step 4: upsert（IO 层，spread 保留其他小说）**
 
 追加：
 
@@ -179,7 +179,7 @@ export function upsertEmotionPoints(
 }
 ```
 
-- [ ] **Step 5: 自检函数（测纯函数，内存不碰 localStorage）**
+- [x] **Step 5: 自检函数（测纯函数，内存不碰 localStorage）**
 
 追加（照 `storeZip.ts` assertStoreZipSelfCheck 模式）：
 
@@ -223,18 +223,18 @@ export function assertEmotionArcSelfCheck(): void {
 }
 ```
 
-- [ ] **Step 6: 在 app 初始化处调用自检**
+- [x] **Step 6: 在 app 初始化处调用自检**
 
 Grep 定位 app 启动入口（如 `src/main.tsx` 或 App 顶层）现有的 `assertStoreZipSelfCheck` 调用点：
 Run: `git -C "F:/AIProject/Endless Creation" grep -n "assertStoreZipSelfCheck"`
 在同一处旁调用 `assertEmotionArcSelfCheck()`（import 后）。若找不到现有自检调用点，则在 `src/main.tsx` 顶层模块作用域加一次调用。
 
-- [ ] **Step 7: build 验证**
+- [x] **Step 7: build 验证**
 
 Run: `cd "F:/AIProject/Endless Creation" && npm run build`
 Expected: exit 0。app 启动时自检跑通（若自检抛错，build 不受影响但运行时会崩——故此步只验编译，运行时自检在 Task 7 GUI 验）。
 
-- [ ] **Step 8: 暂存不 commit**
+- [x] **Step 8: 暂存不 commit**
 
 Run: `git -C "F:/AIProject/Endless Creation" add -A`
 
@@ -253,7 +253,7 @@ Run: `git -C "F:/AIProject/Endless Creation" add -A`
   - `ParsedEmotionPoint = { kind: 'ok'; point: EmotionPointCandidate } | { kind: 'invalid' }`
   - `parseEmotionResult(text: string, chapter: Chapter): ParsedEmotionPoint`
 
-- [ ] **Step 1: limitText 工具 + TextMessage 类型**
+- [x] **Step 1: limitText 工具 + TextMessage 类型**
 
 在 emotionArc.ts 追加（照 characterGraph.ts limitText 头尾各半策略）：
 
@@ -268,7 +268,7 @@ function limitText(text: string, max: number): string {
 }
 ```
 
-- [ ] **Step 2: buildEmotionPrompt（固定标尺 + 仅当前章正文）**
+- [x] **Step 2: buildEmotionPrompt（固定标尺 + 仅当前章正文）**
 
 追加。上下文严格限定标题/简介/蓝图/创意/位置/当前章正文(限长)，不塞其他章：
 
@@ -296,7 +296,7 @@ export function buildEmotionPrompt(novel: Novel, chapter: Chapter, index: number
 }
 ```
 
-- [ ] **Step 3: parseEmotionResult（chapterId 注入、非有限 invalid、有限 round+clamp）**
+- [x] **Step 3: parseEmotionResult（chapterId 注入、非有限 invalid、有限 round+clamp）**
 
 追加（复用 Task 1 的 normalizeScore；剥围栏照 characterGraph.stripCodeFence）：
 
@@ -330,12 +330,12 @@ export function parseEmotionResult(text: string, chapter: Chapter): ParsedEmotio
 }
 ```
 
-- [ ] **Step 4: build 验证**
+- [x] **Step 4: build 验证**
 
 Run: `cd "F:/AIProject/Endless Creation" && npm run build`
 Expected: exit 0。
 
-- [ ] **Step 5: 暂存不 commit**
+- [x] **Step 5: 暂存不 commit**
 
 Run: `git -C "F:/AIProject/Endless Creation" add -A`
 
@@ -351,13 +351,13 @@ Run: `git -C "F:/AIProject/Endless Creation" add -A`
 - Consumes: Task 4 的 `EmotionArcPanel`（本 Task 先挂占位，Task 4 替换）。
 - Produces: emotion tab 可点击、8 tab 导航。
 
-- [ ] **Step 1: 从 8c016cc 恢复 ChartIcon**
+- [x] **Step 1: 从 8c016cc 恢复 ChartIcon**
 
 取原始字节：
 Run: `git -C "F:/AIProject/Endless Creation" show 8c016cc:src/app/icons.tsx | sed -n '206,214p'`
 把这段 `export function ChartIcon(props: IconProps) { ... }` 用 Edit 加回 `src/app/icons.tsx`（放在其他图标导出旁，如 BoltIcon 附近）。
 
-- [ ] **Step 2: ProjectViewTab 类型加 emotion**
+- [x] **Step 2: ProjectViewTab 类型加 emotion**
 
 Grep 定位 `type ProjectViewTab`（`NovelCreation.tsx:20` 一带）：
 Run: `git -C "F:/AIProject/Endless Creation" grep -n "type ProjectViewTab" -- src/features/novel-creation/NovelCreation.tsx`
@@ -366,7 +366,7 @@ Edit 在 `'chapters' |` 后加 `'emotion' |`（放回原位置，chapters 与 fo
 type ProjectViewTab = 'overview' | 'world' | 'characters' | 'graph' | 'outline' | 'chapters' | 'emotion' | 'foreshadowing';
 ```
 
-- [ ] **Step 3: PROJECT_VIEW_TABS 加情感曲线项 + import ChartIcon**
+- [x] **Step 3: PROJECT_VIEW_TABS 加情感曲线项 + import ChartIcon**
 
 Grep 定位 import 行（`NovelCreation.tsx:2`）与 `PROJECT_VIEW_TABS`（38）。Edit：
 - import 加 `ChartIcon`：从 `'../../app/icons'` 的解构里加回 `ChartIcon`。
@@ -375,7 +375,7 @@ Grep 定位 import 行（`NovelCreation.tsx:2`）与 `PROJECT_VIEW_TABS`（38）
   { id: 'emotion', label: '情感曲线', description: '章节情绪起伏', Icon: ChartIcon },
 ```
 
-- [ ] **Step 4: 挂载占位（Task 4 替换为真面板）**
+- [x] **Step 4: 挂载占位（Task 4 替换为真面板）**
 
 Grep 定位 `{projectViewTab === 'graph' && ...}`（947）。Edit 在其后加 emotion 分支临时占位：
 ```tsx
@@ -384,12 +384,12 @@ Grep 定位 `{projectViewTab === 'graph' && ...}`（947）。Edit 在其后加 e
                 )}
 ```
 
-- [ ] **Step 5: build 验证**
+- [x] **Step 5: build 验证**
 
 Run: `cd "F:/AIProject/Endless Creation" && npm run build`
 Expected: exit 0。8 tab 应可编译；ChartIcon 有定义有引用。
 
-- [ ] **Step 6: 暂存不 commit**
+- [x] **Step 6: 暂存不 commit**
 
 Run: `git -C "F:/AIProject/Endless Creation" add -A`
 
@@ -408,7 +408,7 @@ Run: `git -C "F:/AIProject/Endless Creation" add -A`
 
 **关键**：本 Task 只做「渲染已确认数据 + 空态」，分析/候选/单章重分析在 Task 5/6。中文文案独占本文件（规避 NovelCreation 幻影字节坑）。
 
-- [ ] **Step 1: 曲线坐标计算 + SVG 渲染（实心点 + 空心缺口标记 + 实线）**
+- [x] **Step 1: 曲线坐标计算 + SVG 渲染（实心点 + 空心缺口标记 + 实线）**
 
 新建 `EmotionArcPanel.tsx`（照 NovelCharacterGraph 常量+viewBox 范式）：
 
@@ -464,7 +464,7 @@ function solidSegments(marks: ChapterMark[]): ChapterMark[][] {
 }
 ```
 
-- [ ] **Step 2: 面板主体 + 空态 + X 轴标签抽稀**
+- [x] **Step 2: 面板主体 + 空态 + X 轴标签抽稀**
 
 追加组件本体：
 
@@ -519,7 +519,7 @@ export function EmotionArcPanel({ novel }: { novel: Novel }) {
 }
 ```
 
-- [ ] **Step 3: EmotionArcPanel.css（曲线/点/缺口/空态/焦点态/深色态）**
+- [x] **Step 3: EmotionArcPanel.css（曲线/点/缺口/空态/焦点态/深色态）**
 
 新建 `EmotionArcPanel.css`（照 novel-graph 样式命名）：
 
@@ -539,7 +539,7 @@ export function EmotionArcPanel({ novel }: { novel: Novel }) {
 }
 ```
 
-- [ ] **Step 4: NovelCreation 占位替换为 EmotionArcPanel**
+- [x] **Step 4: NovelCreation 占位替换为 EmotionArcPanel**
 
 Grep 定位 Task 3 Step 4 的占位 `novel-emotion-arc-placeholder`。Edit 替换为真面板（先 import）：
 ```typescript
@@ -551,12 +551,12 @@ import { EmotionArcPanel } from './EmotionArcPanel';
                 )}
 ```
 
-- [ ] **Step 5: build 验证**
+- [x] **Step 5: build 验证**
 
 Run: `cd "F:/AIProject/Endless Creation" && npm run build`
 Expected: exit 0。
 
-- [ ] **Step 6: 暂存不 commit**
+- [x] **Step 6: 暂存不 commit**
 
 Run: `git -C "F:/AIProject/Endless Creation" add -A`
 
@@ -573,13 +573,13 @@ Run: `git -C "F:/AIProject/Endless Creation" add -A`
 
 **参照现有 generateText 调用**（`ChapterWorkbench.tsx:73` 一带）：`await rendererBridge.generateText({ messages, ...model, projectId: novel.id, requestType: 'novel.emotionArc' })`。需先 Grep 确认 generateText 的完整参数形状（model 字段如何取）与 requestId 如何拿以便 cancel。
 
-- [ ] **Step 1: Grep 确认 generateText 参数与 cancel 用法**
+- [x] **Step 1: Grep 确认 generateText 参数与 cancel 用法**
 
 Run: `git -C "F:/AIProject/Endless Creation" grep -n "generateText({" -- src/features/novel-creation/ChapterWorkbench.tsx`
 Run: `git -C "F:/AIProject/Endless Creation" grep -n "cancelTextGeneration\|ensureTextModel\|requestId" -- src/features/novel-creation/ChapterWorkbench.tsx`
 读取这些调用点的完整字节，确认：① generateText 的 model 参数怎么来（ensureTextModel 返回什么）；② requestId 从哪拿（generateText 入参还是返回值）；③ cancelTextGeneration 签名。按实际字节接线，不臆造。
 
-- [ ] **Step 2: 分析状态机 + runId**
+- [x] **Step 2: 分析状态机 + runId**
 
 在 EmotionArcPanel 加 state（analyzing 态、候选集合、逐章状态、runId ref）：
 
@@ -592,7 +592,7 @@ Run: `git -C "F:/AIProject/Endless Creation" grep -n "cancelTextGeneration\|ensu
   const requestIdRef = useRef<string | null>(null);
 ```
 
-- [ ] **Step 3: 逐章分析循环（顺序、失败继续、runId 守门）**
+- [x] **Step 3: 逐章分析循环（顺序、失败继续、runId 守门）**
 
 加 `runAnalysis(targets: Chapter[])`。**Task 5 Step 1 确认真实签名后**按实际接线；结构如下（伪接线待 Step1 校准）：
 
@@ -636,7 +636,7 @@ Run: `git -C "F:/AIProject/Endless Creation" grep -n "cancelTextGeneration\|ensu
   }
 ```
 
-- [ ] **Step 4: 停止分析 + 卸载/切换终止**
+- [x] **Step 4: 停止分析 + 卸载/切换终止**
 
 加停止函数 + useEffect 清理（novel.id 变化 & 卸载时终止）：
 
@@ -656,16 +656,16 @@ Run: `git -C "F:/AIProject/Endless Creation" grep -n "cancelTextGeneration\|ensu
   }, [novel.id]);
 ```
 
-- [ ] **Step 5: 分析中态 UI（进度 + 停止分析按钮）**
+- [x] **Step 5: 分析中态 UI（进度 + 停止分析按钮）**
 
 在 render 加 analyzing 态分支（phase === 'analyzing'）：进度文本「分析中 {done}/{total} · {current}」+「停止分析」按钮（onClick=stopAnalysis）。「分析情绪」按钮在 analyzing 态禁用。空态/曲线态的「分析情绪」按钮 onClick 改为 `runAnalysis(有正文章集合)`。
 
-- [ ] **Step 6: build 验证**
+- [x] **Step 6: build 验证**
 
 Run: `cd "F:/AIProject/Endless Creation" && npm run build`
 Expected: exit 0。
 
-- [ ] **Step 7: 暂存不 commit**
+- [x] **Step 7: 暂存不 commit**
 
 Run: `git -C "F:/AIProject/Endless Creation" add -A`
 
@@ -680,7 +680,7 @@ Run: `git -C "F:/AIProject/Endless Creation" add -A`
 - Consumes: Task 1 `upsertEmotionPoints`、`readEmotionArc`；Task 5 candidates/chapterStates state。
 - Produces: 候选态确认落库、单章重分析入口，完成闭环。
 
-- [ ] **Step 1: 候选态 UI（预览虚线 + 复选清单 + 确认/取消）**
+- [x] **Step 1: 候选态 UI（预览虚线 + 复选清单 + 确认/取消）**
 
 在 candidates 态渲染：
 - 曲线区叠加候选虚线（只画当前**勾选**的候选点；已确认实线仍在）。
@@ -693,7 +693,7 @@ Run: `git -C "F:/AIProject/Endless Creation" add -A`
 ```
 进入候选态时初始化 checked = 所有 success 候选的 chapterId（默认全选）。虚线 points 由 `marks` 中 chapterId ∈ checked 且有候选的点构成，实时随 checked 更新。
 
-- [ ] **Step 2: 确认落库（upsert 勾选项 + 检查 ok + 保留候选于失败）**
+- [x] **Step 2: 确认落库（upsert 勾选项 + 检查 ok + 保留候选于失败）**
 
 ```tsx
   function confirmCandidates() {
@@ -714,7 +714,7 @@ Run: `git -C "F:/AIProject/Endless Creation" add -A`
 ```
 「取消」→ `setCandidates(new Map()); setChecked(new Set()); setPhase('curve');`（零落库）。
 
-- [ ] **Step 3: 单章重分析入口（SVG 标记详情弹层）**
+- [x] **Step 3: 单章重分析入口（SVG 标记详情弹层）**
 
 曲线态点击/聚焦某章标记（实心点或空心缺口）→ 弹详情层（标题 + 分值或「暂无分值」+ 依据）+「重新分析本章」按钮。加 state：
 ```tsx
@@ -722,12 +722,12 @@ Run: `git -C "F:/AIProject/Endless Creation" add -A`
 ```
 点标记 → setDetailChapterId(chapterId)。详情层「重新分析本章」→ 找到该 chapter → `runAnalysis([chapter])`（复用 Task 5 循环，单章集合）。无正文章禁用该按钮 + 提示「本章暂无正文」。
 
-- [ ] **Step 4: build 验证**
+- [x] **Step 4: build 验证**
 
 Run: `cd "F:/AIProject/Endless Creation" && npm run build`
 Expected: exit 0。
 
-- [ ] **Step 5: 暂存不 commit**
+- [x] **Step 5: 暂存不 commit**
 
 Run: `git -C "F:/AIProject/Endless Creation" add -A`
 
@@ -743,24 +743,24 @@ Run: `git -C "F:/AIProject/Endless Creation" add -A`
 - Consumes: Task 1-6 全部改动（已暂存未提交）。
 - Produces: 唯一 commit `feat: 增加小说情感曲线分析`。
 
-- [ ] **Step 1: 路线图 Phase 4 情感曲线项打勾**
+- [x] **Step 1: 路线图 Phase 4 情感曲线项打勾**
 
 Read `docs/plans/2026-07-06-v1-roadmap-adjusted.md` 第 116 行。Edit：
 ```
 - [x] 情感曲线闭环：按章节 AI 分析情绪、按 novelId 持久化、支持重新分析并展示真实曲线；完成前不得进入 Phase 4。（2026-07-10 已实现）
 ```
 
-- [ ] **Step 2: 双端 build 终检**
+- [x] **Step 2: 双端 build 终检**
 
 Run: `cd "F:/AIProject/Endless Creation" && npm run build`
 Expected: exit 0（renderer tsc+vite + electron tsc）。
 
-- [ ] **Step 3: 无 schema/IPC 改动审计**
+- [x] **Step 3: 无 schema/IPC 改动审计**
 
 Run: `git -C "F:/AIProject/Endless Creation" diff --cached --stat -- src/types/novel.ts electron/preload/bridgeTypes.ts electron/main/index.ts src/services/rendererBridge.ts`
 Expected: 无输出（四禁改文件零改动）。
 
-- [ ] **Step 4: git diff --check + 文本完整性**
+- [x] **Step 4: git diff --check + 文本完整性**
 
 Run: `git -C "F:/AIProject/Endless Creation" diff --cached --check`
 Expected: 无空白错误/冲突标记。
@@ -768,6 +768,8 @@ Run: `python "C:\Users\x1176\.codex\skills\endless-creation-guardrails\scripts\s
 Expected: TEXT INTEGRITY OK。
 
 - [ ] **Step 5: GUI 全量验收（真机开 Electron）**
+
+> 未执行：本次交付完成双端构建、文本完整性与差异审计，尚未进行带真实模型配置的 Electron 真机全流程验收。
 
 `npm run dev:electron`，按 spec §6 验收清单逐条（36 项）跑关键路径：
 - **自检**：app 启动无自检抛错（A9：assertEmotionArcSelfCheck 跑通）。
@@ -778,7 +780,7 @@ Expected: TEXT INTEGRITY OK。
 - **停止/切换终止**：分析中点停止 / 切 tab → 无后续调用、成本不增（B15/B17）。
 - **空心缺口**：失败章显示空心标记、可点重分析（D28）。
 
-- [ ] **Step 6: 清理 + 唯一 commit**
+- [x] **Step 6: 清理 + 唯一 commit**
 
 Run:
 ```bash
@@ -787,7 +789,7 @@ git -C "F:/AIProject/Endless Creation" commit -m "feat: 增加小说情感曲线
 ```
 Expected: 提交成功。含：emotionArc.ts、EmotionArcPanel.tsx、EmotionArcPanel.css、NovelCreation.tsx、icons.tsx、roadmap.md、spec.md。
 
-- [ ] **Step 7: 提交后核对**
+- [x] **Step 7: 提交后核对**
 
 Run: `git -C "F:/AIProject/Endless Creation" show --stat HEAD | head -20`
 Expected: 单 commit、文件清单符合、工作区干净。**是否 push 由 PO 决定，本计划不自动 push。**
