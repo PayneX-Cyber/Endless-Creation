@@ -1,0 +1,31 @@
+.emotion-arc { display: grid; gap: 16px; min-width: 0; }
+.emotion-arc__chart { min-height: 300px; overflow-x: auto; border: 1px solid var(--border-color, #d8dde5); background: var(--panel-bg, #fff); }
+.emotion-arc__chart svg { display: block; width: 100%; min-width: 620px; height: auto; }
+.emotion-arc__zero { stroke: #9aa3af; stroke-width: 1; stroke-dasharray: 5 5; }
+.emotion-arc__axis-label, .emotion-arc__chapter-label { fill: #707987; font-size: 12px; }
+.emotion-arc__line { fill: none; stroke: #247a67; stroke-width: 3; stroke-linejoin: round; stroke-linecap: round; }
+.emotion-arc__line--candidate { stroke: #d17a22; stroke-dasharray: 8 6; }
+.emotion-arc__marker { cursor: pointer; outline: none; }
+.emotion-arc__marker:focus .emotion-arc__dot, .emotion-arc__marker:focus .emotion-arc__gap { stroke-width: 4; }
+.emotion-arc__dot { fill: #247a67; stroke: #fff; stroke-width: 2; }
+.emotion-arc__dot--candidate { fill: #d17a22; }
+.emotion-arc__gap { fill: transparent; stroke: #9aa3af; stroke-width: 2; stroke-dasharray: 3 2; }
+.emotion-arc__progress, .emotion-arc__error, .emotion-arc__empty, .emotion-arc__detail { padding: 12px 14px; border: 1px solid var(--border-color, #d8dde5); }
+.emotion-arc__error { color: #a23535; border-color: #d9a4a4; }
+.emotion-arc__detail { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.emotion-arc__detail div { display: grid; gap: 3px; margin-right: auto; }
+.emotion-arc__detail p { flex-basis: 100%; margin: 0; color: var(--text-secondary, #626b78); }
+.emotion-arc__candidates { display: grid; gap: 12px; }
+.emotion-arc__candidate-tools, .emotion-arc__actions { display: flex; align-items: center; gap: 8px; }
+.emotion-arc__candidate-tools strong { margin-right: auto; }
+.emotion-arc__candidate-tools button { border: 0; background: none; color: #247a67; cursor: pointer; }
+.emotion-arc__candidate-list { display: grid; border-top: 1px solid var(--border-color, #d8dde5); }
+.emotion-arc__candidate { min-height: 58px; display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-bottom: 1px solid var(--border-color, #d8dde5); }
+.emotion-arc__candidate > span:last-child { display: grid; gap: 4px; }
+.emotion-arc__candidate small { color: var(--text-secondary, #626b78); }
+.emotion-arc__status { min-width: 58px; color: #7a4b33; font-size: 12px; }
+.emotion-arc__actions { justify-content: flex-end; }
+@media (max-width: 720px) {
+  .emotion-arc__detail { align-items: flex-start; }
+  .emotion-arc__actions button { flex: 1; }
+}

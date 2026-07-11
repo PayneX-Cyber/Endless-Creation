@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { ArrowLeftIcon, BoltIcon, BookIcon, ChevronDownIcon, GlobeIcon, ListIcon, PenBookIcon, ProjectIcon, ScriptIcon, UserIcon, UsersIcon } from '../../app/icons';
+import { ArrowLeftIcon, BoltIcon, BookIcon, ChartIcon, ChevronDownIcon, GlobeIcon, ListIcon, PenBookIcon, ProjectIcon, ScriptIcon, UserIcon, UsersIcon } from '../../app/icons';
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, Foreshadowing, Novel, NovelSummary, SettingEntry, SettingType } from '../../types/novel';
@@ -10,6 +10,7 @@ import { NovelErrorBanner, NovelListSkeleton } from './NovelSkeletons';
 import { ChapterWorkbench } from './ChapterWorkbench';
 import { ForeshadowingPanel, type ForeshadowingDraft } from './ForeshadowingPanel';
 import { NovelStats } from './NovelStats';
+import { EmotionArcPanel } from './EmotionArcPanel';
 import { SettingPanel } from './SettingPanel';
 import type { SettingDraft } from './novelSettings';
 import { countWords, createId, formatTime, type SaveStatus } from './novelShared';
@@ -19,7 +20,7 @@ import { copyWholeBookMarkdown, exportOfflinePackage, exportStoryboardDocFile, e
 import './NovelCreation.css';
 
 type NovelView = 'creationCenter' | 'projectList' | 'projectView' | 'inspirationIntro' | 'inspirationPreparing' | 'inspirationChat' | 'inspirationBlueprint' | 'inspirationOutline' | 'workbench';
-type ProjectViewTab = 'overview' | 'world' | 'characters' | 'graph' | 'outline' | 'chapters' | 'foreshadowing';
+type ProjectViewTab = 'overview' | 'world' | 'characters' | 'graph' | 'outline' | 'chapters' | 'emotion' | 'foreshadowing';
 type InspirationBusy = 'idle' | 'chat' | 'blueprint' | 'outline';
 type ChatBubble = InspirationChatMessage & { id: string };
 type NovelForm = { title: string; summary: string; note: string };
@@ -43,6 +44,7 @@ const PROJECT_VIEW_TABS = [
   { id: 'outline', label: '章节大纲', description: '故事结构规划', Icon: ListIcon },
   { id: 'chapters', label: '章节内容', description: '生成状态与摘要', Icon: BookIcon },
   { id: 'foreshadowing', label: '伏笔管理', description: '故事线索与回收', Icon: BoltIcon },
+  { id: 'emotion', label: '情感曲线', description: '全书情绪起伏与基调', Icon: ChartIcon },
 ] as const satisfies readonly { id: ProjectViewTab; label: string; description: string; Icon: typeof ProjectIcon }[];
 
 export function NovelCreation({ projectId }: { projectId: string }) {
@@ -990,6 +992,9 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                       </button>
                     ))}</div> : <EmptyState title="暂无章节内容" text="新增章节后，可以进入编辑器开始写正文。" />}
                   </>
+                )}
+                {projectViewTab === 'emotion' && (
+                  <EmotionArcPanel novel={currentNovel} resolveModel={ensureTextModelReady} />
                 )}
                 {projectViewTab === 'foreshadowing' && (
                   <ForeshadowingPanel

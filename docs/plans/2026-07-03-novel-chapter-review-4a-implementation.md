@@ -2,7 +2,7 @@
 
 日期：2026-07-03  
 上位文档：`docs/plans/2026-07-03-novel-chapter-review-4a-spec.md`（4a 规格）  
-状态：待实施
+状态：已实施，提交 `fbcfce5`
 
 ## 一、方案总览
 
@@ -431,4 +431,4 @@ function cancelReview() {
 
 ---
 
-**方案完成，待实施。**
+**方案已实施。**

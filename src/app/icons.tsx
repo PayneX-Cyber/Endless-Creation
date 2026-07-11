@@ -221,6 +221,15 @@ export function BillingIcon(props: IconProps) {
   );
 }
 
+export function ChartIcon(props: IconProps) {
+  return (
+    <SvgIcon {...props}>
+      <rect x="4" y="4" width="16" height="16" rx="3" />
+      <path d="m7 15 3.2-3.2 2.6 2.4 4.2-5M16 9h1v1" />
+    </SvgIcon>
+  );
+}
+
 export function HelpIcon(props: IconProps) {
   return (
     <SvgIcon {...props}>
