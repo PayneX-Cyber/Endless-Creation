@@ -767,9 +767,9 @@ Expected: 无空白错误/冲突标记。
 Run: `python "C:\Users\x1176\.codex\skills\endless-creation-guardrails\scripts\scan_text_integrity.py" "F:\AIProject\Endless Creation\src"`
 Expected: TEXT INTEGRITY OK。
 
-- [ ] **Step 5: GUI 全量验收（真机开 Electron）**
+- [x] **Step 5: GUI 全量验收（真机开 Electron）**
 
-> 未执行：本次交付完成双端构建、文本完整性与差异审计，尚未进行带真实模型配置的 Electron 真机全流程验收。
+> 2026-07-11：Electron 真机验收由用户确认完成。
 
 `npm run dev:electron`，按 spec §6 验收清单逐条（36 项）跑关键路径：
 - **自检**：app 启动无自检抛错（A9：assertEmotionArcSelfCheck 跑通）。
