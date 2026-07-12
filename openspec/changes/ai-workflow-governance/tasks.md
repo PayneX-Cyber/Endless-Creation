@@ -10,8 +10,8 @@
 
 ## 3. Handoff
 
-- [ ] 3.1 实现 session/staged handoff、manifest 事实源、context 截断、密钥拒绝和 binary patch
-- [ ] 3.2 实现 stale 检查与显式 apply，验证冲突停止、迟到状态拒绝和二进制文件往返
+- [x] 3.1 实现 session/staged handoff、manifest 事实源、context 截断、密钥拒绝和 binary patch
+- [x] 3.2 实现 stale 检查与显式 apply，验证冲突停止、迟到状态拒绝和二进制文件往返
 
 ## 4. 迁移与来源治理
 

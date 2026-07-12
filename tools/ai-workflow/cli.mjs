@@ -7,10 +7,23 @@ import path from 'node:path';
 import { runtimeDir } from './lib/core.mjs';
 import { git } from './lib/core.mjs';
 import { cacheKey, readCache, writeCache } from './lib/cache.mjs';
+import { applyHandoff, createHandoff, inspectHandoff } from './lib/handoff.mjs';
 
 const inFlight = new Map();
 
 export async function run(argv = process.argv.slice(2), env = process.env, root = process.cwd()) {
+  if (argv[0] === 'handoff') {
+    if (argv[1] === 'create') {
+      await createHandoff({ root, mode: argv[2] ?? 'session' });
+      return 0;
+    }
+    if (argv[1] === 'inspect') return (await inspectHandoff(argv[2])).stale ? 3 : 0;
+    if (argv[1] === 'apply') {
+      await applyHandoff(argv[2], { root, apply: argv.includes('--apply') });
+      return 0;
+    }
+    return 2;
+  }
   if (argv[0] !== 'validate') return 2;
   const profile = argv[1] ?? 'targeted';
   if ('AI_WORKFLOW_BYPASS' in env) {

@@ -110,27 +110,27 @@ Run: `git add tools/ai-workflow && git commit -m "feat: add workflow scheduler a
 - Produces: `createHandoff({root, mode})`；`inspectHandoff(path)`；`applyHandoff(path, {apply})`。
 - Manifest records: HEAD、index tree、OpenSpec phase、source hashes、mode 和生成时间。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 覆盖 session/staged 产物、超过 2000 行 context 截断、二进制 patch 往返、疑似密钥拒绝、HEAD/index/phase 变化 stale、无 `--apply` 不修改仓库以及 patch 冲突停止。
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `node --test tools/ai-workflow/test/handoff.test.mjs`
 
 Expected: FAIL，提示 handoff 模块不存在。
 
-- [ ] **Step 3: 实现 handoff**
+- [x] **Step 3: 实现 handoff**
 
 机器恢复只读取 `manifest.json`；`context.md` 只保存摘要和截断标记。staged patch 调用 `git diff --cached --binary --full-index`。生成前扫描候选文本中的密钥模式；apply 前重新计算事实字段并拒绝 stale。
 
-- [ ] **Step 4: 运行定向测试**
+- [x] **Step 4: 运行定向测试**
 
 Run: `node --test tools/ai-workflow/test/handoff.test.mjs`
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 Run: `git add tools/ai-workflow && git commit -m "feat: add verifiable workflow handoff"`
 
