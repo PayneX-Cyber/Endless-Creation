@@ -1,6 +1,6 @@
 workflow: full
 language: zh-CN
-phase: verify
+phase: build
 context_compression: off
 build_mode: executing-plans
 build_pause: null
@@ -8,12 +8,12 @@ subagent_dispatch: null
 tdd_mode: tdd
 review_mode: thorough
 isolation: worktree
-verify_mode: null
+verify_mode: full
 auto_transition: true
 base_ref: dd5b9dd998bc6e2e80783cc3d487b80f96ffb084
 design_doc: docs/superpowers/specs/2026-07-12-ai-workflow-governance-design.md
 plan: docs/superpowers/plans/2026-07-12-ai-workflow-governance.md
-verify_result: pending
+verify_result: fail
 verification_report: null
 branch_status: pending
 created_at: 2026-07-12

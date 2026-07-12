@@ -64,29 +64,30 @@ export async function run(argv = process.argv.slice(2), env = process.env, root 
   }
   if (argv[0] !== 'validate') return 2;
   const profile = argv[1] ?? 'targeted';
-  return validationExit(root, profile, argv.includes('--staged'), env);
+  return validationExit(root, profile, argv.includes('--staged'), env, argv.includes('--no-cache'));
 }
 
-async function validationExit(root, profile, staged, env) {
+async function validationExit(root, profile, staged, env, noCache = false) {
   if ('AI_WORKFLOW_BYPASS' in env) {
     const reason = env.AI_WORKFLOW_BYPASS.trim();
     if (!reason) return 2;
     await appendFile(path.join(await runtimeDir(root), 'audit.jsonl'), `${JSON.stringify({ event: 'bypass', reason, createdAt: new Date().toISOString() })}\n`);
     return 0;
   }
-  const result = await cachedValidation(root, profile, staged);
+  const result = await cachedValidation(root, profile, staged, noCache || profile === 'ci');
   return result.ok ? 0 : 1;
 }
 
-async function cachedValidation(root, profile, staged) {
+async function cachedValidation(root, profile, staged, noCache) {
   const config = await readFile(path.join(root, '.ai-workflow', 'config.json'), 'utf8');
   const key = cacheKey({
-    tree: staged ? await git(root, 'write-tree') : await git(root, 'rev-parse', 'HEAD'),
+    tree: staged ? await git(root, 'write-tree') : await workspaceFingerprint(root),
     configHash: createHash('sha256').update(config).digest('hex'),
     environment: `${process.version}:${await git(root, '--version')}:ai-workflow-v1`,
     profile
   });
   const stateDir = await runtimeDir(root);
+  if (noCache) return validate({ root, profile, staged });
   const hit = await readCache(stateDir, key);
   if (hit) {
     await appendFile(path.join(stateDir, 'metrics.jsonl'), `${JSON.stringify({ event: 'cache-hit', profile, createdAt: new Date().toISOString() })}\n`);
@@ -100,6 +101,21 @@ async function cachedValidation(root, profile, staged) {
     }).finally(() => inFlight.delete(key)));
   }
   return inFlight.get(key);
+}
+
+async function workspaceFingerprint(root) {
+  const hash = createHash('sha256');
+  hash.update(await git(root, 'rev-parse', 'HEAD'));
+  hash.update(await git(root, 'diff', '--binary', 'HEAD'));
+  const untracked = (await git(root, 'ls-files', '--others', '--exclude-standard', '-z'))
+    .split('\0')
+    .filter(Boolean)
+    .sort();
+  for (const relative of untracked) {
+    hash.update(relative);
+    hash.update(await readFile(path.join(root, relative)));
+  }
+  return hash.digest('hex');
 }
 
 if (fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

@@ -84,3 +84,42 @@ test('CLI executes when launched as a relative script path', async () => {
   assert.equal(result.status, 1);
   assert.ok((await readdir(path.join(root, '.git', 'ai-workflow', 'reports'))).length > 0);
 });
+
+test('workspace cache changes with tracked and untracked content', async () => {
+  const root = await repository('guard');
+  await writeFile(path.join(root, '.ai-workflow', 'config.json'), JSON.stringify({
+    stage: 'guard',
+    profiles: {
+      targeted: {
+        commands: ['node -e "const fs=require(\'fs\');process.exit(fs.readFileSync(\'value.txt\',\'utf8\')===\'good\'?0:1)"']
+      }
+    }
+  }));
+  await writeFile(path.join(root, 'value.txt'), 'good');
+  git(root, 'add', '.');
+  git(root, 'commit', '-m', 'cache baseline');
+
+  assert.equal(await run(['validate', 'targeted'], {}, root), 0);
+  await writeFile(path.join(root, 'value.txt'), 'bad');
+  assert.equal(await run(['validate', 'targeted'], {}, root), 1);
+  await writeFile(path.join(root, 'value.txt'), 'good');
+  await writeFile(path.join(root, 'untracked.txt'), 'one');
+  assert.equal(await run(['validate', 'targeted'], {}, root), 0);
+  await writeFile(path.join(root, 'untracked.txt'), 'two');
+  assert.equal(await run(['validate', 'targeted'], {}, root), 0);
+  assert.equal((await readdir(path.join(root, '.git', 'ai-workflow', 'cache'))).length, 3);
+});
+
+test('ci validation never reads or writes cache', async () => {
+  const root = await repository('guard');
+  await writeFile(path.join(root, '.ai-workflow', 'config.json'), JSON.stringify({
+    stage: 'guard',
+    profiles: { ci: { commands: [] } }
+  }));
+  git(root, 'add', '.');
+  git(root, 'commit', '-m', 'ci baseline');
+
+  assert.equal(await run(['validate', 'ci'], {}, root), 0);
+  assert.equal(await run(['validate', 'ci'], {}, root), 0);
+  await assert.rejects(readdir(path.join(root, '.git', 'ai-workflow', 'cache')));
+});

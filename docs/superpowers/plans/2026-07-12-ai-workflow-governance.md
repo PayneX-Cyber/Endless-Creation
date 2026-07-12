@@ -229,3 +229,39 @@ Run: `git add .githooks tools/ai-workflow package.json docs/README.md docs/qa op
 - Placeholder scan: 无 TBD/TODO/“稍后实现”。
 - Interface consistency: CLI、运行目录、退出码、manifest 和 Migration Manager 名称跨任务一致。
 - Scope: 未新增依赖，未触及应用 schema、IPC、导出协议或业务持久化。
+
+## Verify 返修计划（2026-07-13）
+
+### Task 6：staged 与缓存正确性
+
+- [x] 增加回归测试：unstaged 配置不影响 staged、shadow 可解析仓库依赖、workspace 内容变化击穿缓存、ci 不读写缓存。
+- [x] 确认测试按预期失败。
+- [x] 将 shadow 放入 Git 运行目录并从 shadow 读取配置；缓存键纳入 workspace diff/untracked 内容，ci 与 `--no-cache` 禁用缓存。
+- [x] 运行 validate/integration 测试并提交。
+
+### Task 7：handoff 接收边界
+
+- [ ] 增加回归测试：目标 HEAD/index/phase 不一致时 stale，patch checksum 被篡改时拒绝 apply。
+- [ ] 确认测试按预期失败。
+- [ ] inspect/apply 使用接收仓库事实并在 apply 前校验 checksum。
+- [ ] 运行 handoff 测试并提交。
+
+### Task 8：来源更新单事务
+
+- [ ] 增加回归测试：镜像同步失败时锁文件和镜像同时恢复。
+- [ ] 确认测试按预期失败。
+- [ ] 在内存生成新 lock，以单次 Migration Manager snapshot/WAL 覆盖 lock 与镜像。
+- [ ] 运行 sources/migration 测试并提交。
+
+### Task 9：CLI 与报告契约
+
+- [ ] 增加回归测试：`doctor`、`scheduler status/recover/prune`、`migrate status/plan/apply/rollback/prune` 可路由，所有命令写统一报告。
+- [ ] 确认测试按预期失败。
+- [ ] 复用现有模块补最小命令实现和统一报告包装，不新增依赖。
+- [ ] 运行 integration 测试并提交。
+
+### Task 10：返修验收
+
+- [ ] 连续压测官方测试、scheduler、migration/sources。
+- [ ] 运行 build、OpenSpec strict validate、文本扫描和 diff check。
+- [ ] 完成 thorough 代码审查，回填 tasks 与 QA 台账，运行 build guard。

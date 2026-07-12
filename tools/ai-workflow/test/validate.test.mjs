@@ -37,6 +37,34 @@ test('staged validation ignores unstaged content', async () => {
   assert.equal(await readFile(path.join(root, 'value.txt'), 'utf8'), 'bad');
 });
 
+test('staged validation reads its config from the index', async () => {
+  const root = await repository();
+  await writeFile(path.join(root, 'value.txt'), 'good');
+  git(root, 'add', 'value.txt');
+  await writeFile(path.join(root, 'config.json'), JSON.stringify({
+    profiles: { targeted: { commands: ['node -e "process.exit(1)"'] } }
+  }));
+
+  const result = await validate({ root, profile: 'targeted', configPath: 'config.json', staged: true });
+
+  assert.equal(result.ok, true);
+});
+
+test('staged shadow resolves dependencies from the repository', async () => {
+  const root = await repository();
+  await mkdir(path.join(root, 'node_modules', 'demo'), { recursive: true });
+  await writeFile(path.join(root, 'node_modules', 'demo', 'package.json'), '{"main":"index.js"}');
+  await writeFile(path.join(root, 'node_modules', 'demo', 'index.js'), 'module.exports = true');
+  await writeFile(path.join(root, 'config.json'), JSON.stringify({
+    profiles: { targeted: { commands: ['node -e "require(\'demo\')"'] } }
+  }));
+  git(root, 'add', 'config.json');
+
+  const result = await validate({ root, profile: 'targeted', configPath: 'config.json', staged: true });
+
+  assert.equal(result.ok, true);
+});
+
 test('unknown profile is a configuration error', async () => {
   const root = await repository();
   await assert.rejects(

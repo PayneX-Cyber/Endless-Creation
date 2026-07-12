@@ -23,3 +23,11 @@
 - [x] 5.1 接入薄 pre-commit 入口和 Observe 阶段配置，记录耗时、缓存命中率及 bypass 频次
 - [x] 5.2 完成 Windows/Linux 命令级测试、`npm.cmd run build`、必要文本扫描和真实仓库端到端验收
 - [x] 5.3 回填 OpenSpec、Superpowers 计划、QA 台账及 rollout 状态，确认可从 Observe 安全升级或回滚
+
+## 6. Verify 返修
+
+- [x] 6.1 staged 验证从 index shadow 读取配置并复用仓库依赖，workspace/ci 缓存按真实内容正确失效
+- [ ] 6.2 handoff 针对接收仓库检查 stale，并在 apply 前校验 patch checksum
+- [ ] 6.3 `sources update` 用单次 Migration Manager 事务覆盖锁文件与镜像，任一失败全部回滚
+- [ ] 6.4 补齐 `doctor`、`scheduler`、`migrate` CLI 路由和统一结构化运行报告
+- [ ] 6.5 重跑压力测试、构建、OpenSpec strict validate、文本扫描与完整代码审查
