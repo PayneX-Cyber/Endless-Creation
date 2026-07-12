@@ -1,7 +1,7 @@
 ## 1. CLI 与 staged 验证
 
-- [ ] 1.1 建立零运行时依赖 CLI、配置解析、稳定退出码和结构化报告，并用 `node:test` 覆盖命令契约
-- [ ] 1.2 实现 Git index 影子工作区、四级 profile、路径规则和带理由审计 bypass，验证 unstaged 内容不会参与检查
+- [x] 1.1 建立零运行时依赖 CLI、配置解析、稳定退出码和结构化报告，并用 `node:test` 覆盖命令契约
+- [x] 1.2 实现 Git index 影子工作区、四级 profile、路径规则和带理由审计 bypass，验证 unstaged 内容不会参与检查
 
 ## 2. 调度与缓存
 

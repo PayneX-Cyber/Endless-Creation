@@ -39,27 +39,27 @@ base-ref: dd5b9dd998bc6e2e80783cc3d487b80f96ffb084
 - Produces: `run(argv, env) -> Promise<number>`；`loadConfig(root)`；`validate({root, profile, staged})`。
 - Produces exit codes: `0 success`, `1 validation failure`, `2 usage/config`, `3 blocked`, `4 recovery-required`, `5 internal`.
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 在临时 Git 仓库提交基线文件，再让同一文件 staged 内容合法、working tree 内容非法；调用 `validate({ staged: true })`，断言命令只看到 index 内容。再覆盖 profile 选择、未知 profile 返回配置错误、`AI_WORKFLOW_BYPASS` 空理由拒绝和非空理由写 audit。
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `node --test tools/ai-workflow/test/validate.test.mjs`
 
 Expected: FAIL，提示模块不存在。
 
-- [ ] **Step 3: 实现最小 CLI 与影子工作区**
+- [x] **Step 3: 实现最小 CLI 与影子工作区**
 
 用 `git rev-parse --git-dir` 定位运行目录，用 `git checkout-index --all --force --prefix=<shadow>/` 导出 index；按 `.ai-workflow/config.json` 的路径规则选择 profile 并以 `spawn` 执行命令。所有报告写入 `.git/ai-workflow/reports/`，audit 采用追加 JSONL。
 
-- [ ] **Step 4: 运行定向测试**
+- [x] **Step 4: 运行定向测试**
 
 Run: `node --test tools/ai-workflow/test/validate.test.mjs`
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 Run: `git add tools/ai-workflow .ai-workflow/config.json .gitignore && git commit -m "feat: add staged workflow validation"`
 

@@ -10,3 +10,4 @@ Thumbs.db
 .vite/
 coverage/
 output/
+.worktrees/
