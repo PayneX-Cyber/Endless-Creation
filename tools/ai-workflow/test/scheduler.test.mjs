@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -44,6 +44,32 @@ test('dead stale tickets are removed', async () => {
   await withWriterLock({ stateDir, staleMs: 1 }, async () => {});
 
   assert.match(await readFile(path.join(stateDir, 'audit.jsonl'), 'utf8'), /stale-ticket-removed/);
+});
+
+test('a waiter failure never removes another writer lock', async () => {
+  const stateDir = await mkdtemp(path.join(tmpdir(), 'scheduler-'));
+  let enter;
+  let release;
+  const entered = new Promise(resolve => { enter = resolve; });
+  const blocked = new Promise(resolve => { release = resolve; });
+  const writer = withWriterLock({ stateDir }, async () => {
+    enter();
+    await blocked;
+  });
+  await entered;
+  await writeFile(path.join(stateDir, 'queue', 'malformed.json'), 'not-json');
+
+  let lockSurvived = false;
+  try {
+    await assert.rejects(withWriterLock({ stateDir }, async () => {}), SyntaxError);
+    await access(path.join(stateDir, 'writer.lock'));
+    lockSurvived = true;
+  } finally {
+    release();
+    await writer;
+  }
+
+  assert.equal(lockSurvived, true);
 });
 
 test('cache key changes with tree config environment or profile', async () => {

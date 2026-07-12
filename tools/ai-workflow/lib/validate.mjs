@@ -34,7 +34,7 @@ export async function validate({ root, profile, configPath, staged = false }) {
   }
 }
 
-async function selectProfile(root, config, staged) {
+export async function selectProfile(root, config, staged) {
   const files = staged ? (await git(root, 'diff', '--cached', '--name-only')).split(/\r?\n/).filter(Boolean) : [];
   const ranks = Object.keys(config.profiles ?? {});
   let selected = ranks[0];

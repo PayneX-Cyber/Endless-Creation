@@ -126,6 +126,20 @@ test('ci validation never reads or writes cache', async () => {
   await assert.rejects(readdir(path.join(root, '.git', 'ai-workflow', 'cache')));
 });
 
+test('an automatically selected ci profile never writes cache', async () => {
+  const root = await repository('observe');
+  await writeFile(path.join(root, '.ai-workflow', 'config.json'), JSON.stringify({
+    stage: 'observe',
+    profiles: { targeted: { commands: [] }, ci: { commands: [] } },
+    paths: { 'file.txt': 'ci' }
+  }));
+  git(root, 'add', '.ai-workflow/config.json');
+
+  assert.equal(await run(['hook', 'run', 'pre-commit'], {}, root), 0);
+  assert.equal(await run(['hook', 'run', 'pre-commit'], {}, root), 0);
+  await assert.rejects(readdir(path.join(root, '.git', 'ai-workflow', 'cache')));
+});
+
 test('maintenance commands route and write uniform reports', async () => {
   const root = await repository('observe');
   const commands = [

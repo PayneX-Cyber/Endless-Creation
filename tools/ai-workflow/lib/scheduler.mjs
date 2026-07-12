@@ -59,6 +59,8 @@ export async function withWriterLock({ stateDir, staleMs = 30_000 }, operation) 
   const queueDir = path.dirname(ticket);
   const lockPath = path.join(stateDir, 'writer.lock');
   let heartbeat;
+  let heartbeatWrite = Promise.resolve();
+  let ownsLock = false;
   try {
     while (true) {
       await removeStaleTickets(queueDir, ticket, stateDir, staleMs);
@@ -71,6 +73,7 @@ export async function withWriterLock({ stateDir, staleMs = 30_000 }, operation) 
         const handle = await open(lockPath, 'wx');
         await handle.writeFile(JSON.stringify({ pid: process.pid, heartbeatAt: Date.now() }));
         await handle.close();
+        ownsLock = true;
         break;
       } catch (error) {
         if (error.code !== 'EEXIST') throw error;
@@ -78,13 +81,18 @@ export async function withWriterLock({ stateDir, staleMs = 30_000 }, operation) 
         await sleep(10);
       }
     }
-    const beat = async () => writeFile(lockPath, JSON.stringify({ pid: process.pid, heartbeatAt: Date.now() }));
-    heartbeat = setInterval(() => void beat(), Math.max(10, Math.floor(staleMs / 3)));
+    const beat = () => {
+      heartbeatWrite = heartbeatWrite.then(() =>
+        writeFile(lockPath, JSON.stringify({ pid: process.pid, heartbeatAt: Date.now() }))
+      );
+    };
+    heartbeat = setInterval(beat, Math.max(10, Math.floor(staleMs / 3)));
     return await operation();
   } finally {
     clearInterval(heartbeat);
+    await heartbeatWrite;
     await rm(ticket, { force: true });
-    await rm(lockPath, { force: true });
+    if (ownsLock) await rm(lockPath, { force: true });
   }
 }
 
@@ -106,7 +114,7 @@ async function removeStaleTickets(queueDir, ownTicket, stateDir, staleMs) {
       await rm(candidate, { force: true });
       await appendFile(path.join(stateDir, 'audit.jsonl'), `${JSON.stringify({ event: 'stale-ticket-removed', pid: value.pid, createdAt: new Date().toISOString() })}\n`);
     } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
+      if (!['ENOENT', 'EPERM', 'EACCES'].includes(error.code)) throw error;
     }
   }
 }

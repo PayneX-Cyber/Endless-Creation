@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { validate } from './lib/validate.mjs';
+import { selectProfile, validate } from './lib/validate.mjs';
 import { appendFile } from 'node:fs/promises';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
@@ -143,15 +143,18 @@ async function validationExit(root, profile, staged, env, noCache = false) {
 }
 
 async function cachedValidation(root, profile, staged, noCache) {
-  const config = await readFile(path.join(root, '.ai-workflow', 'config.json'), 'utf8');
+  const config = staged
+    ? await git(root, 'show', ':.ai-workflow/config.json')
+    : await readFile(path.join(root, '.ai-workflow', 'config.json'), 'utf8');
+  const effectiveProfile = profile ?? await selectProfile(root, JSON.parse(config), staged);
   const key = cacheKey({
     tree: staged ? await git(root, 'write-tree') : await workspaceFingerprint(root),
     configHash: createHash('sha256').update(config).digest('hex'),
     environment: `${process.version}:${await git(root, '--version')}:ai-workflow-v1`,
-    profile
+    profile: effectiveProfile
   });
   const stateDir = await runtimeDir(root);
-  if (noCache) return validate({ root, profile, staged });
+  if (noCache || effectiveProfile === 'ci') return validate({ root, profile: effectiveProfile, staged });
   const hit = await readCache(stateDir, key);
   if (hit) {
     await appendFile(path.join(stateDir, 'metrics.jsonl'), `${JSON.stringify({ event: 'cache-hit', profile, createdAt: new Date().toISOString() })}\n`);
@@ -159,7 +162,7 @@ async function cachedValidation(root, profile, staged, noCache) {
   }
   await appendFile(path.join(stateDir, 'metrics.jsonl'), `${JSON.stringify({ event: 'cache-miss', profile, createdAt: new Date().toISOString() })}\n`);
   if (!inFlight.has(key)) {
-    inFlight.set(key, validate({ root, profile, staged }).then(async result => {
+    inFlight.set(key, validate({ root, profile: effectiveProfile, staged }).then(async result => {
       await writeCache(stateDir, key, result);
       return result;
     }).finally(() => inFlight.delete(key)));
