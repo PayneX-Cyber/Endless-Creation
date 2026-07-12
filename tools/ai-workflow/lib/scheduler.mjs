@@ -88,6 +88,14 @@ export async function withWriterLock({ stateDir, staleMs = 30_000 }, operation) 
   }
 }
 
+export async function maintainScheduler({ stateDir, staleMs = 30_000 }) {
+  const queueDir = path.join(stateDir, 'queue');
+  await mkdir(queueDir, { recursive: true });
+  await removeStaleTickets(queueDir, null, stateDir, staleMs);
+  await recoverStale(path.join(stateDir, 'writer.lock'), stateDir, staleMs);
+  return { ok: true };
+}
+
 async function removeStaleTickets(queueDir, ownTicket, stateDir, staleMs) {
   for (const name of await readdir(queueDir)) {
     const candidate = path.join(queueDir, name);

@@ -5,7 +5,8 @@ import { createHash } from 'node:crypto';
 import { withWriterLock } from './scheduler.mjs';
 
 export async function runMigration({ root, id, paths, preflight, apply, verify }) {
-  for (const relative of paths) {
+  const snapshotPaths = [...new Set([...paths, '.ai-workflow/version.json'])];
+  for (const relative of snapshotPaths) {
     if (!relative || path.isAbsolute(relative) || relative.split(/[\\/]/).includes('..')) {
       throw new Error(`Invalid managed path: ${relative}`);
     }
@@ -21,7 +22,7 @@ export async function runMigration({ root, id, paths, preflight, apply, verify }
   await wal(journalPath, { phase: 'preflight', id });
   if (await preflight() !== true) throw new Error('Migration preflight failed');
   await wal(journalPath, { phase: 'snapshot', id });
-  const manifest = await snapshot(root, snapshotDir, paths);
+  const manifest = await snapshot(root, snapshotDir, snapshotPaths);
   await validateSnapshot(snapshotDir, manifest);
 
   return withWriterLock({ stateDir }, async () => {
@@ -63,6 +64,88 @@ export async function recoverMigration(root, id) {
   const manifest = JSON.parse(await readFile(path.join(value.snapshotDir, 'manifest.json'), 'utf8'));
   await restore(root, value.snapshotDir, manifest);
   await rm(marker, { force: true });
+  return { ok: true };
+}
+
+export async function readMigrationDefinition(root, id) {
+  if (!/^[A-Za-z0-9._-]+$/.test(id ?? '')) throw new Error('Invalid migration id');
+  const definition = JSON.parse(await readFile(path.join(root, '.ai-workflow', 'migrations', `${id}.json`), 'utf8'));
+  if (definition.id !== id || !Array.isArray(definition.paths) || !Array.isArray(definition.operations)) {
+    throw new Error('Invalid migration definition');
+  }
+  const allowed = new Set(definition.paths);
+  for (const operation of definition.operations) {
+    if (!allowed.has(operation.path) || !['write', 'copy', 'delete'].includes(operation.type)) {
+      throw new Error('Migration operation is outside managed paths');
+    }
+  }
+  return definition;
+}
+
+export async function runDeclarativeMigration(root, id) {
+  const definition = await readMigrationDefinition(root, id);
+  return runMigration({
+    root,
+    id,
+    paths: definition.paths,
+    preflight: async () => true,
+    apply: async () => {
+      for (const operation of definition.operations) {
+        const target = path.join(root, operation.path);
+        if (operation.type === 'delete') {
+          await rm(target, { recursive: true, force: true });
+        } else if (operation.type === 'copy') {
+          if (!operation.from || path.isAbsolute(operation.from) || operation.from.split(/[\\/]/).includes('..')) {
+            throw new Error('Invalid migration copy source');
+          }
+          await mkdir(path.dirname(target), { recursive: true });
+          await cp(path.join(root, operation.from), target, { recursive: true, force: true });
+        } else {
+          await mkdir(path.dirname(target), { recursive: true });
+          const temporary = `${target}.${process.pid}.tmp`;
+          await writeFile(temporary, String(operation.content ?? ''));
+          await rename(temporary, target);
+        }
+      }
+    },
+    verify: async () => {
+      for (const [relative, expected] of Object.entries(definition.checksums ?? {})) {
+        if (await hashPath(path.join(root, relative)) !== expected) {
+          throw new Error(`Migration checksum mismatch: ${relative}`);
+        }
+      }
+    }
+  });
+}
+
+export async function rollbackMigration(root, runId) {
+  if (!/^[A-Za-z0-9._-]+$/.test(runId ?? '')) throw new Error('Invalid migration run id');
+  const stateDir = await migrationStateDir(root);
+  const snapshotDir = path.join(stateDir, 'migrations', runId, 'snapshot');
+  const manifest = JSON.parse(await readFile(path.join(snapshotDir, 'manifest.json'), 'utf8'));
+  return withWriterLock({ stateDir }, async () => {
+    await restore(root, snapshotDir, manifest);
+    return { ok: true };
+  });
+}
+
+export async function migrationStatus(root) {
+  const stateDir = await migrationStateDir(root);
+  return {
+    recoveryRequired: await hasEntries(path.join(stateDir, 'recovery-required')),
+    runs: await entries(path.join(stateDir, 'migrations'))
+  };
+}
+
+export async function pruneMigrations(root, maxAgeMs = 14 * 24 * 60 * 60 * 1000) {
+  const stateDir = await migrationStateDir(root);
+  const runsDir = path.join(stateDir, 'migrations');
+  for (const name of await entries(runsDir)) {
+    const target = path.join(runsDir, name);
+    if (Date.now() - (await stat(target)).mtimeMs > maxAgeMs) {
+      await rm(target, { recursive: true, force: true });
+    }
+  }
   return { ok: true };
 }
 
@@ -143,6 +226,15 @@ async function hasEntries(dir) {
     return (await readdir(dir)).length > 0;
   } catch (error) {
     if (error.code === 'ENOENT') return false;
+    throw error;
+  }
+}
+
+async function entries(dir) {
+  try {
+    return await readdir(dir);
+  } catch (error) {
+    if (error.code === 'ENOENT') return [];
     throw error;
   }
 }

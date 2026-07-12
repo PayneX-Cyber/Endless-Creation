@@ -47,7 +47,9 @@ test('observe records validation failure without blocking while guard blocks', a
 test('hook bypass is audited and equivalent validations hit one cache record', async () => {
   const root = await repository('guard');
   assert.equal(await run(['hook', 'run', 'pre-commit'], { AI_WORKFLOW_BYPASS: 'incident' }, root), 0);
-  assert.match(await readFile(path.join(root, '.git', 'ai-workflow', 'audit.jsonl'), 'utf8'), /incident/);
+  const audit = JSON.parse((await readFile(path.join(root, '.git', 'ai-workflow', 'audit.jsonl'), 'utf8')).trim());
+  assert.equal(audit.reason, 'incident');
+  assert.ok(audit.branch && audit.head && audit.stagedTree);
 
   await writeFile(path.join(root, '.ai-workflow', 'config.json'), JSON.stringify({
     stage: 'guard', profiles: { targeted: { commands: [] } }
@@ -122,4 +124,47 @@ test('ci validation never reads or writes cache', async () => {
   assert.equal(await run(['validate', 'ci'], {}, root), 0);
   assert.equal(await run(['validate', 'ci'], {}, root), 0);
   await assert.rejects(readdir(path.join(root, '.git', 'ai-workflow', 'cache')));
+});
+
+test('maintenance commands route and write uniform reports', async () => {
+  const root = await repository('observe');
+  const commands = [
+    ['doctor'],
+    ['scheduler', 'status'],
+    ['scheduler', 'recover'],
+    ['scheduler', 'prune'],
+    ['migrate', 'status'],
+    ['migrate', 'prune']
+  ];
+
+  for (const command of commands) assert.equal(await run(command, {}, root), 0);
+
+  const reportDir = path.join(root, '.git', 'ai-workflow', 'runs');
+  const reports = await readdir(reportDir);
+  assert.equal(reports.length, commands.length);
+  const report = JSON.parse(await readFile(path.join(reportDir, reports[0]), 'utf8'));
+  assert.equal(report.schemaVersion, 'ai-workflow.run.v1');
+  assert.equal(typeof report.exitCode, 'number');
+  assert.ok(report.command && report.runId && report.startedAt);
+});
+
+test('declarative migration can plan apply and roll back', async () => {
+  const root = await repository('observe');
+  const migrations = path.join(root, '.ai-workflow', 'migrations');
+  await mkdir(migrations, { recursive: true });
+  await writeFile(path.join(root, 'managed.txt'), 'before');
+  await writeFile(path.join(migrations, '001.json'), JSON.stringify({
+    id: '001',
+    paths: ['managed.txt'],
+    operations: [{ type: 'write', path: 'managed.txt', content: 'after' }]
+  }));
+
+  assert.equal(await run(['migrate', 'plan', '001'], {}, root), 0);
+  assert.equal(await run(['migrate', 'apply', '001'], {}, root), 0);
+  assert.equal(await readFile(path.join(root, 'managed.txt'), 'utf8'), 'after');
+  const stateDir = path.join(root, '.git', 'ai-workflow', 'migrations');
+  const runId = (await readdir(stateDir))[0];
+  assert.equal(await run(['migrate', 'rollback', runId], {}, root), 0);
+  assert.equal(await readFile(path.join(root, 'managed.txt'), 'utf8'), 'before');
+  await assert.rejects(readFile(path.join(root, '.ai-workflow', 'version.json'), 'utf8'));
 });

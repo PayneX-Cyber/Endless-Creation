@@ -255,10 +255,10 @@ Run: `git add .githooks tools/ai-workflow package.json docs/README.md docs/qa op
 
 ### Task 9：CLI 与报告契约
 
-- [ ] 增加回归测试：`doctor`、`scheduler status/recover/prune`、`migrate status/plan/apply/rollback/prune` 可路由，所有命令写统一报告。
-- [ ] 确认测试按预期失败。
-- [ ] 复用现有模块补最小命令实现和统一报告包装，不新增依赖。
-- [ ] 运行 integration 测试并提交。
+- [x] 增加回归测试：`doctor`、`scheduler status/recover/prune`、`migrate status/plan/apply/rollback/prune` 可路由，所有命令写统一报告。
+- [x] 确认测试按预期失败。
+- [x] 复用现有模块补最小命令实现和统一报告包装，不新增依赖。
+- [x] 运行 integration 测试并提交。
 
 ### Task 10：返修验收
 

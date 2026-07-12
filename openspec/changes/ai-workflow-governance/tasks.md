@@ -29,5 +29,5 @@
 - [x] 6.1 staged 验证从 index shadow 读取配置并复用仓库依赖，workspace/ci 缓存按真实内容正确失效
 - [x] 6.2 handoff 针对接收仓库检查 stale，并在 apply 前校验 patch checksum
 - [x] 6.3 `sources update` 用单次 Migration Manager 事务覆盖锁文件与镜像，任一失败全部回滚
-- [ ] 6.4 补齐 `doctor`、`scheduler`、`migrate` CLI 路由和统一结构化运行报告
+- [x] 6.4 补齐 `doctor`、`scheduler`、`migrate` CLI 路由和统一结构化运行报告
 - [ ] 6.5 重跑压力测试、构建、OpenSpec strict validate、文本扫描与完整代码审查

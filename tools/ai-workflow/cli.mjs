@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { validate } from './lib/validate.mjs';
 import { appendFile } from 'node:fs/promises';
-import { readFile } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runtimeDir } from './lib/core.mjs';
@@ -11,10 +11,67 @@ import { cacheKey, readCache, writeCache } from './lib/cache.mjs';
 import { applyHandoff, createHandoff, inspectHandoff } from './lib/handoff.mjs';
 import { diffSources, syncSources, updateSources, verifySources } from './lib/sources.mjs';
 import { installHook } from './lib/hook.mjs';
+import { maintainScheduler } from './lib/scheduler.mjs';
+import {
+  migrationStatus,
+  pruneMigrations,
+  readMigrationDefinition,
+  rollbackMigration,
+  runDeclarativeMigration
+} from './lib/migration.mjs';
 
 const inFlight = new Map();
 
 export async function run(argv = process.argv.slice(2), env = process.env, root = process.cwd()) {
+  const startedAt = new Date();
+  try {
+    const exitCode = await dispatch(argv, env, root);
+    await writeRunReport(root, argv, exitCode, startedAt);
+    return exitCode;
+  } catch (error) {
+    const exitCode = errorExitCode(error);
+    await writeRunReport(root, argv, exitCode, startedAt, error);
+    return exitCode;
+  }
+}
+
+async function dispatch(argv, env, root) {
+  if (argv[0] === 'doctor') {
+    JSON.parse(await readFile(path.join(root, '.ai-workflow', 'config.json'), 'utf8'));
+    await git(root, 'rev-parse', 'HEAD');
+    return 0;
+  }
+  if (argv[0] === 'scheduler') {
+    if (argv[1] === 'status') {
+      await runtimeDir(root);
+      return 0;
+    }
+    if (['recover', 'prune'].includes(argv[1])) {
+      await maintainScheduler({ stateDir: await runtimeDir(root) });
+      return 0;
+    }
+    return 2;
+  }
+  if (argv[0] === 'migrate') {
+    if (argv[1] === 'status') return (await migrationStatus(root)).recoveryRequired ? 4 : 0;
+    if (argv[1] === 'prune') {
+      await pruneMigrations(root);
+      return 0;
+    }
+    if (argv[1] === 'plan' && argv[2]) {
+      await readMigrationDefinition(root, argv[2]);
+      return 0;
+    }
+    if (argv[1] === 'apply' && argv[2]) {
+      const result = await runDeclarativeMigration(root, argv[2]);
+      return result.recoveryRequired ? 4 : result.ok ? 0 : 1;
+    }
+    if (argv[1] === 'rollback' && argv[2]) {
+      await rollbackMigration(root, argv[2]);
+      return 0;
+    }
+    return 2;
+  }
   if (argv[0] === 'hook') {
     if (argv[1] === 'install') {
       await installHook(root);
@@ -71,7 +128,14 @@ async function validationExit(root, profile, staged, env, noCache = false) {
   if ('AI_WORKFLOW_BYPASS' in env) {
     const reason = env.AI_WORKFLOW_BYPASS.trim();
     if (!reason) return 2;
-    await appendFile(path.join(await runtimeDir(root), 'audit.jsonl'), `${JSON.stringify({ event: 'bypass', reason, createdAt: new Date().toISOString() })}\n`);
+    const [branch, head, stagedTree] = await Promise.all([
+      git(root, 'branch', '--show-current'),
+      git(root, 'rev-parse', 'HEAD'),
+      git(root, 'write-tree')
+    ]);
+    await appendFile(path.join(await runtimeDir(root), 'audit.jsonl'), `${JSON.stringify({
+      event: 'bypass', reason, branch, head, stagedTree, createdAt: new Date().toISOString()
+    })}\n`);
     return 0;
   }
   const result = await cachedValidation(root, profile, staged, noCache || profile === 'ci');
@@ -116,6 +180,31 @@ async function workspaceFingerprint(root) {
     hash.update(await readFile(path.join(root, relative)));
   }
   return hash.digest('hex');
+}
+
+async function writeRunReport(root, argv, exitCode, startedAt, error) {
+  const dir = path.join(await runtimeDir(root), 'runs');
+  await mkdir(dir, { recursive: true });
+  const report = {
+    schemaVersion: 'ai-workflow.run.v1',
+    runId: randomUUID(),
+    command: argv.join(' '),
+    profile: argv[0] === 'validate' ? argv[1] ?? 'targeted' : null,
+    scope: argv.includes('--staged') ? 'staged' : 'workspace',
+    startedAt: startedAt.toISOString(),
+    durationMs: Date.now() - startedAt.getTime(),
+    exitCode,
+    result: exitCode === 0 ? 'pass' : 'fail',
+    ...(error ? { message: error.message } : {})
+  };
+  await writeFile(path.join(dir, `${report.runId}.json`), `${JSON.stringify(report, null, 2)}\n`);
+}
+
+function errorExitCode(error) {
+  if (/recovery-required/i.test(error.message)) return 4;
+  if (/secret|integrity/i.test(error.message)) return 5;
+  if (/unknown|invalid|ENOENT/i.test(error.message)) return 2;
+  return 1;
 }
 
 if (fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
