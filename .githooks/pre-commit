@@ -1,0 +1,2 @@
+#!/bin/sh
+exec node tools/ai-workflow/cli.mjs hook run pre-commit

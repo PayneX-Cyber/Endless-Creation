@@ -32,8 +32,8 @@
 
 - V1 Beta 收口、AI usage 持久化和情感曲线均已完成并推送。
 - Phase 4 商业化仍后置；情感曲线只解除其中一项门槛。
-- 当前没有活动 OpenSpec change。
-- [AI 工作流治理与防腐化基建设计](superpowers/specs/2026-07-12-ai-workflow-governance-design.md) 已批准，等待建立 OpenSpec change 和实施计划。
+- 当前活动 OpenSpec change：`ai-workflow-governance`，build 已完成，等待 verify。
+- [AI 工作流治理与防腐化基建设计](superpowers/specs/2026-07-12-ai-workflow-governance-design.md) 已实现至 Observe 阶段；[QA 台账](qa/2026-07-12-ai-workflow-governance.md) 已记录验证证据和 Skill 来源基线。
 - 下一阶段优先做内部全链路狗粮验证，不把内部验证冒充真实种子用户反馈。
 
 ## 架构

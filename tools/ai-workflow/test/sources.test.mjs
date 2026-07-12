@@ -47,3 +47,11 @@ test('sync rejects source integrity mismatch', async () => {
   const root = await fixture(false);
   await assert.rejects(syncSources(root, { mirrors: ['.agents/skills'] }), /integrity/i);
 });
+
+test('sync dry-run reports changes without writing mirrors', async () => {
+  const root = await fixture();
+  const result = await syncSources(root, { mirrors: ['.agents/skills'], dryRun: true });
+  assert.equal(result.dryRun, true);
+  await assert.rejects(access(path.join(root, '.agents', 'skills', 'demo')));
+  await access(path.join(root, '.agents', 'skills', 'unmanaged'));
+});

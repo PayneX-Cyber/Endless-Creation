@@ -4,15 +4,29 @@ import { appendFile } from 'node:fs/promises';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { runtimeDir } from './lib/core.mjs';
 import { git } from './lib/core.mjs';
 import { cacheKey, readCache, writeCache } from './lib/cache.mjs';
 import { applyHandoff, createHandoff, inspectHandoff } from './lib/handoff.mjs';
 import { diffSources, syncSources, updateSources, verifySources } from './lib/sources.mjs';
+import { installHook } from './lib/hook.mjs';
 
 const inFlight = new Map();
 
 export async function run(argv = process.argv.slice(2), env = process.env, root = process.cwd()) {
+  if (argv[0] === 'hook') {
+    if (argv[1] === 'install') {
+      await installHook(root);
+      return 0;
+    }
+    if (argv[1] === 'run' && argv[2] === 'pre-commit') {
+      const config = JSON.parse(await readFile(path.join(root, '.ai-workflow', 'config.json'), 'utf8'));
+      const code = await validationExit(root, undefined, true, env);
+      return config.stage === 'observe' && code === 1 ? 0 : code;
+    }
+    return 2;
+  }
   if (argv[0] === 'handoff') {
     if (argv[1] === 'create') {
       await createHandoff({ root, mode: argv[2] ?? 'session' });
@@ -33,7 +47,11 @@ export async function run(argv = process.argv.slice(2), env = process.env, root 
       return 0;
     }
     if (argv[1] === 'sync') {
-      const result = await syncSources(root, { mirrors, prune: argv.includes('--prune') });
+      const result = await syncSources(root, {
+        mirrors,
+        prune: argv.includes('--prune'),
+        dryRun: argv.includes('--dry-run')
+      });
       return result.recoveryRequired ? 4 : result.ok ? 0 : 1;
     }
     if (argv[1] === 'update') {
@@ -46,13 +64,17 @@ export async function run(argv = process.argv.slice(2), env = process.env, root 
   }
   if (argv[0] !== 'validate') return 2;
   const profile = argv[1] ?? 'targeted';
+  return validationExit(root, profile, argv.includes('--staged'), env);
+}
+
+async function validationExit(root, profile, staged, env) {
   if ('AI_WORKFLOW_BYPASS' in env) {
     const reason = env.AI_WORKFLOW_BYPASS.trim();
     if (!reason) return 2;
     await appendFile(path.join(await runtimeDir(root), 'audit.jsonl'), `${JSON.stringify({ event: 'bypass', reason, createdAt: new Date().toISOString() })}\n`);
     return 0;
   }
-  const result = await cachedValidation(root, profile, argv.includes('--staged'));
+  const result = await cachedValidation(root, profile, staged);
   return result.ok ? 0 : 1;
 }
 
@@ -66,7 +88,11 @@ async function cachedValidation(root, profile, staged) {
   });
   const stateDir = await runtimeDir(root);
   const hit = await readCache(stateDir, key);
-  if (hit) return { ...hit, cacheHit: true };
+  if (hit) {
+    await appendFile(path.join(stateDir, 'metrics.jsonl'), `${JSON.stringify({ event: 'cache-hit', profile, createdAt: new Date().toISOString() })}\n`);
+    return { ...hit, cacheHit: true };
+  }
+  await appendFile(path.join(stateDir, 'metrics.jsonl'), `${JSON.stringify({ event: 'cache-miss', profile, createdAt: new Date().toISOString() })}\n`);
   if (!inFlight.has(key)) {
     inFlight.set(key, validate({ root, profile, staged }).then(async result => {
       await writeCache(stateDir, key, result);
@@ -76,6 +102,6 @@ async function cachedValidation(root, profile, staged) {
   return inFlight.get(key);
 }
 
-if (import.meta.url === `file://${process.argv[1].replaceAll('\\', '/')}`) {
+if (fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   process.exitCode = await run();
 }

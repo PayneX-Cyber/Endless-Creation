@@ -20,6 +20,6 @@
 
 ## 5. 接入与验收
 
-- [ ] 5.1 接入薄 pre-commit 入口和 Observe 阶段配置，记录耗时、缓存命中率及 bypass 频次
-- [ ] 5.2 完成 Windows/Linux 命令级测试、`npm.cmd run build`、必要文本扫描和真实仓库端到端验收
-- [ ] 5.3 回填 OpenSpec、Superpowers 计划、QA 台账及 rollout 状态，确认可从 Observe 安全升级或回滚
+- [x] 5.1 接入薄 pre-commit 入口和 Observe 阶段配置，记录耗时、缓存命中率及 bypass 频次
+- [x] 5.2 完成 Windows/Linux 命令级测试、`npm.cmd run build`、必要文本扫描和真实仓库端到端验收
+- [x] 5.3 回填 OpenSpec、Superpowers 计划、QA 台账及 rollout 状态，确认可从 Observe 安全升级或回滚

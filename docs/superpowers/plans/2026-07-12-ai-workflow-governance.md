@@ -187,21 +187,21 @@ Run: `git add tools/ai-workflow && git commit -m "feat: add transactional workfl
 - Consumes: CLI 所有公开命令。
 - Produces: `npm run test:ai-workflow` 与 `npm run check:ai-workflow`。
 
-- [ ] **Step 1: 写端到端失败测试**
+- [x] **Step 1: 写端到端失败测试**
 
 在临时仓库安装 hook，覆盖通过、阻止、审计 bypass、现有未知 hook 拒绝覆盖、Windows hook 执行、缓存命中、handoff 往返、迁移回滚和 sources drift。
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `node --test tools/ai-workflow/test/integration.test.mjs`
 
 Expected: FAIL，提示 hook/命令尚未接入。
 
-- [ ] **Step 3: 接入 Observe 阶段**
+- [x] **Step 3: 接入 Observe 阶段**
 
 hook 只执行 `node tools/ai-workflow/cli.mjs hook run pre-commit`；安装时检查 `core.hooksPath` 和已有 hook，未知内容拒绝覆盖。使用 `git update-index --chmod=+x .githooks/pre-commit` 记录可执行位。Observe 默认只记录结果，不拦截。
 
-- [ ] **Step 4: 运行全部验证**
+- [x] **Step 4: 运行全部验证**
 
 Run: `npm.cmd run test:ai-workflow`
 
@@ -215,11 +215,11 @@ Run: `python "C:\Users\x1176\.codex\skills\endless-creation-guardrails\scripts\s
 
 Expected: 无文本完整性错误。
 
-- [ ] **Step 5: 真实仓库验收并回填**
+- [x] **Step 5: 真实仓库验收并回填**
 
 依次运行 `validate targeted`、重复验证确认 cache hit、生成并 inspect staged handoff、执行 dry-run sources diff、模拟失败迁移确认 rollback。把命令、退出码、报告路径和结果写入 QA 文档，逐项勾选 OpenSpec tasks。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 Run: `git add .githooks tools/ai-workflow package.json docs/README.md docs/qa openspec/changes/ai-workflow-governance && git commit -m "feat: integrate AI workflow governance"`
 

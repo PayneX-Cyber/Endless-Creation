@@ -68,5 +68,7 @@ test('path rules select the strongest profile and write a report', async () => {
   const result = await validate({ root, staged: true });
 
   assert.equal(result.profile, 'fast');
-  assert.match(await readFile(result.reportPath, 'utf8'), /"profile": "fast"/);
+  const report = JSON.parse(await readFile(result.reportPath, 'utf8'));
+  assert.equal(report.profile, 'fast');
+  assert.equal(typeof report.durationMs, 'number');
 });

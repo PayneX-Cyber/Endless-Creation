@@ -5,6 +5,7 @@ import path from 'node:path';
 import { exec, git, loadConfig, runtimeDir } from './core.mjs';
 
 export async function validate({ root, profile, configPath, staged = false }) {
+  const startedAt = Date.now();
   const config = await loadConfig(root, configPath);
   if (!profile) profile = await selectProfile(root, config, staged);
   const selected = config.profiles?.[profile];
@@ -19,9 +20,9 @@ export async function validate({ root, profile, configPath, staged = false }) {
     for (const command of selected.commands ?? []) {
       await exec(command, { cwd: shadow, shell: true });
     }
-    return await report(root, { ok: true, profile });
+    return await report(root, { ok: true, profile, durationMs: Date.now() - startedAt });
   } catch (error) {
-    return await report(root, { ok: false, profile, message: error.message });
+    return await report(root, { ok: false, profile, message: error.message, durationMs: Date.now() - startedAt });
   } finally {
     if (staged) await rm(shadow, { recursive: true, force: true });
   }

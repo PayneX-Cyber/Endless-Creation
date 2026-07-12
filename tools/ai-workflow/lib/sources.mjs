@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { cp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { runMigration } from './migration.mjs';
@@ -46,10 +46,15 @@ export async function verifySources(root, options) {
   return { ok: diff.missing.length === 0 && diff.drifted.length === 0 && diff.unmanaged.length === 0, ...diff };
 }
 
-export async function syncSources(root, { mirrors, prune = false }) {
+export async function syncSources(root, { mirrors, prune = false, dryRun = false }) {
   const lock = await lockFile(root);
-  await verifyIntegrity(root, lock);
   const before = await diffSources(root, { mirrors });
+  const unsupported = Object.entries(lock.skills ?? {})
+    .filter(([, entry]) => entry.sourceType && entry.sourceType !== 'local')
+    .map(([name]) => name);
+  if (dryRun) return { ok: true, dryRun: true, diff: before, unsupported };
+  if (unsupported.length) throw new Error(`Unsupported non-local sources: ${unsupported.join(', ')}`);
+  await verifyIntegrity(root, lock);
   const managedPaths = mirrors.flatMap(mirror => Object.keys(lock.skills ?? {}).map(name => path.join(mirror, name)));
   const prunePaths = prune ? before.unmanaged : [];
   return runMigration({
