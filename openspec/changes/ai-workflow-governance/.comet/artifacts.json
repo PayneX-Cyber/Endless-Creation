@@ -1,0 +1,8 @@
+{
+  "openspec_proposal": "openspec/changes/ai-workflow-governance/proposal.md",
+  "openspec_design": "openspec/changes/ai-workflow-governance/design.md",
+  "openspec_tasks": "openspec/changes/ai-workflow-governance/tasks.md",
+  "openspec_delta_spec": "openspec/changes/ai-workflow-governance/specs/ai-workflow-governance/spec.md",
+  "handoff_context": "openspec/changes/ai-workflow-governance/.comet/handoff/design-context.json",
+  "handoff_markdown": "openspec/changes/ai-workflow-governance/.comet/handoff/design-context.md"
+}

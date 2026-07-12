@@ -1,0 +1,19 @@
+schema: spec-driven
+
+context: |
+  Endless Creation 是 Electron 42 + React 19 + TypeScript 6 + Vite 8 的本地优先 AI 创作桌面应用。
+  当前主线是小说创作闭环；现有能力与状态以 docs/README.md 和 V1 路线图为入口。
+  OpenSpec 负责 WHAT，docs/superpowers 负责 HOW，docs/qa 保存验证记录。
+  默认整包交付，复用现有 adapter、候选确认和本地持久化模式。
+  不得修改或记录用户真实 API 密钥；AI 结构化结果必须先候选、确认后写入。
+
+rules:
+  proposal:
+    - 必须包含目标、非目标、用户价值和迁移/兼容影响
+    - 必须说明是否触及 schema、IPC、导出协议或持久化
+  design:
+    - 优先复用现有模块和依赖，不为单一实现新增抽象
+    - 明确信任边界、失败处理和防 AI 污染策略
+  tasks:
+    - 按可验证的端到端交付组织，不拆成设计-only、协议-only、UI-only 小任务
+    - 最后包含 npm.cmd run build、必要的文本扫描和真机验收

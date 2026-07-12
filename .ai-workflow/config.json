@@ -1,0 +1,14 @@
+{
+  "stage": "observe",
+  "profiles": {
+    "targeted": { "commands": [] },
+    "fast": { "commands": ["npm.cmd run build"] },
+    "full": { "commands": ["npm.cmd run build"] },
+    "ci": { "commands": ["npm.cmd run build"] }
+  },
+  "paths": {
+    "docs/**": "targeted",
+    "src/**": "fast",
+    "electron/**": "fast"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "change": "ai-workflow-governance",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "c8b8ede1703e42d36de66cd778781feaf3ec262015fed5251574b75487cdf306",
+  "files": [
+    { "path": "openspec/changes/ai-workflow-governance/proposal.md", "sha256": "8edf2491494b4acb8c39a61341ac5a4a28083db101684f4da32164213494520d" },
+    { "path": "openspec/changes/ai-workflow-governance/design.md", "sha256": "50aee092c4415c88383c5af24d698a58f99f3539d8782e65efc60077904270d1" },
+    { "path": "openspec/changes/ai-workflow-governance/tasks.md", "sha256": "b644bddaa62246dfb1f5a2e3986fbb569323f5011b70dca184365d5fb88324e5" },
+    { "path": "openspec/changes/ai-workflow-governance/specs/ai-workflow-governance/spec.md", "sha256": "612d177f7bd1fbe440b3f7b09e93bfd0217d9f86f158005ecc46a3ef718af592" }
+  ]
+}
