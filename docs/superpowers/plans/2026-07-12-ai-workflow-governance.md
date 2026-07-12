@@ -262,6 +262,6 @@ Run: `git add .githooks tools/ai-workflow package.json docs/README.md docs/qa op
 
 ### Task 10：返修验收
 
-- [ ] 连续压测官方测试、scheduler、migration/sources。
-- [ ] 运行 build、OpenSpec strict validate、文本扫描和 diff check。
-- [ ] 完成 thorough 代码审查，回填 tasks 与 QA 台账，运行 build guard。
+- [x] 连续压测官方测试、scheduler、migration/sources。
+- [x] 运行 build、OpenSpec strict validate、文本扫描和 diff check。
+- [x] 完成 thorough 代码审查，回填 tasks 与 QA 台账，运行 build guard。

@@ -63,3 +63,27 @@
 ## 结论
 
 Observe 阶段验收通过：验证、调度、缓存、handoff、迁移、薄 hook 和审计链可用，默认不阻断现有提交。当前 Skill 镜像尚未收敛，已作为观测基线记录；在 lock 具备固定远程来源前不得执行远程写同步，也不得升级到 Coordinate/CI 阶段。
+
+## Verify 返修复验（2026-07-13）
+
+首次 full verify 发现 5 个 IMPORTANT 缺口，已通过 `verify-fail` 正规退回 build 修复：
+
+- staged shadow 从 index 读取配置并可解析仓库依赖；hook enforcement 同样以 staged 配置为准。
+- workspace 缓存键纳入 tracked diff 与 untracked 内容；显式或自动选择的 ci 均不读写缓存。
+- handoff apply 针对接收仓库校验 HEAD/tree/phase，并在应用前校验 patch SHA-256。
+- `sources update` 以单次 snapshot/WAL 同时覆盖 lock 与镜像，失败不残留半提交状态。
+- `doctor`、`scheduler`、`migrate` 命令已接通，所有 CLI 调用写 `ai-workflow.run.v1` 报告。
+
+返修压力审查还发现并修复了等待者异常删除其他写者锁的问题；锁释放改为显式 ownership，Windows ticket 临时 `EPERM/EACCES` 留待下一轮检查。
+
+| 检查 | 结果 |
+| --- | --- |
+| `npm.cmd run test:ai-workflow` | PASS，40/40，连续 3 轮 |
+| scheduler 专项 | PASS，100/100 |
+| migration/sources 专项 | PASS，20/20 |
+| `npm.cmd run build` | PASS |
+| 真实 `validate fast --staged --no-cache` | PASS，退出码 0 |
+| `openspec validate ai-workflow-governance --strict` | PASS |
+| 文本完整性扫描 | PASS，`TEXT INTEGRITY OK` |
+| `git diff --check` | PASS |
+| thorough 正确性/安全/边界审查 | PASS，无未解决 CRITICAL/IMPORTANT |
