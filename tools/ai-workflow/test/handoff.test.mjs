@@ -22,6 +22,15 @@ async function repository() {
   return root;
 }
 
+async function cloneRepository(source) {
+  const parent = await mkdtemp(path.join(tmpdir(), 'handoff-target-'));
+  const target = path.join(parent, 'repo');
+  execFileSync('git', ['clone', '--quiet', source, target]);
+  git(target, 'config', 'user.email', 'test@example.com');
+  git(target, 'config', 'user.name', 'Test');
+  return target;
+}
+
 test('staged handoff writes canonical manifest, truncated context and binary patch', async () => {
   const root = await repository();
   await writeFile(path.join(root, 'story.txt'), `${Array.from({ length: 2100 }, (_, i) => `line ${i}`).join('\n')}\n`);
@@ -58,15 +67,39 @@ test('inspect marks changed index as stale', async () => {
 
 test('apply is explicit and patch round trips', async () => {
   const source = await repository();
+  const target = await cloneRepository(source);
   await writeFile(path.join(source, 'story.txt'), 'changed\n');
   git(source, 'add', '.');
   const bundle = await createHandoff({ root: source, mode: 'staged' });
-  const target = await repository();
 
   assert.equal((await applyHandoff(bundle, { root: target, apply: false })).applied, false);
-  assert.equal(await readFile(path.join(target, 'story.txt'), 'utf8'), 'base\n');
+  assert.equal((await readFile(path.join(target, 'story.txt'), 'utf8')).trim(), 'base');
   assert.equal((await applyHandoff(bundle, { root: target, apply: true })).applied, true);
   assert.equal((await readFile(path.join(target, 'story.txt'), 'utf8')).trim(), 'changed');
+});
+
+test('apply rejects a receiving repository with a different HEAD', async () => {
+  const source = await repository();
+  const target = await cloneRepository(source);
+  await writeFile(path.join(source, 'story.txt'), 'changed\n');
+  git(source, 'add', '.');
+  const bundle = await createHandoff({ root: source, mode: 'staged' });
+  await writeFile(path.join(target, 'other.txt'), 'diverged\n');
+  git(target, 'add', '.');
+  git(target, 'commit', '-m', 'diverge');
+
+  await assert.rejects(applyHandoff(bundle, { root: target, apply: true }), /stale/i);
+});
+
+test('apply rejects a handoff whose patch checksum changed', async () => {
+  const source = await repository();
+  const target = await cloneRepository(source);
+  await writeFile(path.join(source, 'story.txt'), 'changed\n');
+  git(source, 'add', '.');
+  const bundle = await createHandoff({ root: source, mode: 'staged' });
+  await writeFile(path.join(bundle, 'changes.patch'), 'tampered\n');
+
+  await assert.rejects(applyHandoff(bundle, { root: target, apply: true }), /checksum/i);
 });
 
 test('phase changes make a handoff stale and patch conflicts stop', async () => {
@@ -74,6 +107,9 @@ test('phase changes make a handoff stale and patch conflicts stop', async () => 
   const change = path.join(source, 'openspec', 'changes', 'sample');
   await mkdir(change, { recursive: true });
   await writeFile(path.join(change, '.comet.yaml'), 'phase: build\n');
+  git(source, 'add', '.');
+  git(source, 'commit', '-m', 'add phase');
+  const target = await cloneRepository(source);
   await writeFile(path.join(source, 'story.txt'), 'source\n');
   git(source, 'add', '.');
   const bundle = await createHandoff({ root: source, mode: 'staged' });
@@ -81,7 +117,6 @@ test('phase changes make a handoff stale and patch conflicts stop', async () => 
   assert.equal((await inspectHandoff(bundle)).stale, true);
 
   await writeFile(path.join(change, '.comet.yaml'), 'phase: build\n');
-  const target = await repository();
   await writeFile(path.join(target, 'story.txt'), 'conflict\n');
   await assert.rejects(applyHandoff(bundle, { root: target, apply: true }));
 });

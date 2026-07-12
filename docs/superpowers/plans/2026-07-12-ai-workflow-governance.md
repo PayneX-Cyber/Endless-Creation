@@ -241,10 +241,10 @@ Run: `git add .githooks tools/ai-workflow package.json docs/README.md docs/qa op
 
 ### Task 7：handoff 接收边界
 
-- [ ] 增加回归测试：目标 HEAD/index/phase 不一致时 stale，patch checksum 被篡改时拒绝 apply。
-- [ ] 确认测试按预期失败。
-- [ ] inspect/apply 使用接收仓库事实并在 apply 前校验 checksum。
-- [ ] 运行 handoff 测试并提交。
+- [x] 增加回归测试：目标 HEAD/index/phase 不一致时 stale，patch checksum 被篡改时拒绝 apply。
+- [x] 确认测试按预期失败。
+- [x] inspect/apply 使用接收仓库事实并在 apply 前校验 checksum。
+- [x] 运行 handoff 测试并提交。
 
 ### Task 8：来源更新单事务
 

@@ -49,20 +49,23 @@ export async function createHandoff({ root, mode }) {
   return bundle;
 }
 
-export async function inspectHandoff(bundle) {
+export async function inspectHandoff(bundle, { root, receiving = false } = {}) {
   const manifest = JSON.parse(await readFile(path.join(bundle, 'manifest.json'), 'utf8'));
-  const current = await repositoryFacts(manifest.sourceRoot);
+  const current = await repositoryFacts(root ?? manifest.sourceRoot);
   const stale = current.head !== manifest.head
-    || current.indexTree !== manifest.indexTree
+    || current.indexTree !== (receiving ? manifest.headTree : manifest.indexTree)
     || current.openSpecPhase !== manifest.openSpecPhase;
   return { stale, manifest, current };
 }
 
 export async function applyHandoff(bundle, { root, apply = false }) {
-  const inspected = await inspectHandoff(bundle);
+  const inspected = await inspectHandoff(bundle, { root, receiving: true });
   if (inspected.stale) throw new Error('Handoff is stale');
   if (!apply) return { applied: false, stale: false };
   const patch = path.join(bundle, 'changes.patch');
+  const content = await readFile(patch);
+  const checksum = createHash('sha256').update(content).digest('hex');
+  if (checksum !== inspected.manifest.patchSha256) throw new Error('Handoff patch checksum mismatch');
   await exec('git', ['apply', '--binary', patch], { cwd: root });
   return { applied: true, stale: false };
 }
@@ -70,6 +73,7 @@ export async function applyHandoff(bundle, { root, apply = false }) {
 async function repositoryFacts(root) {
   return {
     head: await git(root, 'rev-parse', 'HEAD'),
+    headTree: await git(root, 'rev-parse', 'HEAD^{tree}'),
     indexTree: await git(root, 'write-tree'),
     openSpecPhase: await readPhase(root)
   };
