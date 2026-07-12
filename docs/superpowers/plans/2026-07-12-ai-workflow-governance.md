@@ -248,10 +248,10 @@ Run: `git add .githooks tools/ai-workflow package.json docs/README.md docs/qa op
 
 ### Task 8：来源更新单事务
 
-- [ ] 增加回归测试：镜像同步失败时锁文件和镜像同时恢复。
-- [ ] 确认测试按预期失败。
-- [ ] 在内存生成新 lock，以单次 Migration Manager snapshot/WAL 覆盖 lock 与镜像。
-- [ ] 运行 sources/migration 测试并提交。
+- [x] 增加回归测试：镜像同步失败时锁文件和镜像同时恢复。
+- [x] 确认测试按预期失败。
+- [x] 在内存生成新 lock，以单次 Migration Manager snapshot/WAL 覆盖 lock 与镜像。
+- [x] 运行 sources/migration 测试并提交。
 
 ### Task 9：CLI 与报告契约
 

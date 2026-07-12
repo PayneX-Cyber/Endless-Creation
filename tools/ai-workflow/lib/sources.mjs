@@ -55,14 +55,21 @@ export async function syncSources(root, { mirrors, prune = false, dryRun = false
   if (dryRun) return { ok: true, dryRun: true, diff: before, unsupported };
   if (unsupported.length) throw new Error(`Unsupported non-local sources: ${unsupported.join(', ')}`);
   await verifyIntegrity(root, lock);
+  return sourceTransaction(root, lock, { mirrors, prune, before });
+}
+
+async function sourceTransaction(root, lock, { mirrors, prune = false, before, writeLock = false }) {
   const managedPaths = mirrors.flatMap(mirror => Object.keys(lock.skills ?? {}).map(name => path.join(mirror, name)));
   const prunePaths = prune ? before.unmanaged : [];
   return runMigration({
     root,
     id: `sources-sync-${Date.now()}`,
-    paths: [...managedPaths, ...prunePaths],
+    paths: [...(writeLock ? ['skills-lock.json'] : []), ...managedPaths, ...prunePaths],
     preflight: async () => true,
     apply: async () => {
+      if (writeLock) {
+        await writeFile(path.join(root, 'skills-lock.json'), `${JSON.stringify(lock, null, 2)}\n`);
+      }
       for (const mirror of mirrors) {
         for (const [name, entry] of Object.entries(lock.skills ?? {})) {
           const target = path.join(root, mirror, name);
@@ -74,6 +81,7 @@ export async function syncSources(root, { mirrors, prune = false, dryRun = false
       for (const relative of prunePaths) await rm(path.join(root, relative), { recursive: true, force: true });
     },
     verify: async () => {
+      await verifyIntegrity(root, lock);
       const after = await diffSources(root, { mirrors });
       if (after.missing.length || after.drifted.length || (prune && after.unmanaged.length)) {
         throw new Error('Source mirror verification failed');
@@ -83,20 +91,17 @@ export async function syncSources(root, { mirrors, prune = false, dryRun = false
 }
 
 export async function updateSources(root, name, updates, options) {
-  const lockPath = path.join(root, 'skills-lock.json');
   const lock = await lockFile(root);
   if (!lock.skills?.[name]) throw new Error(`Unknown source: ${name}`);
   const next = structuredClone(lock);
   next.skills[name] = { ...next.skills[name], ...updates };
-  return runMigration({
-    root, id: `sources-update-${name}-${Date.now()}`, paths: ['skills-lock.json'],
-    preflight: async () => true,
-    apply: async () => writeFile(lockPath, `${JSON.stringify(next, null, 2)}\n`),
-    verify: async () => verifyIntegrity(root, next)
-  }).then(async result => {
-    if (!result.ok) return result;
-    return syncSources(root, options);
-  });
+  const unsupported = Object.entries(next.skills ?? {})
+    .filter(([, entry]) => entry.sourceType && entry.sourceType !== 'local')
+    .map(([sourceName]) => sourceName);
+  if (unsupported.length) throw new Error(`Unsupported non-local sources: ${unsupported.join(', ')}`);
+  await verifyIntegrity(root, next);
+  const before = await diffSources(root, options);
+  return sourceTransaction(root, next, { ...options, before, writeLock: true });
 }
 
 async function verifyIntegrity(root, lock) {

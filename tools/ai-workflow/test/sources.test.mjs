@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { diffSources, hashDirectory, syncSources, verifySources } from '../lib/sources.mjs';
+import { diffSources, hashDirectory, syncSources, updateSources, verifySources } from '../lib/sources.mjs';
 
 async function fixture(hash = true) {
   const root = await mkdtemp(path.join(tmpdir(), 'sources-'));
@@ -54,4 +54,16 @@ test('sync dry-run reports changes without writing mirrors', async () => {
   assert.equal(result.dryRun, true);
   await assert.rejects(access(path.join(root, '.agents', 'skills', 'demo')));
   await access(path.join(root, '.agents', 'skills', 'unmanaged'));
+});
+
+test('update rolls back the lock when mirror synchronization cannot start', async () => {
+  const root = await fixture();
+  const before = await readFile(path.join(root, 'skills-lock.json'), 'utf8');
+
+  await assert.rejects(
+    updateSources(root, 'demo', { resolvedVersion: '2' }, { mirrors: ['../outside'] }),
+    /managed path/i
+  );
+
+  assert.equal(await readFile(path.join(root, 'skills-lock.json'), 'utf8'), before);
 });
