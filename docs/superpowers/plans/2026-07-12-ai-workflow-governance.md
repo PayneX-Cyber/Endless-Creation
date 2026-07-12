@@ -75,27 +75,27 @@ Run: `git add tools/ai-workflow .ai-workflow/config.json .gitignore && git commi
 - Consumes: `loadConfig(root)` 与 `.git/ai-workflow/`。
 - Produces: `withWriterLock(context, operation)`；`enqueue(context, request)`；`cacheKey(context)`；`readCache/writeCache`。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 启动两个子进程争用同一锁，断言 FIFO 且临界区不重叠；写入死亡 PID ticket 和超时 heartbeat，断言被清理并审计；相同 tree/config/environment 断言缓存命中，任一输入变化断言 miss。
 
-- [ ] **Step 2: 运行测试确认失败**
+- [x] **Step 2: 运行测试确认失败**
 
 Run: `node --test tools/ai-workflow/test/scheduler.test.mjs`
 
 Expected: FAIL，提示调度模块不存在。
 
-- [ ] **Step 3: 实现锁、队列和缓存**
+- [x] **Step 3: 实现锁、队列和缓存**
 
 以 `fs.open(lock, "wx")` 获取锁；ticket 保存 PID、序号和创建时间；heartbeat 原子替换。仅在 PID 不存活且 heartbeat 超时后回收。缓存键使用 `SHA-256(tree + configHash + node/git/tool versions + profile)`，成功验证才写缓存。
 
-- [ ] **Step 4: 运行定向测试**
+- [x] **Step 4: 运行定向测试**
 
 Run: `node --test tools/ai-workflow/test/scheduler.test.mjs`
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 Run: `git add tools/ai-workflow && git commit -m "feat: add workflow scheduler and cache"`
 
