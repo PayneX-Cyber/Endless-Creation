@@ -8,6 +8,7 @@ import { runtimeDir } from './lib/core.mjs';
 import { git } from './lib/core.mjs';
 import { cacheKey, readCache, writeCache } from './lib/cache.mjs';
 import { applyHandoff, createHandoff, inspectHandoff } from './lib/handoff.mjs';
+import { diffSources, syncSources, updateSources, verifySources } from './lib/sources.mjs';
 
 const inFlight = new Map();
 
@@ -21,6 +22,25 @@ export async function run(argv = process.argv.slice(2), env = process.env, root 
     if (argv[1] === 'apply') {
       await applyHandoff(argv[2], { root, apply: argv.includes('--apply') });
       return 0;
+    }
+    return 2;
+  }
+  if (argv[0] === 'sources') {
+    const mirrors = ['.agents/skills', '.codex/skills', '.claude/skills', '.agent/skills'];
+    if (argv[1] === 'verify') return (await verifySources(root, { mirrors })).ok ? 0 : 1;
+    if (argv[1] === 'diff') {
+      await diffSources(root, { mirrors });
+      return 0;
+    }
+    if (argv[1] === 'sync') {
+      const result = await syncSources(root, { mirrors, prune: argv.includes('--prune') });
+      return result.recoveryRequired ? 4 : result.ok ? 0 : 1;
+    }
+    if (argv[1] === 'update') {
+      const to = argv[argv.indexOf('--to') + 1];
+      if (!argv[2] || !to) return 2;
+      const result = await updateSources(root, argv[2], { resolvedVersion: to }, { mirrors });
+      return result.recoveryRequired ? 4 : result.ok ? 0 : 1;
     }
     return 2;
   }

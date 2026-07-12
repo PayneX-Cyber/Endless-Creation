@@ -15,8 +15,8 @@
 
 ## 4. 迁移与来源治理
 
-- [ ] 4.1 实现五阶段 Migration Manager、WAL、快照、自动回滚和 `recovery-required` 阻断
-- [ ] 4.2 实现 `sources verify/diff/sync/update/--prune`，验证锁文件 round-trip、镜像漂移和失败回滚
+- [x] 4.1 实现五阶段 Migration Manager、WAL、快照、自动回滚和 `recovery-required` 阻断
+- [x] 4.2 实现 `sources verify/diff/sync/update/--prune`，验证锁文件 round-trip、镜像漂移和失败回滚
 
 ## 5. 接入与验收
 

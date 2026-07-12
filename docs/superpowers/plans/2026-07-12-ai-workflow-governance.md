@@ -147,25 +147,25 @@ Run: `git add tools/ai-workflow && git commit -m "feat: add verifiable workflow 
 - Produces: `runMigration({root, id, preflight, apply, verify})`；`recoverMigration(root, id)`。
 - Produces: `verifySources`、`diffSources`、`syncSources`、`updateSources`，删除仅接受 `prune: true`。
 
-- [ ] **Step 1: 写迁移失败测试**
+- [x] **Step 1: 写迁移失败测试**
 
 覆盖五阶段成功、apply/verify 失败自动回滚、WAL 每阶段可恢复、回滚失败进入 `recovery-required`、阻止后续迁移，并断言未调用 reset/checkout。
 
-- [ ] **Step 2: 写来源失败测试**
+- [x] **Step 2: 写来源失败测试**
 
 使用临时 lock 和镜像目录覆盖 verify/diff、unmanaged 默认保留、显式 prune、sync 失败恢复、integrity 不符拒绝以及安装器 round-trip 不保留字段时使用旁车元数据。
 
-- [ ] **Step 3: 运行测试确认失败**
+- [x] **Step 3: 运行测试确认失败**
 
 Run: `node --test tools/ai-workflow/test/migration.test.mjs tools/ai-workflow/test/sources.test.mjs`
 
 Expected: FAIL，提示模块不存在。
 
-- [ ] **Step 4: 实现迁移和来源同步**
+- [x] **Step 4: 实现迁移和来源同步**
 
 WAL 每次 append 后 `FileHandle.sync()`；snapshot 放 `.git/ai-workflow/migrations/`，以临时目录加 rename 提升。来源操作全部委托 Migration Manager，未登记文件只报告，`--prune` 才删除。
 
-- [ ] **Step 5: 运行定向测试并提交**
+- [x] **Step 5: 运行定向测试并提交**
 
 Run: `node --test tools/ai-workflow/test/migration.test.mjs tools/ai-workflow/test/sources.test.mjs`
 
