@@ -2,7 +2,6 @@ import { appendFile, mkdir, open, readFile, readdir, rm, writeFile } from 'node:
 import path from 'node:path';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-let sequence = 0;
 let enqueueTail = Promise.resolve();
 
 function alive(pid) {
@@ -16,11 +15,11 @@ function alive(pid) {
 
 export async function enqueue({ stateDir }) {
   const createdAt = Date.now();
-  const id = sequence++;
   const create = enqueueTail.then(async () => {
     const queueDir = path.join(stateDir, 'queue');
     await mkdir(queueDir, { recursive: true });
-    const name = `${createdAt.toString().padStart(16, '0')}-${String(id).padStart(8, '0')}-${process.pid}.json`;
+    const id = await nextSequence(stateDir);
+    const name = `${String(id).padStart(16, '0')}-${process.pid}.json`;
     const ticket = path.join(queueDir, name);
     await writeFile(ticket, JSON.stringify({ pid: process.pid, createdAt }), { flag: 'wx' });
     return ticket;
@@ -29,8 +28,33 @@ export async function enqueue({ stateDir }) {
   return create;
 }
 
+async function nextSequence(stateDir) {
+  const lockPath = path.join(stateDir, 'queue-sequence.lock');
+  const valuePath = path.join(stateDir, 'queue-sequence');
+  while (true) {
+    try {
+      const handle = await open(lockPath, 'wx');
+      try {
+        let current = 0;
+        try {
+          current = Number(await readFile(valuePath, 'utf8')) || 0;
+        } catch (error) {
+          if (error.code !== 'ENOENT') throw error;
+        }
+        await writeFile(valuePath, String(current + 1));
+        return current;
+      } finally {
+        await handle.close();
+        await rm(lockPath, { force: true });
+      }
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      await sleep(5);
+    }
+  }
+}
+
 export async function withWriterLock({ stateDir, staleMs = 30_000 }, operation) {
-  await mkdir(stateDir, { recursive: true });
   const ticket = await enqueue({ stateDir });
   const queueDir = path.dirname(ticket);
   const lockPath = path.join(stateDir, 'writer.lock');
