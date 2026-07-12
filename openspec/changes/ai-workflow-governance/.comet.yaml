@@ -1,6 +1,6 @@
 workflow: full
 language: zh-CN
-phase: verify
+phase: archive
 context_compression: off
 build_mode: executing-plans
 build_pause: null
@@ -13,11 +13,11 @@ auto_transition: true
 base_ref: dd5b9dd998bc6e2e80783cc3d487b80f96ffb084
 design_doc: docs/superpowers/specs/2026-07-12-ai-workflow-governance-design.md
 plan: docs/superpowers/plans/2026-07-12-ai-workflow-governance.md
-verify_result: pending
+verify_result: pass
 verification_report: docs/superpowers/reports/2026-07-13-ai-workflow-governance-verify.md
-branch_status: pending
+branch_status: handled
 created_at: 2026-07-12
-verified_at: null
+verified_at: 2026-07-12
 archived: false
 direct_override: null
 handoff_context: openspec/changes/ai-workflow-governance/.comet/handoff/design-context.json
