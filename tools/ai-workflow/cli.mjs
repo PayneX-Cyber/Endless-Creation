@@ -78,7 +78,7 @@ async function dispatch(argv, env, root) {
       return 0;
     }
     if (argv[1] === 'run' && argv[2] === 'pre-commit') {
-      const config = JSON.parse(await readFile(path.join(root, '.ai-workflow', 'config.json'), 'utf8'));
+      const config = JSON.parse(await workflowConfigText(root, true));
       const code = await validationExit(root, undefined, true, env);
       return config.stage === 'observe' && code === 1 ? 0 : code;
     }
@@ -143,9 +143,7 @@ async function validationExit(root, profile, staged, env, noCache = false) {
 }
 
 async function cachedValidation(root, profile, staged, noCache) {
-  const config = staged
-    ? await git(root, 'show', ':.ai-workflow/config.json')
-    : await readFile(path.join(root, '.ai-workflow', 'config.json'), 'utf8');
+  const config = await workflowConfigText(root, staged);
   const effectiveProfile = profile ?? await selectProfile(root, JSON.parse(config), staged);
   const key = cacheKey({
     tree: staged ? await git(root, 'write-tree') : await workspaceFingerprint(root),
@@ -183,6 +181,12 @@ async function workspaceFingerprint(root) {
     hash.update(await readFile(path.join(root, relative)));
   }
   return hash.digest('hex');
+}
+
+async function workflowConfigText(root, staged) {
+  return staged
+    ? git(root, 'show', ':.ai-workflow/config.json')
+    : readFile(path.join(root, '.ai-workflow', 'config.json'), 'utf8');
 }
 
 async function writeRunReport(root, argv, exitCode, startedAt, error) {

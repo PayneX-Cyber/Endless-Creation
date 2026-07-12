@@ -44,6 +44,15 @@ test('observe records validation failure without blocking while guard blocks', a
   assert.equal(await run(['hook', 'run', 'pre-commit'], {}, guard), 1);
 });
 
+test('hook enforcement stage comes from the index', async () => {
+  const root = await repository('guard');
+  const configPath = path.join(root, '.ai-workflow', 'config.json');
+  const config = JSON.parse(await readFile(configPath, 'utf8'));
+  await writeFile(configPath, JSON.stringify({ ...config, stage: 'observe' }));
+
+  assert.equal(await run(['hook', 'run', 'pre-commit'], {}, root), 1);
+});
+
 test('hook bypass is audited and equivalent validations hit one cache record', async () => {
   const root = await repository('guard');
   assert.equal(await run(['hook', 'run', 'pre-commit'], { AI_WORKFLOW_BYPASS: 'incident' }, root), 0);
