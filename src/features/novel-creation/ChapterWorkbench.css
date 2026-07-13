@@ -496,6 +496,41 @@
   font-weight: 800;
 }
 
+.novel-editor-find {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #dfe6ef;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.novel-editor-find__fields,
+.novel-editor-find__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.novel-editor-find__fields {
+  flex: 1 1 440px;
+}
+
+.novel-editor-find__fields input {
+  min-width: 120px;
+  flex: 1;
+}
+
+.novel-editor-find__fields span {
+  min-width: 92px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
 .novel-workbench__review-loading {
   display: flex;
   align-items: center;
@@ -675,8 +710,13 @@
 .app-shell[data-theme='dark'] .novel-workbench__side-empty,
 .app-shell[data-theme='dark'] .novel-workbench__state,
 .app-shell[data-theme='dark'] .novel-workbench__editor textarea,
+.app-shell[data-theme='dark'] .novel-editor-find,
 .app-shell[data-theme='dark'] .novel-workbench__preview-list article {
   background: #111822;
+}
+
+.app-shell[data-theme='dark'] .novel-editor-find {
+  border-color: #283447;
 }
 
 .app-shell[data-theme='dark'] .novel-creation .novel-workbench__chapter:hover,

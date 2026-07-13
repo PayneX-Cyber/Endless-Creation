@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, ChapterVersion, Foreshadowing, Novel } from '../../types/novel';
@@ -9,6 +9,7 @@ import { SETTING_LABELS, groupSettingsByType } from './novelSettings';
 import type { ChapterStatus as NovelChapterStatus } from '../../types/novel';
 import { ForeshadowingPanel, type ForeshadowingDraft, type ForeshadowingAiCandidate, type ForeshadowingPayoffAiCandidate } from './ForeshadowingPanel';
 import type { ChapterLocateRequest } from './novelNavigation';
+import { ChapterFindReplace, pushEditorHistory, redoEditorHistory, resetEditorHistory, undoEditorHistory, type EditorHistory, type EditorSnapshot, type TextMatch } from './novelEditorTools';
 import './ChapterWorkbench.css';
 
 export type ReadyTextModel = { channelId: string; channelLabel?: string; baseUrl: string; apiKey: string; model: string };
@@ -27,6 +28,7 @@ type OptimizeJob = SelectionState & {
 };
 type ForeshadowCandidateState = { id: string; title: string; note: string; sourceChapterId: string };
 type ForeshadowPayoffCandidateState = { id: string; foreshadowingId: string; note: string; sourceChapterId: string };
+type ContentWriteSource = 'manual' | 'replace' | 'ai' | 'history';
 
 const MAX_CHAPTER_VERSIONS = 5;
 
@@ -135,6 +137,11 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
   const runRef = useRef(0);
   const confirmBusyRef = useRef(false);
   const streamTextRef = useRef('');
+  const historyRef = useRef<EditorHistory>(resetEditorHistory({ content: '', selectionStart: 0, selectionEnd: 0 }));
+  const pendingManualSnapshotRef = useRef<EditorSnapshot | null>(null);
+  const manualHistoryTimerRef = useRef(0);
+  const contentWriteSourceRef = useRef<ContentWriteSource | null>(null);
+  const isApplyingHistoryRef = useRef(false);
 
   useEffect(() => () => {
     const requestId = requestIdRef.current;
@@ -170,6 +177,18 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
 
   const activeIndex = chapters.findIndex((chapter) => chapter.id === activeChapterId);
   const activeChapter = activeIndex >= 0 ? chapters[activeIndex] : null;
+
+  useEffect(() => {
+    flushManualHistory();
+    window.clearTimeout(manualHistoryTimerRef.current);
+    pendingManualSnapshotRef.current = null;
+    const content = activeChapter?.content ?? '';
+    historyRef.current = resetEditorHistory({ content, selectionStart: content.length, selectionEnd: content.length });
+  }, [activeChapterId]);
+
+  useEffect(() => () => {
+    window.clearTimeout(manualHistoryTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (!locateRequest || locateRequest.chapterId !== activeChapter?.id) return;
@@ -246,6 +265,81 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     const start = target.selectionStart;
     const end = target.selectionEnd;
     setSelection(start < end ? { chapterId: activeChapter.id, start, end, text: target.value.slice(start, end) } : null);
+  }
+
+  function flushManualHistory() {
+    window.clearTimeout(manualHistoryTimerRef.current);
+    const pending = pendingManualSnapshotRef.current;
+    pendingManualSnapshotRef.current = null;
+    if (pending) historyRef.current = pushEditorHistory(historyRef.current, pending);
+  }
+
+  function queueManualHistory(snapshot: EditorSnapshot) {
+    pendingManualSnapshotRef.current = snapshot;
+    window.clearTimeout(manualHistoryTimerRef.current);
+    manualHistoryTimerRef.current = window.setTimeout(flushManualHistory, 350);
+  }
+
+  function restoreEditorSelection(start: number, end: number) {
+    window.requestAnimationFrame(() => {
+      const textarea = textareaRef.current;
+      if (!textarea) return;
+      const safeStart = Math.min(start, textarea.value.length);
+      const safeEnd = Math.min(end, textarea.value.length);
+      textarea.focus({ preventScroll: true });
+      textarea.setSelectionRange(safeStart, safeEnd);
+      const maxScroll = Math.max(0, textarea.scrollHeight - textarea.clientHeight);
+      textarea.scrollTop = maxScroll * (safeStart / Math.max(1, textarea.value.length));
+      recordSelection(textarea);
+      isApplyingHistoryRef.current = false;
+      contentWriteSourceRef.current = null;
+    });
+  }
+
+  function writeChapterContent(chapterId: string, content: string, source: ContentWriteSource, selectionStart: number, selectionEnd: number) {
+    flushManualHistory();
+    contentWriteSourceRef.current = source;
+    const writeSource = contentWriteSourceRef.current;
+    if (writeSource === 'replace') {
+      historyRef.current = pushEditorHistory(historyRef.current, { content, selectionStart, selectionEnd });
+    } else if (writeSource === 'ai' && chapterId === activeChapterId) {
+      historyRef.current = resetEditorHistory({ content, selectionStart, selectionEnd });
+    } else if (writeSource === 'history') {
+      isApplyingHistoryRef.current = true;
+    }
+    onUpdateChapter(chapterId, { content });
+    restoreEditorSelection(selectionStart, selectionEnd);
+  }
+
+  function handleManualContentChange(target: HTMLTextAreaElement) {
+    if (!activeChapter || isApplyingHistoryRef.current) return;
+    contentWriteSourceRef.current = 'manual';
+    onUpdateChapter(activeChapter.id, { content: target.value });
+    queueManualHistory({ content: target.value, selectionStart: target.selectionStart, selectionEnd: target.selectionEnd });
+    contentWriteSourceRef.current = null;
+  }
+
+  function applyHistory(direction: 'undo' | 'redo') {
+    if (!activeChapter || busy) return;
+    flushManualHistory();
+    const result = direction === 'undo' ? undoEditorHistory(historyRef.current) : redoEditorHistory(historyRef.current);
+    historyRef.current = result.history;
+    if (result.snapshot) {
+      writeChapterContent(activeChapter.id, result.snapshot.content, 'history', result.snapshot.selectionStart, result.snapshot.selectionEnd);
+    }
+  }
+
+  function handleEditorKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (!(event.ctrlKey || event.metaKey)) return;
+    const key = event.key.toLocaleLowerCase();
+    const direction = key === 'y' || (key === 'z' && event.shiftKey) ? 'redo' : key === 'z' ? 'undo' : null;
+    if (!direction) return;
+    event.preventDefault();
+    applyHistory(direction);
+  }
+
+  function locateEditorMatch(match: TextMatch) {
+    restoreEditorSelection(match.offset, match.offset + match.length);
   }
 
   function getValidSelection(): SelectionState | null {
@@ -345,7 +439,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     }
     const nextContent = activeChapter.content.slice(0, selectionStart) + optimizedText + activeChapter.content.slice(selectionEnd);
     const nextEnd = selectionStart + optimizedText.length;
-    onUpdateChapter(chapterId, { content: nextContent });
+    writeChapterContent(chapterId, nextContent, 'ai', selectionStart, nextEnd);
     setOptimizeJob(null);
     requestAnimationFrame(() => {
       textareaRef.current?.focus();
@@ -475,7 +569,8 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     if (storedChapter.content !== contentSnapshot && !window.confirm('正文已被修改，写入将覆盖当前内容。仍要写入吗？')) {
       throw new Error('用户取消写入。');
     }
-    onUpdateChapter(chapter.id, { content: version.content, selectedVersionId: version.id });
+    writeChapterContent(chapter.id, version.content, 'ai', version.content.length, version.content.length);
+    onUpdateChapter(chapter.id, { selectedVersionId: version.id });
   }
 
   async function generateMissingOutlines() {
@@ -927,6 +1022,12 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
             {consistency.error && <p className="novel-flow__error">{consistency.error}</p>}
             {rhythm.error && <p className="novel-flow__error">{rhythm.error}</p>}
             {optimizeError && <p className="novel-flow__error">{optimizeError}</p>}
+            <ChapterFindReplace
+              content={activeChapter.content}
+              disabled={busy}
+              onLocate={locateEditorMatch}
+              onReplace={(content, selectionStart, selectionEnd) => writeChapterContent(activeChapter.id, content, 'replace', selectionStart, selectionEnd)}
+            />
             <div className="novel-workbench__progress-bar">
               <label className="novel-workbench__progress-field">
                 <span>{PROGRESS_LABELS.statusCompletion.slice(0, 2)}</span>
@@ -971,7 +1072,8 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
             <textarea
               ref={textareaRef}
               value={activeChapter.content}
-              onChange={(event) => onUpdateChapter(activeChapter.id, { content: event.target.value })}
+              onChange={(event) => handleManualContentChange(event.currentTarget)}
+              onKeyDown={handleEditorKeyDown}
               onKeyUp={(event) => recordSelection(event.currentTarget)}
               onMouseUp={(event) => recordSelection(event.currentTarget)}
               onSelect={(event) => recordSelection(event.currentTarget)}
