@@ -1,6 +1,6 @@
 workflow: full
 language: zh-CN
-phase: build
+phase: verify
 context_compression: off
 build_mode: direct
 build_pause: null
@@ -14,7 +14,7 @@ base_ref: ad1fee0763d89d3ee262cac431d1034e1bb19f8c
 design_doc: docs/superpowers/specs/2026-07-13-persist-emotion-graph-design.md
 plan: docs/superpowers/plans/2026-07-13-persist-emotion-graph.md
 verify_result: pending
-verification_report: null
+verification_report: docs/superpowers/reports/2026-07-13-persist-emotion-graph-verify.md
 branch_status: pending
 created_at: 2026-07-13
 verified_at: null
