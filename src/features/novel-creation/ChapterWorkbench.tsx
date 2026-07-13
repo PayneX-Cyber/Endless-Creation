@@ -8,6 +8,7 @@ import { CHAPTER_STATUS_LABEL, CHAPTER_STATUS_ORDER, PROGRESS_LABELS, SOFT_GATE_
 import { SETTING_LABELS, groupSettingsByType } from './novelSettings';
 import type { ChapterStatus as NovelChapterStatus } from '../../types/novel';
 import { ForeshadowingPanel, type ForeshadowingDraft, type ForeshadowingAiCandidate, type ForeshadowingPayoffAiCandidate } from './ForeshadowingPanel';
+import type { ChapterLocateRequest } from './novelNavigation';
 import './ChapterWorkbench.css';
 
 export type ReadyTextModel = { channelId: string; channelLabel?: string; baseUrl: string; apiKey: string; model: string };
@@ -34,8 +35,10 @@ interface ChapterWorkbenchProps {
   projectId: string;
   chapters: Chapter[];
   activeChapterId: string | null;
+  locateRequest?: ChapterLocateRequest | null;
   saveStatus: SaveStatus;
   onSelectChapter: (chapterId: string) => void;
+  onLocateConsumed?: (requestId: number) => void;
   onUpdateChapter: (chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId' | 'status' | 'wordTarget'>>) => void;
   onUpdateChapterAndSave: (chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId' | 'status' | 'wordTarget'>>) => void;
   onUpdateNovel: (update: (novel: Novel) => Novel) => void;
@@ -104,7 +107,7 @@ function useAiCheck(config: {
   return { busy, error, result, setError, setResult, setBusy, run, cancel };
 }
 
-export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, saveStatus, onSelectChapter, onUpdateChapter, onUpdateChapterAndSave, onUpdateNovel, onRetrySave, onBackToProjects, onOpenProjectView, initialForeshadowPanel = false, onConsumeInitialPanel, onValidChapter, ensureTextModel }: ChapterWorkbenchProps) {
+export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, locateRequest, saveStatus, onSelectChapter, onLocateConsumed, onUpdateChapter, onUpdateChapterAndSave, onUpdateNovel, onRetrySave, onBackToProjects, onOpenProjectView, initialForeshadowPanel = false, onConsumeInitialPanel, onValidChapter, ensureTextModel }: ChapterWorkbenchProps) {
   const [generatingChapterId, setGeneratingChapterId] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState('');
   const [cancelledVersionId, setCancelledVersionId] = useState<string | null>(null);
@@ -167,6 +170,35 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
 
   const activeIndex = chapters.findIndex((chapter) => chapter.id === activeChapterId);
   const activeChapter = activeIndex >= 0 ? chapters[activeIndex] : null;
+
+  useEffect(() => {
+    if (!locateRequest || locateRequest.chapterId !== activeChapter?.id) return;
+    let timeout = 0;
+    let frame = 0;
+    const locate = (attempt: number) => {
+      const textarea = textareaRef.current;
+      if (!textarea) {
+        if (attempt < 3) timeout = window.setTimeout(() => locate(attempt + 1), 0);
+        else onLocateConsumed?.(locateRequest.requestId);
+        return;
+      }
+      const end = locateRequest.offset + locateRequest.text.length;
+      const currentText = textarea.value.slice(locateRequest.offset, end);
+      if (currentText.toLocaleLowerCase() === locateRequest.text.toLocaleLowerCase()) {
+        textarea.focus({ preventScroll: true });
+        textarea.setSelectionRange(locateRequest.offset, end);
+        const maxScroll = Math.max(0, textarea.scrollHeight - textarea.clientHeight);
+        textarea.scrollTop = maxScroll * (locateRequest.offset / Math.max(1, textarea.value.length));
+        recordSelection(textarea);
+      }
+      onLocateConsumed?.(locateRequest.requestId);
+    };
+    frame = window.requestAnimationFrame(() => locate(0));
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timeout);
+    };
+  }, [activeChapter?.content, activeChapter?.id, locateRequest, onLocateConsumed]);
 
   useEffect(() => {
     if (!initialForeshadowPanel) return;

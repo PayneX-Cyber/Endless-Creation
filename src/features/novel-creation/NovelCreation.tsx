@@ -17,6 +17,7 @@ import { countWords, createId, formatTime, type SaveStatus } from './novelShared
 import { CHAPTER_STATUS_LABEL, CHAPTER_STATUS_ORDER, PROGRESS_LABELS, resolveChapterStatus } from './novelProgress';
 import type { ChapterStatus as NovelChapterStatus } from '../../types/novel';
 import { copyWholeBookMarkdown, exportOfflinePackage, exportStoryboardDocFile, exportWholeBookMarkdownFile } from './novelExport';
+import { ChapterSearchPanel, reorderChapters, type ChapterLocateRequest, type ChapterSearchResult } from './novelNavigation';
 import './NovelCreation.css';
 
 type NovelView = 'creationCenter' | 'projectList' | 'projectView' | 'inspirationIntro' | 'inspirationPreparing' | 'inspirationChat' | 'inspirationBlueprint' | 'inspirationOutline' | 'workbench';
@@ -51,6 +52,9 @@ export function NovelCreation({ projectId }: { projectId: string }) {
   const [summaries, setSummaries] = useState<NovelSummary[]>([]);
   const [currentNovel, setCurrentNovel] = useState<Novel | null>(null);
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
+  const [draggedChapterId, setDraggedChapterId] = useState<string | null>(null);
+  const [dragOverChapterId, setDragOverChapterId] = useState<string | null>(null);
+  const [pendingLocate, setPendingLocate] = useState<ChapterLocateRequest | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
   const [feedback, setFeedback] = useState('');
   const [isLoading, setLoading] = useState(true);
@@ -366,6 +370,34 @@ export function NovelCreation({ projectId }: { projectId: string }) {
       chapters: novel.chapters.filter((item) => item.id !== chapterId).sort((a, b) => a.order - b.order).map((item, order) => ({ ...item, order })),
     }));
     setActiveChapterId((current) => current === chapterId ? null : current);
+  }
+
+  function moveChapter(chapterId: string, offset: number) {
+    const fromIndex = chapters.findIndex((chapter) => chapter.id === chapterId);
+    const toIndex = fromIndex + offset;
+    if (fromIndex < 0 || toIndex < 0 || toIndex >= chapters.length) return;
+    const now = new Date().toISOString();
+    updateNovel((novel) => ({ ...novel, chapters: reorderChapters(novel.chapters, fromIndex, toIndex), updatedAt: now }));
+  }
+
+  function dropChapter(targetChapterId: string) {
+    const fromIndex = chapters.findIndex((chapter) => chapter.id === draggedChapterId);
+    const toIndex = chapters.findIndex((chapter) => chapter.id === targetChapterId);
+    setDraggedChapterId(null);
+    setDragOverChapterId(null);
+    if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
+    const now = new Date().toISOString();
+    updateNovel((novel) => ({ ...novel, chapters: reorderChapters(novel.chapters, fromIndex, toIndex), updatedAt: now }));
+  }
+
+  async function openSearchResult(result: ChapterSearchResult) {
+    setPendingLocate(result.field === 'content' ? {
+      chapterId: result.chapterId,
+      offset: result.matchOffset,
+      text: result.matchedText,
+      requestId: Date.now(),
+    } : null);
+    await openProjectWorkbench(currentNovel?.id ?? '', result.chapterId);
   }
 
   function ensureTextModelReady(onIssue: (message: string) => void): { channel: ApiProviderChannel; model: string; baseUrl: string; apiKey: string } | null {
@@ -926,6 +958,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                     <div className="novel-project-panel__head">
                       <div className="novel-project-panel__heading"><h2>项目概览</h2><p>查看项目定位、创作进度与核心资料</p></div>
                     </div>
+                    <ChapterSearchPanel novel={currentNovel} onSelect={(result) => void openSearchResult(result)} />
                     <section className="novel-overview__summary">
                       <div><strong>核心摘要</strong><span>快速了解项目的定位与主线</span></div>
                       <textarea aria-label="核心摘要" value={projectSummary(currentNovel)} onChange={(event) => updateProjectField('blueprint', event.target.value)} placeholder="写下这本小说的核心设定、主线冲突和整体梗概。" />
@@ -980,12 +1013,26 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                       <button className="novel-flow__primary novel-flow__primary--compact" onClick={addChapter} type="button">新增章节</button>
                     </div>
                     {chapters.length ? <div className="novel-outline-list">{chapters.map((chapter, index) => (
-                      <div className="novel-outline-entry" key={chapter.id}>
+                      <div
+                        aria-label={`第 ${index + 1} 章，可拖拽调整顺序`}
+                        className={dragOverChapterId === chapter.id && draggedChapterId !== chapter.id ? 'novel-outline-entry novel-outline-entry--drop-target' : 'novel-outline-entry'}
+                        draggable
+                        key={chapter.id}
+                        onDragEnd={() => { setDraggedChapterId(null); setDragOverChapterId(null); }}
+                        onDragOver={(event) => { event.preventDefault(); setDragOverChapterId(chapter.id); }}
+                        onDragStart={(event) => { event.dataTransfer.effectAllowed = 'move'; setDraggedChapterId(chapter.id); }}
+                        onDrop={(event) => { event.preventDefault(); dropChapter(chapter.id); }}
+                        tabIndex={0}
+                      >
                         <span className="novel-outline-entry__marker" aria-hidden="true">{index + 1}</span>
                         <article className="novel-outline-card">
                           <div className="novel-outline-card__head">
                             <span>第 {index + 1} 章</span>
-                            <button className="novel-flow__ghost" onClick={() => deleteChapterById(chapter.id)} type="button">删除</button>
+                            <div className="novel-outline-card__actions">
+                              <button aria-label={`上移第 ${index + 1} 章`} className="novel-flow__ghost" disabled={index === 0} onClick={() => moveChapter(chapter.id, -1)} type="button">上移</button>
+                              <button aria-label={`下移第 ${index + 1} 章`} className="novel-flow__ghost" disabled={index === chapters.length - 1} onClick={() => moveChapter(chapter.id, 1)} type="button">下移</button>
+                              <button className="novel-flow__ghost" onClick={() => deleteChapterById(chapter.id)} type="button">删除</button>
+                            </div>
                           </div>
                           <input value={chapter.title} onChange={(event) => updateChapterById(chapter.id, { title: event.target.value })} placeholder="未命名章节" />
                           <div className="novel-outline-card__progress">
@@ -1151,8 +1198,10 @@ export function NovelCreation({ projectId }: { projectId: string }) {
           projectId={projectId}
           chapters={chapters}
           activeChapterId={activeChapterId}
+          locateRequest={pendingLocate}
           saveStatus={saveStatus}
           onSelectChapter={setActiveChapterId}
+          onLocateConsumed={(requestId) => setPendingLocate((current) => current?.requestId === requestId ? null : current)}
           onUpdateChapter={updateChapterById}
           onUpdateChapterAndSave={updateChapterByIdAndSave}
           onUpdateNovel={updateNovel}
