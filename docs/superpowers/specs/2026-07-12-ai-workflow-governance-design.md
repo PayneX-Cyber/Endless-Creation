@@ -2,6 +2,8 @@
 comet_change: ai-workflow-governance
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-07-13-ai-workflow-governance
+status: final
 ---
 
 # AI 工作流治理与防腐化基建设计

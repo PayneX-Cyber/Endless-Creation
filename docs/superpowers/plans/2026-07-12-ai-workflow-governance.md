@@ -2,6 +2,7 @@
 change: ai-workflow-governance
 design-doc: docs/superpowers/specs/2026-07-12-ai-workflow-governance-design.md
 base-ref: dd5b9dd998bc6e2e80783cc3d487b80f96ffb084
+archived-with: 2026-07-13-ai-workflow-governance
 ---
 
 # AI 工作流治理基建实施计划
