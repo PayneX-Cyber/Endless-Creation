@@ -1,0 +1,50 @@
+# chapter-search Specification
+
+## Purpose
+TBD - created by archiving change novel-navigation-reorder. Update Purpose after archive.
+## Requirements
+### Requirement: 跨章全文搜索
+
+系统 SHALL 提供搜索入口，接受关键词，扫描当前小说所有章节的 `title`、`content` 与 `outline`，返回命中章节列表。每条结果 MUST 包含章号、章节标题与包含关键词的摘要片段。搜索为纯读操作，MUST NOT 修改小说数据。
+
+#### Scenario: 关键词命中多章
+
+- **WHEN** 用户输入一个在多个章节正文中出现的关键词并触发搜索
+- **THEN** 系统列出所有命中章节，每条含章号、标题与命中处的摘要片段
+- **AND** 摘要片段中关键词可辨识（高亮或标注）
+
+#### Scenario: 搜索大纲与标题
+
+- **WHEN** 关键词只出现在某章的 `outline` 或 `title` 中
+- **THEN** 该章仍出现在结果中，并标明命中来源
+
+#### Scenario: 无命中
+
+- **WHEN** 关键词在任何章节的 title/content/outline 中都不存在
+- **THEN** 系统显示无结果提示，不报错
+
+#### Scenario: 空关键词
+
+- **WHEN** 用户在关键词为空或仅空白时触发搜索
+- **THEN** 系统不执行搜索，不产生结果列表
+
+### Requirement: 搜索结果定位到章内位置
+
+点击搜索结果时，系统 SHALL 切换到该命中章节，并在正文编辑器中滚动到命中位置、选中命中文本。若目标章节不是当前激活章节，MUST 先切章再定位。
+
+#### Scenario: 点击结果切章并定位
+
+- **WHEN** 用户点击一条搜索结果
+- **THEN** 系统切换到该章节
+- **AND** 正文编辑器滚动到关键词命中位置并选中命中文本
+
+#### Scenario: 命中位置在当前章
+
+- **WHEN** 用户点击的结果属于当前已激活章节
+- **THEN** 系统直接在正文编辑器中定位到命中位置并选中，无需切章
+
+#### Scenario: 命中内容已变化
+
+- **WHEN** 搜索后正文被编辑导致命中偏移不再有效，用户点击该结果
+- **THEN** 系统仍切换到该章节，定位失败时不报错、不选中错误位置
+
