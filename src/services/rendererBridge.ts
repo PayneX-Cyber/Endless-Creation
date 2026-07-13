@@ -351,7 +351,9 @@ export const rendererBridge = {
       chapters: [],
       foreshadowings: [],
       settings: [],
-      version: 4,
+      pinnedSettingIds: [],
+      pinnedForeshadowingIds: [],
+      version: 5,
       createdAt: now,
       updatedAt: now,
     };
@@ -475,7 +477,9 @@ function normalizeWebNovel(value: unknown): Novel | null {
     chapters: Array.isArray(value.chapters) ? value.chapters : [],
     foreshadowings: Array.isArray(value.foreshadowings) ? value.foreshadowings : [],
     settings: Array.isArray(value.settings) ? value.settings : [],
-    version: 4,
+    pinnedSettingIds: Array.isArray(value.pinnedSettingIds) ? value.pinnedSettingIds : [],
+    pinnedForeshadowingIds: Array.isArray(value.pinnedForeshadowingIds) ? value.pinnedForeshadowingIds : [],
+    version: 5,
   };
 }
 

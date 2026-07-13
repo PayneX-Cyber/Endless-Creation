@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, ChapterVersion, Foreshadowing, Novel } from '../../types/novel';
-import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, buildChapterConsistencyPrompt, buildChapterRhythmPrompt, buildForeshadowingCandidatesPrompt, parseForeshadowingCandidates, buildForeshadowingPayoffCandidatesPrompt, parseForeshadowingPayoffCandidates, type OptimizeType, type TextMessage } from './novelPrompts';
+import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, buildChapterConsistencyPrompt, buildChapterRhythmPrompt, buildForeshadowingCandidatesPrompt, parseForeshadowingCandidates, buildForeshadowingPayoffCandidatesPrompt, parseForeshadowingPayoffCandidates, PINNED_CONTEXT_LIMIT, type OptimizeType, type TextMessage } from './novelPrompts';
 import { countWords, createId, formatTime, saveStatusLabel, type SaveStatus } from './novelShared';
 import { CHAPTER_STATUS_LABEL, CHAPTER_STATUS_ORDER, PROGRESS_LABELS, SOFT_GATE_HINTS, resolveChapterStatus } from './novelProgress';
 import { SETTING_LABELS, groupSettingsByType } from './novelSettings';
@@ -762,6 +762,15 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     }));
   }
 
+  function togglePinnedForeshadowing(id: string) {
+    const now = new Date().toISOString();
+    onUpdateNovel((current) => {
+      const ids = current.pinnedForeshadowingIds ?? [];
+      if (!ids.includes(id) && ids.length + (current.pinnedSettingIds?.length ?? 0) >= PINNED_CONTEXT_LIMIT) return current;
+      return { ...current, pinnedForeshadowingIds: ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id], updatedAt: now };
+    });
+  }
+
   function renderMain() {
     if (!chapters.length) {
       return (
@@ -1185,6 +1194,9 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
           onEdit={editForeshadowing}
           onToggleStatus={toggleForeshadowingStatus}
           onDelete={deleteForeshadowing}
+          pinnedIds={novel.pinnedForeshadowingIds}
+          pinLimitReached={(novel.pinnedSettingIds?.length ?? 0) + (novel.pinnedForeshadowingIds?.length ?? 0) >= PINNED_CONTEXT_LIMIT}
+          onTogglePin={togglePinnedForeshadowing}
           onClose={closeForeshadowPanel}
           aiCandidates={foreshadowCandidates.map<ForeshadowingAiCandidate>((candidate) => ({
             id: candidate.id,

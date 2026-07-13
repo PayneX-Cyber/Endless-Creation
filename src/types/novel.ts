@@ -54,7 +54,9 @@ export interface Novel {
   chapters: Chapter[];
   foreshadowings: Foreshadowing[];
   settings?: SettingEntry[];
-  version: 4;
+  pinnedSettingIds?: string[];
+  pinnedForeshadowingIds?: string[];
+  version: 5;
   createdAt: string;
   updatedAt: string;
 }

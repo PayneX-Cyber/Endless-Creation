@@ -32,6 +32,9 @@ interface ForeshadowingPanelProps {
   onEdit: (id: string, draft: ForeshadowingDraft) => void;
   onToggleStatus: (id: string) => void;
   onDelete: (id: string) => void;
+  pinnedIds?: string[];
+  pinLimitReached?: boolean;
+  onTogglePin?: (id: string) => void;
   onClose?: () => void;
   variant?: 'modal' | 'embedded';
   title?: string;
@@ -64,6 +67,9 @@ export function ForeshadowingPanel({
   onEdit,
   onToggleStatus,
   onDelete,
+  pinnedIds = [],
+  pinLimitReached = false,
+  onTogglePin,
   onClose,
   variant = 'modal',
   title = '伏笔记录',
@@ -160,6 +166,7 @@ export function ForeshadowingPanel({
             </div>
           )}
         </div>
+        {pinLimitReached && <p className="novel-flow__error">已达钉选上限（8 条），取消一条后可继续钉选。</p>}
 
         {isForm ? (
           <div className="novel-foreshadow__form">
@@ -246,6 +253,7 @@ export function ForeshadowingPanel({
                     </div>
                     {item.note && <p className="novel-foreshadow__note">{item.note}</p>}
                     <div className="novel-foreshadow__item-actions">
+                      {onTogglePin && <button aria-pressed={pinnedIds.includes(item.id)} className="novel-flow__ghost" disabled={pinLimitReached && !pinnedIds.includes(item.id)} onClick={() => onTogglePin(item.id)} type="button">{pinnedIds.includes(item.id) ? '取消钉选' : '钉选'}</button>}
                       <button className="novel-flow__ghost" onClick={() => openEdit(item)} type="button">编辑</button>
                       <button className="novel-flow__ghost" onClick={() => onToggleStatus(item.id)} type="button">
                         {item.status === 'planted' ? '标记已回收' : '取消回收'}

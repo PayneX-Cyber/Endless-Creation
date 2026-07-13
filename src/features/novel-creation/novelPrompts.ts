@@ -2,6 +2,47 @@ import type { Chapter, Foreshadowing, Novel } from '../../types/novel';
 
 export type TextMessage = { role: 'system' | 'user'; content: string };
 export type OptimizeType = 'dialogue' | 'environment' | 'psychology' | 'action';
+export const PINNED_CONTEXT_LIMIT = 8;
+
+const SETTING_TYPE_LABEL = {
+  character: '角色',
+  location: '地点',
+  organization: '组织',
+  item: '物品',
+  term: '术语',
+  rule: '规则',
+  other: '其他',
+} as const;
+
+export function buildPinnedContext(novel: Novel): string {
+  const settingsById = new Map((novel.settings ?? []).map((item) => [item.id, item]));
+  const foreshadowingsById = new Map(novel.foreshadowings.map((item) => [item.id, item]));
+  const lines = (novel.pinnedSettingIds ?? [])
+    .map((id) => settingsById.get(id))
+    .filter((item) => item !== undefined)
+    .map((item) => `[设定·${SETTING_TYPE_LABEL[item.type]}] ${item.title}：${item.body}`);
+  lines.push(...(novel.pinnedForeshadowingIds ?? [])
+    .map((id) => foreshadowingsById.get(id))
+    .filter((item) => item !== undefined)
+    .slice(0, PINNED_CONTEXT_LIMIT - lines.length)
+    .map((item) => `[伏笔·${item.status === 'paidOff' ? '已回收' : '待回收'}] ${item.title}${item.note ? `：${item.note}` : ''}`));
+  return lines.length ? `固定上下文：\n${lines.slice(0, PINNED_CONTEXT_LIMIT).join('\n')}` : '';
+}
+
+export function assertPinnedContextSelfCheck(): void {
+  const novel = {
+    settings: [{ id: 'setting-1', type: 'rule', title: '规则', body: '不可违背' }],
+    foreshadowings: [{ id: 'foreshadow-1', title: '旧钥匙', status: 'planted', note: '尚未使用' }],
+    pinnedSettingIds: ['missing', 'setting-1'],
+    pinnedForeshadowingIds: ['foreshadow-1'],
+  } as Novel;
+  const context = buildPinnedContext(novel);
+  if (!context.includes('不可违背') || !context.includes('旧钥匙') || context.includes('missing')) {
+    throw new Error('Pinned context self-check failed.');
+  }
+}
+
+assertPinnedContextSelfCheck();
 
 export function buildContinueChapterPrompt(novel: Novel, chapter: Chapter): TextMessage[] {
   const tail = chapter.content.slice(-1500);
@@ -82,6 +123,7 @@ export function buildOutlinePrompt(novel: Novel): TextMessage[] {
 export function buildChapterFromOutlinePrompt(novel: Novel, chapter: Chapter, previousChapter?: Chapter): TextMessage[] {
   const tail = chapter.content.slice(-800);
   const previousTail = previousChapter?.content.trim() ? previousChapter.content.trim().slice(-600) : '';
+  const pinnedContext = buildPinnedContext(novel);
   return [
     { role: 'system', content: '你是小说写作助手，按本章大纲写正文，直接输出正文，不解释，不加标题。' },
     {
@@ -90,6 +132,7 @@ export function buildChapterFromOutlinePrompt(novel: Novel, chapter: Chapter, pr
         `小说标题：${novel.title}`,
         novel.summary ? `小说简介：${novel.summary}` : '',
         novel.blueprint ? `作品蓝图：${novel.blueprint}` : '',
+        pinnedContext,
         previousTail ? `上一章《${previousChapter?.title || '未命名章节'}》结尾：\n${previousTail}` : '',
         `当前章节：${chapter.title || '未命名章节'}`,
         '本章大纲：',
@@ -281,6 +324,7 @@ export function buildChapterReviewPrompt(novel: Novel, chapter: Chapter): TextMe
 
 export function buildChapterConsistencyPrompt(novel: Novel, chapter: Chapter): TextMessage[] {
   const previousContext = buildPreviousChapterContext(novel, chapter);
+  const pinnedContext = buildPinnedContext(novel);
   return [
     {
       role: 'system',
@@ -293,6 +337,7 @@ export function buildChapterConsistencyPrompt(novel: Novel, chapter: Chapter): T
         novel.summary ? `小说简介：${novel.summary}` : '',
         novel.blueprint ? `作品蓝图：\n${novel.blueprint}` : '',
         novel.idea ? `创意：${novel.idea}` : '',
+        pinnedContext,
         '前文已完成章节摘录：',
         previousContext,
         `当前章节：${chapter.title || '未命名章节'}`,

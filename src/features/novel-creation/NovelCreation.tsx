@@ -3,7 +3,7 @@ import { ArrowLeftIcon, BoltIcon, BookIcon, ChartIcon, ChevronDownIcon, GlobeIco
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
 import type { Chapter, Foreshadowing, Novel, NovelSummary, SettingEntry, SettingType } from '../../types/novel';
-import { buildBlueprintFromConversationPrompt, buildInspirationChatPrompt, buildOutlinePrompt, INSPIRATION_OPENING_MESSAGE, parseImportedManuscript, parseOutlineText, type InspirationChatMessage, type TextMessage } from './novelPrompts';
+import { buildBlueprintFromConversationPrompt, buildInspirationChatPrompt, buildOutlinePrompt, INSPIRATION_OPENING_MESSAGE, parseImportedManuscript, parseOutlineText, PINNED_CONTEXT_LIMIT, type InspirationChatMessage, type TextMessage } from './novelPrompts';
 import { buildCharacterGraphPrompt, parseCharacterGraph, type CharacterGraph } from './characterGraph';
 import { NovelCharacterGraphPanel } from './NovelCharacterGraph';
 import { NovelErrorBanner, NovelListSkeleton } from './NovelSkeletons';
@@ -732,6 +732,15 @@ export function NovelCreation({ projectId }: { projectId: string }) {
     updateNovel((novel) => ({ ...novel, settings: (novel.settings ?? []).filter((entry) => entry.id !== id), updatedAt: now }));
   }
 
+  function togglePinnedSetting(id: string) {
+    const now = new Date().toISOString();
+    updateNovel((novel) => {
+      const ids = novel.pinnedSettingIds ?? [];
+      if (!ids.includes(id) && ids.length + (novel.pinnedForeshadowingIds?.length ?? 0) >= PINNED_CONTEXT_LIMIT) return novel;
+      return { ...novel, pinnedSettingIds: ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id], updatedAt: now };
+    });
+  }
+
   function addForeshadowing(draft: ForeshadowingDraft) {
     const now = new Date().toISOString();
     const entry: Foreshadowing = {
@@ -779,6 +788,15 @@ export function NovelCreation({ projectId }: { projectId: string }) {
   function deleteForeshadowing(id: string) {
     const now = new Date().toISOString();
     updateNovel((novel) => ({ ...novel, foreshadowings: novel.foreshadowings.filter((entry) => entry.id !== id), updatedAt: now }));
+  }
+
+  function togglePinnedForeshadowing(id: string) {
+    const now = new Date().toISOString();
+    updateNovel((novel) => {
+      const ids = novel.pinnedForeshadowingIds ?? [];
+      if (!ids.includes(id) && ids.length + (novel.pinnedSettingIds?.length ?? 0) >= PINNED_CONTEXT_LIMIT) return novel;
+      return { ...novel, pinnedForeshadowingIds: ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id], updatedAt: now };
+    });
   }
 
   return (
@@ -931,6 +949,9 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                     onAdd={addSetting}
                     onEdit={editSetting}
                     onDelete={deleteSetting}
+                    pinnedIds={currentNovel.pinnedSettingIds}
+                    pinLimitReached={(currentNovel.pinnedSettingIds?.length ?? 0) + (currentNovel.pinnedForeshadowingIds?.length ?? 0) >= PINNED_CONTEXT_LIMIT}
+                    onTogglePin={togglePinnedSetting}
                   />
                 )}
                 {projectViewTab === 'characters' && (
@@ -944,6 +965,9 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                     onAdd={addSetting}
                     onEdit={editSetting}
                     onDelete={deleteSetting}
+                    pinnedIds={currentNovel.pinnedSettingIds}
+                    pinLimitReached={(currentNovel.pinnedSettingIds?.length ?? 0) + (currentNovel.pinnedForeshadowingIds?.length ?? 0) >= PINNED_CONTEXT_LIMIT}
+                    onTogglePin={togglePinnedSetting}
                   />
                 )}
                 {projectViewTab === 'graph' && (
@@ -1008,6 +1032,9 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                     onEdit={editForeshadowing}
                     onToggleStatus={toggleForeshadowingStatus}
                     onDelete={deleteForeshadowing}
+                    pinnedIds={currentNovel.pinnedForeshadowingIds}
+                    pinLimitReached={(currentNovel.pinnedSettingIds?.length ?? 0) + (currentNovel.pinnedForeshadowingIds?.length ?? 0) >= PINNED_CONTEXT_LIMIT}
+                    onTogglePin={togglePinnedForeshadowing}
                     onAnalyzeChapter={openAnalyzeChapterPicker}
                     analyzeDisabled={!chapters.some((chapter) => chapter.content.trim())}
                     analyzeDisabledHint="请先完成章节正文"

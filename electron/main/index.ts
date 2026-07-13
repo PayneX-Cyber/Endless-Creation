@@ -168,7 +168,9 @@ interface Novel {
   chapters: Chapter[];
   foreshadowings: Foreshadowing[];
   settings?: SettingEntry[];
-  version: 4;
+  pinnedSettingIds?: string[];
+  pinnedForeshadowingIds?: string[];
+  version: 5;
   createdAt: string;
   updatedAt: string;
 }
@@ -688,10 +690,17 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
     chapters,
     foreshadowings: sanitizeForeshadowings(candidate.foreshadowings, now),
     settings: sanitizeSettings(candidate.settings, now),
-    version: 4,
+    pinnedSettingIds: sanitizeStringIds(candidate.pinnedSettingIds),
+    pinnedForeshadowingIds: sanitizeStringIds(candidate.pinnedForeshadowingIds),
+    version: 5,
     createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : now,
     updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : now,
   };
+}
+
+function sanitizeStringIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return [...new Set(value.filter((id): id is string => typeof id === 'string' && id.trim() !== '').map((id) => id.trim()))];
 }
 
 function sanitizeForeshadowings(value: unknown, now: string): Foreshadowing[] {
@@ -802,7 +811,9 @@ async function createNovel(input: unknown): Promise<{ ok: boolean; message: stri
     chapters: [],
     foreshadowings: [],
     settings: [],
-    version: 4,
+    pinnedSettingIds: [],
+    pinnedForeshadowingIds: [],
+    version: 5,
     createdAt: now,
     updatedAt: now,
   };

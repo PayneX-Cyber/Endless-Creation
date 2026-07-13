@@ -17,6 +17,9 @@ interface SettingPanelProps {
   onAdd: (draft: SettingDraft) => void;
   onEdit: (id: string, draft: SettingDraft) => void;
   onDelete: (id: string) => void;
+  pinnedIds?: string[];
+  pinLimitReached?: boolean;
+  onTogglePin?: (id: string) => void;
   allowedTypes?: readonly SettingType[];
   title?: string;
   description?: string;
@@ -29,6 +32,9 @@ export function SettingPanel({
   onAdd,
   onEdit,
   onDelete,
+  pinnedIds = [],
+  pinLimitReached = false,
+  onTogglePin,
   allowedTypes = SETTING_TYPE_ORDER,
   title = SETTING_LABELS.panelTitle,
   description = SETTING_LABELS.panelSub,
@@ -87,6 +93,7 @@ export function SettingPanel({
         </div>
         {!isForm && <button className="novel-flow__primary novel-flow__primary--compact" onClick={openCreate} type="button">{characterMode ? '新增角色' : SETTING_LABELS.add}</button>}
       </div>
+      {pinLimitReached && <p className="novel-flow__error">已达钉选上限（8 条），取消一条后可继续钉选。</p>}
       {isForm ? (
         <div className="novel-setting__form">
           {typeOptions.length > 1 && (
@@ -124,6 +131,7 @@ export function SettingPanel({
                       <div className="novel-setting__item-head">
                         <strong>{item.title}</strong>
                         <div className="novel-setting__item-actions">
+                          {onTogglePin && <button aria-pressed={pinnedIds.includes(item.id)} className="novel-flow__ghost" disabled={pinLimitReached && !pinnedIds.includes(item.id)} onClick={() => onTogglePin(item.id)} type="button">{pinnedIds.includes(item.id) ? '取消钉选' : '钉选'}</button>}
                           <button className="novel-flow__ghost" onClick={() => openEdit(item)} type="button">{SETTING_LABELS.edit}</button>
                           <button className="novel-flow__ghost" onClick={() => handleDelete(item)} type="button">{SETTING_LABELS.delete}</button>
                         </div>
