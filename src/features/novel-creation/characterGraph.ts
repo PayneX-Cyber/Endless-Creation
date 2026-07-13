@@ -1,24 +1,7 @@
-import type { Novel } from '../../types/novel';
+import type { CharacterGraph, GraphCharacter, GraphRelationship, Novel } from '../../types/novel';
+export type { CharacterGraph, GraphCharacter, GraphRelationship } from '../../types/novel';
 
 export type TextMessage = { role: 'system' | 'user'; content: string };
-
-// 人物关系图谱 V0：AI 从蓝图 + 已有正文里推演人物与关系，仅 session 态展示，不落库、不建模。
-export interface GraphCharacter {
-  name: string;
-  role: string; // 身份/定位，可为空串
-  description: string; // 一句话简述，可为空串
-}
-
-export interface GraphRelationship {
-  from: string; // 人物名，须能在 characters 里找到
-  to: string;   // 人物名，须能在 characters 里找到
-  label: string; // 关系描述，可为空串
-}
-
-export interface CharacterGraph {
-  characters: GraphCharacter[];
-  relationships: GraphRelationship[];
-}
 
 // 判别式联合：调用侧按 kind 三分支处理，绝不靠空对象猜语义。
 export type ParsedCharacterGraph =

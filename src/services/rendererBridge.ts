@@ -11,7 +11,7 @@ import type {
   ApiTextGenerationResult,
   TextStreamEvent,
 } from '../types/apiProvider';
-import type { Novel, NovelListResult, NovelResult } from '../types/novel';
+import type { CharacterGraph, EmotionArc, Novel, NovelListResult, NovelResult } from '../types/novel';
 import type { ThemeMode } from '../types/workspace';
 
 const THEME_STORAGE_KEY = 'ec-theme';
@@ -353,7 +353,7 @@ export const rendererBridge = {
       settings: [],
       pinnedSettingIds: [],
       pinnedForeshadowingIds: [],
-      version: 5,
+      version: 6,
       createdAt: now,
       updatedAt: now,
     };
@@ -470,6 +470,37 @@ function isNovel(value: unknown): value is Novel {
   return Boolean(value && typeof value === 'object' && typeof (value as Novel).id === 'string' && typeof (value as Novel).title === 'string');
 }
 
+function normalizeEmotionArc(value: unknown): EmotionArc | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const arc = value as EmotionArc;
+  return typeof arc.updatedAt === 'string'
+    && Array.isArray(arc.points)
+    && arc.points.every((point) => typeof point?.chapterId === 'string'
+      && typeof point.score === 'number'
+      && Number.isFinite(point.score)
+      && point.score >= -100
+      && point.score <= 100
+      && typeof point.reason === 'string'
+      && typeof point.updatedAt === 'string')
+    ? arc
+    : undefined;
+}
+
+function normalizeCharacterGraph(value: unknown): CharacterGraph | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const graph = value as CharacterGraph;
+  return Array.isArray(graph.characters)
+    && graph.characters.every((item) => typeof item?.name === 'string'
+      && typeof item.role === 'string'
+      && typeof item.description === 'string')
+    && Array.isArray(graph.relationships)
+    && graph.relationships.every((item) => typeof item?.from === 'string'
+      && typeof item.to === 'string'
+      && typeof item.label === 'string')
+    ? graph
+    : undefined;
+}
+
 function normalizeWebNovel(value: unknown): Novel | null {
   if (!isNovel(value)) return null;
   return {
@@ -479,7 +510,9 @@ function normalizeWebNovel(value: unknown): Novel | null {
     settings: Array.isArray(value.settings) ? value.settings : [],
     pinnedSettingIds: Array.isArray(value.pinnedSettingIds) ? value.pinnedSettingIds : [],
     pinnedForeshadowingIds: Array.isArray(value.pinnedForeshadowingIds) ? value.pinnedForeshadowingIds : [],
-    version: 5,
+    emotionArc: normalizeEmotionArc(value.emotionArc),
+    characterGraph: normalizeCharacterGraph(value.characterGraph),
+    version: 6,
   };
 }
 

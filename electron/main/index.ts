@@ -156,6 +156,35 @@ interface SettingEntry {
   updatedAt: string;
 }
 
+interface EmotionPoint {
+  chapterId: string;
+  score: number;
+  reason: string;
+  updatedAt: string;
+}
+
+interface EmotionArc {
+  points: EmotionPoint[];
+  updatedAt: string;
+}
+
+interface GraphCharacter {
+  name: string;
+  role: string;
+  description: string;
+}
+
+interface GraphRelationship {
+  from: string;
+  to: string;
+  label: string;
+}
+
+interface CharacterGraph {
+  characters: GraphCharacter[];
+  relationships: GraphRelationship[];
+}
+
 interface Novel {
   id: string;
   title: string;
@@ -170,7 +199,9 @@ interface Novel {
   settings?: SettingEntry[];
   pinnedSettingIds?: string[];
   pinnedForeshadowingIds?: string[];
-  version: 5;
+  emotionArc?: EmotionArc;
+  characterGraph?: CharacterGraph;
+  version: 6;
   createdAt: string;
   updatedAt: string;
 }
@@ -654,6 +685,36 @@ function countNovelWords(text: string): number {
   return Array.from(text.replace(/\s+/g, '')).length;
 }
 
+function sanitizeEmotionArc(value: unknown): EmotionArc | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const arc = value as Partial<EmotionArc>;
+  if (typeof arc.updatedAt !== 'string' || !Array.isArray(arc.points)) return undefined;
+  if (!arc.points.every((point) => point
+    && typeof point.chapterId === 'string'
+    && typeof point.score === 'number'
+    && Number.isFinite(point.score)
+    && point.score >= -100
+    && point.score <= 100
+    && typeof point.reason === 'string'
+    && typeof point.updatedAt === 'string')) return undefined;
+  return { points: arc.points, updatedAt: arc.updatedAt };
+}
+
+function sanitizeCharacterGraph(value: unknown): CharacterGraph | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const graph = value as Partial<CharacterGraph>;
+  if (!Array.isArray(graph.characters) || !Array.isArray(graph.relationships)) return undefined;
+  if (!graph.characters.every((item) => item
+    && typeof item.name === 'string'
+    && typeof item.role === 'string'
+    && typeof item.description === 'string')) return undefined;
+  if (!graph.relationships.every((item) => item
+    && typeof item.from === 'string'
+    && typeof item.to === 'string'
+    && typeof item.label === 'string')) return undefined;
+  return { characters: graph.characters, relationships: graph.relationships };
+}
+
 function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Partial<Novel>;
@@ -692,7 +753,9 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
     settings: sanitizeSettings(candidate.settings, now),
     pinnedSettingIds: sanitizeStringIds(candidate.pinnedSettingIds),
     pinnedForeshadowingIds: sanitizeStringIds(candidate.pinnedForeshadowingIds),
-    version: 5,
+    emotionArc: sanitizeEmotionArc(candidate.emotionArc),
+    characterGraph: sanitizeCharacterGraph(candidate.characterGraph),
+    version: 6,
     createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : now,
     updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : now,
   };
@@ -813,7 +876,7 @@ async function createNovel(input: unknown): Promise<{ ok: boolean; message: stri
     settings: [],
     pinnedSettingIds: [],
     pinnedForeshadowingIds: [],
-    version: 5,
+    version: 6,
     createdAt: now,
     updatedAt: now,
   };
