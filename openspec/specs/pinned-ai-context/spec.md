@@ -1,7 +1,7 @@
 # pinned-ai-context Specification
 
 ## Purpose
-TBD - created by archiving change add-pinned-ai-context. Update Purpose after archive.
+允许用户从已有结构化设定与伏笔中手动钉选最多 8 条固定上下文，并将其注入章节续写与一致性检查；钉选状态随 Novel schema 持久化。
 ## Requirements
 ### Requirement: 钉选结构化设定与伏笔
 
@@ -92,4 +92,3 @@ TBD - created by archiving change add-pinned-ai-context. Update Purpose after ar
 - **THEN** 小说被迁移为 version 5
 - **AND** `pinnedSettingIds` 与 `pinnedForeshadowingIds` 初始化为空数组
 - **AND** 原有章节、设定、伏笔等数据完整保留
-

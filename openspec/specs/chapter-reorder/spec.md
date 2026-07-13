@@ -1,7 +1,7 @@
 # chapter-reorder Specification
 
 ## Purpose
-TBD - created by archiving change novel-navigation-reorder. Update Purpose after archive.
+允许用户通过拖拽或上移/下移按钮调整章节顺序，将 order 归一化后经现有自动保存链持久化，使导出、前文上下文、统计与图谱等消费者跟随新顺序。
 ## Requirements
 ### Requirement: 章节重排交互
 
@@ -45,4 +45,3 @@ TBD - created by archiving change novel-navigation-reorder. Update Purpose after
 - **WHEN** 章节顺序被调整
 - **THEN** 导出、前文上下文 prompt、统计与图谱等按 `order` 排序的消费方均按新顺序生效
 - **AND** 无需用户额外操作
-

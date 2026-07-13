@@ -1,7 +1,7 @@
 # chapter-undo-history Specification
 
 ## Purpose
-TBD - created by archiving change novel-editor-enhance. Update Purpose after archive.
+为当前章节正文提供自建的多步撤销与重做历史；手动编辑和查找替换写入历史，AI 写回、流式生成、切章及撤销/重做自身不写入历史。
 ## Requirements
 ### Requirement: 正文编辑多步撤销/重做
 

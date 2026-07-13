@@ -19,7 +19,7 @@
 ### 构建 / 静态
 - `npm.cmd run build`：双端通过（renderer vite built in 572ms + electron tsc exit 0）
 - `git diff --check`：clean
-- 幻影字节扫描（U+FFFD grep 改动文件）：clean。**注：记忆记录的文本完整性脚本 `.codex/skills/endless-creation-guardrails/scripts/scan_text_integrity.py` 已从仓库移除（该 guardrails skill 整体不存在），改用 grep U+FFFD + tsc 通过作为等价证据。**
+- 权威文本完整性扫描（`C:\Users\x1176\.codex\skills\endless-creation-guardrails\scripts\scan_text_integrity.py`）：TEXT INTEGRITY OK；U+FFFD grep 改动文件 clean。
 
 ### 运行时自检（node 单跑 buildPinnedContext 逻辑）
 - 悬空 id 跳过：true
@@ -52,3 +52,7 @@
 ## 结论
 
 无 CRITICAL、无 IMPORTANT、无 WARNING。全部检查通过，ready for archive。
+
+## GUI 真机验收
+
+PO 已完成 GUI 真机验收：钉选状态重开后保留、续写实际带入钉选上下文、删除已钉选设定后悬空引用被跳过、达到 8 条上限后继续钉选被禁用，全部 PASS；验收环境已清理。

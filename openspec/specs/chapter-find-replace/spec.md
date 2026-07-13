@@ -1,7 +1,7 @@
 # chapter-find-replace Specification
 
 ## Purpose
-TBD - created by archiving change novel-editor-enhance. Update Purpose after archive.
+为当前激活章节正文提供查找、逐项定位、替换当前项与全部替换，并使替换操作可通过正文历史栈撤销。
 ## Requirements
 ### Requirement: 章内查找
 

@@ -1,7 +1,7 @@
 # chapter-search Specification
 
 ## Purpose
-TBD - created by archiving change novel-navigation-reorder. Update Purpose after archive.
+为长篇小说提供跨章全文搜索：按关键词扫描当前小说所有章节的标题、正文与大纲，列出命中章节及摘要片段；点击结果切换到该章节，正文命中时在编辑器中选中并滚动到命中字符位置。搜索为纯读操作，不修改小说数据、不改 schema、无外部索引或依赖。
 ## Requirements
 ### Requirement: 跨章全文搜索
 
@@ -30,17 +30,23 @@ TBD - created by archiving change novel-navigation-reorder. Update Purpose after
 
 ### Requirement: 搜索结果定位到章内位置
 
-点击搜索结果时，系统 SHALL 切换到该命中章节，并在正文编辑器中滚动到命中位置、选中命中文本。若目标章节不是当前激活章节，MUST 先切章再定位。
+点击搜索结果时，系统 SHALL 切换到该命中章节。命中来源为正文（`content`）时，系统 SHALL 在正文编辑器中滚动到命中位置并选中命中文本；命中来源为标题（`title`）或大纲（`outline`）时，系统仅切换到该章节、不在正文中定位（因这些内容不在正文编辑器中）。若目标章节不是当前激活章节，MUST 先切章再执行上述定位。
 
-#### Scenario: 点击结果切章并定位
+#### Scenario: 正文命中切章并选中定位
 
-- **WHEN** 用户点击一条搜索结果
+- **WHEN** 用户点击一条命中来源为正文的搜索结果
 - **THEN** 系统切换到该章节
 - **AND** 正文编辑器滚动到关键词命中位置并选中命中文本
 
+#### Scenario: 标题或大纲命中仅切章
+
+- **WHEN** 用户点击一条命中来源为标题或大纲的搜索结果
+- **THEN** 系统切换到该章节
+- **AND** 不在正文编辑器中选中或定位任何位置
+
 #### Scenario: 命中位置在当前章
 
-- **WHEN** 用户点击的结果属于当前已激活章节
+- **WHEN** 用户点击的正文命中结果属于当前已激活章节
 - **THEN** 系统直接在正文编辑器中定位到命中位置并选中，无需切章
 
 #### Scenario: 命中内容已变化
