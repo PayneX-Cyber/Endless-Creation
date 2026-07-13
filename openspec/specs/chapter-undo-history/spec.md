@@ -1,0 +1,57 @@
+# chapter-undo-history Specification
+
+## Purpose
+TBD - created by archiving change novel-editor-enhance. Update Purpose after archive.
+## Requirements
+### Requirement: 正文编辑多步撤销/重做
+
+系统 SHALL 为当前章节正文编辑维护一个撤销历史栈，支持多步撤销（Ctrl+Z）与重做（Ctrl+Y 或等价快捷键）。因受控 textarea 破坏了浏览器原生 undo，系统 MUST 接管这些快捷键（阻止默认行为）并从自建历史栈执行撤销/重做。撤销/重做后的正文 SHALL 经现有 `onUpdateChapter` 自动保存链持久化。
+
+#### Scenario: 多步撤销手动编辑
+
+- **WHEN** 用户手动输入若干段正文后连续按撤销
+- **THEN** 系统逐步回退到之前的正文状态
+
+#### Scenario: 重做已撤销的编辑
+
+- **WHEN** 用户撤销若干步后按重做
+- **THEN** 系统逐步重新应用被撤销的正文状态
+
+#### Scenario: 撤销/重做自身不再进栈
+
+- **WHEN** 用户执行撤销或重做
+- **THEN** 该撤销/重做产生的正文写入不会作为新的一步进入历史栈（不产生循环）
+
+### Requirement: 历史栈进栈边界
+
+历史栈 SHALL 只记录手动编辑与查找替换的写入。AI 续写写回、流式逐字生成的 delta、以及撤销/重做自身触发的写入 MUST NOT 进入历史栈。
+
+#### Scenario: 手动编辑进栈
+
+- **WHEN** 用户手动在正文编辑器打字
+- **THEN** 该编辑进入历史栈，可被撤销
+
+#### Scenario: 查找替换写入进栈
+
+- **WHEN** 用户通过查找替换修改正文（替换当前项或全部替换）
+- **THEN** 该替换作为一步进入历史栈，可被撤销
+
+#### Scenario: AI 写回不进栈
+
+- **WHEN** AI 续写结果写回正文
+- **THEN** 该写回不作为可撤销的手动编辑步骤进入历史栈
+
+#### Scenario: 流式生成不逐字进栈
+
+- **WHEN** 正文正在以流式逐字方式生成
+- **THEN** 逐字 delta 不产生逐字历史记录
+
+### Requirement: 切章清栈
+
+切换到另一章节时，系统 SHALL 清空/重置撤销历史栈，使撤销不会跨章回退到其他章节的正文。
+
+#### Scenario: 切章后不跨章撤销
+
+- **WHEN** 用户在 A 章编辑后切换到 B 章
+- **THEN** A 章的历史栈不再对 B 章生效
+- **AND** 在 B 章按撤销不会回退到 A 章的正文内容

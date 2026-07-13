@@ -1,0 +1,50 @@
+# chapter-find-replace Specification
+
+## Purpose
+TBD - created by archiving change novel-editor-enhance. Update Purpose after archive.
+## Requirements
+### Requirement: 章内查找
+
+系统 SHALL 为当前激活章节的正文提供查找入口，接受关键词，在正文 `content` 中定位所有匹配项。系统 MUST 标示匹配总数与当前项序号，并支持在匹配项之间逐个跳转。查找为纯读操作，MUST NOT 修改正文。
+
+#### Scenario: 关键词命中多处
+
+- **WHEN** 用户在查找框输入一个在当前章正文中多次出现的关键词
+- **THEN** 系统标示匹配总数
+- **AND** 定位到第一个匹配项并在正文中选中/高亮该处
+
+#### Scenario: 逐个跳转
+
+- **WHEN** 存在多个匹配项，用户点击"下一个"/"上一个"
+- **THEN** 系统在匹配项之间移动当前项，并在正文中选中/高亮当前匹配
+
+#### Scenario: 无匹配
+
+- **WHEN** 关键词在当前章正文中不存在
+- **THEN** 系统显示无匹配提示，不选中任何位置
+
+#### Scenario: 空关键词
+
+- **WHEN** 查找关键词为空或仅空白
+- **THEN** 系统不执行查找，不产生匹配结果
+
+### Requirement: 章内替换
+
+系统 SHALL 支持替换当前匹配项与全部替换。替换仅作用于当前激活章节的 `content`，MUST NOT 跨章。替换后的正文变更 SHALL 经现有 `onUpdateChapter` 自动保存链持久化。
+
+#### Scenario: 替换当前项
+
+- **WHEN** 存在当前匹配项，用户输入替换文本并点击"替换"
+- **THEN** 系统仅替换当前匹配项，正文更新
+- **AND** 自动定位到下一个匹配项（若有）
+
+#### Scenario: 全部替换
+
+- **WHEN** 用户点击"全部替换"
+- **THEN** 系统将当前章正文中所有匹配项替换为替换文本
+- **AND** 正文更新并经自动保存链持久化
+
+#### Scenario: 替换后可撤销
+
+- **WHEN** 用户执行一次替换（当前项或全部）后按撤销
+- **THEN** 该替换作为一步被撤销，正文恢复到替换前
