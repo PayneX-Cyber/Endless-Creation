@@ -41,7 +41,7 @@ base-ref: ad1fee0763d89d3ee262cac431d1034e1bb19f8c
 - Produces: `Novel.emotionArc?: EmotionArc`, `Novel.characterGraph?: CharacterGraph`, `Novel.version: 6`.
 - Consumes: existing chapter/settings/foreshadowing/pinned fields unchanged.
 
-- [ ] **Step 1: 在权威 renderer 类型文件定义成果类型并升级版本**
+- [x] **Step 1: 在权威 renderer 类型文件定义成果类型并升级版本**
 
 在 `src/types/novel.ts` 的 `Novel` 前加入：
 
@@ -86,7 +86,7 @@ version: 6;
 
 并将 `NOVEL_SCHEMA_VERSION` 改为 `6`。
 
-- [ ] **Step 2: 同步 preload、main、rendererBridge 三份协议副本**
+- [x] **Step 2: 同步 preload、main、rendererBridge 三份协议副本**
 
 在另外三份 Novel 协议旁复制相同五个接口，在 `Novel` 中复制相同两个可选字段，并把字面量版本改为：
 
@@ -96,7 +96,7 @@ version: 6;
 
 逐份确认字段名、必选属性、可选性与数组元素类型完全一致，不以 `unknown` 或宽泛对象替代。
 
-- [ ] **Step 3: 删除功能模块的重复类型权威源**
+- [x] **Step 3: 删除功能模块的重复类型权威源**
 
 `emotionArc.ts` 改为从 schema 导入并按兼容需要 re-export：
 
@@ -127,7 +127,7 @@ export type {
 import type { CharacterGraph } from '../../types/novel';
 ```
 
-- [ ] **Step 4: 运行双端类型构建确认四副本一致**
+- [x] **Step 4: 运行双端类型构建确认四副本一致**
 
 Run:
 
@@ -137,7 +137,7 @@ npm.cmd run build
 
 Expected: renderer Vite 与 Electron TypeScript 均成功，exit code 0；不得出现 `version: 5` 或重复类型不兼容错误。
 
-- [ ] **Step 5: 提交 schema 原子变更**
+- [x] **Step 5: 提交 schema 原子变更**
 
 ```powershell
 git add src/types/novel.ts electron/preload/bridgeTypes.ts electron/main/index.ts src/services/rendererBridge.ts src/features/novel-creation/emotionArc.ts src/features/novel-creation/characterGraph.ts src/features/novel-creation/NovelCharacterGraph.tsx
@@ -158,7 +158,7 @@ git commit -m "feat: add novel analysis fields to schema v6"
 - Produces: pure validators `isEmotionArc(value): value is EmotionArc`, `isCharacterGraph(value): value is CharacterGraph`.
 - Save callback signature: `(novel: Novel) => Promise<{ ok: boolean; novel?: Novel }>`.
 
-- [ ] **Step 1: 在主进程实现严格、保守的字段消毒**
+- [x] **Step 1: 在主进程实现严格、保守的字段消毒**
 
 在 `electron/main/index.ts` 的 `sanitizeNovel` 附近加入有限数值、字符串和成果校验器。核心结构必须等价于：
 
@@ -215,7 +215,7 @@ version: 6,
 
 不得写成 `sanitizeEmotionArc(...) ?? { points: [], updatedAt: ... }`。
 
-- [ ] **Step 2: 对 Web fallback sanitizer 使用同一字段语义**
+- [x] **Step 2: 对 Web fallback sanitizer 使用同一字段语义**
 
 在 `src/services/rendererBridge.ts` 的 fallback Novel 消毒/规范化路径加入同等校验，并确保返回值是：
 
@@ -227,7 +227,7 @@ version: 6,
 
 Electron 和 Web fallback 对非法点、非法图谱及缺失字段的处理必须一致。
 
-- [ ] **Step 3: 创建纯计划 + 副作用分层的迁移 helper**
+- [x] **Step 3: 创建纯计划 + 副作用分层的迁移 helper**
 
 创建 `src/features/novel-creation/novelAnalysisPersistence.ts`。导出全名存储键、校验器与迁移入口：
 
@@ -351,7 +351,7 @@ export async function migrateLegacyNovelAnalysis(
 
 注意：`undefined` 条目不是有效旧成果；坏整表或坏当前条目不得被 `removeEntry`。
 
-- [ ] **Step 4: 在 openNovel 的 state 写入前 await 惰性迁移**
+- [x] **Step 4: 在 openNovel 的 state 写入前 await 惰性迁移**
 
 在 `NovelCreation.tsx` 导入 helper：
 
@@ -376,7 +376,7 @@ return true;
 
 迁移 helper 必须吞掉 localStorage/save 异常并返回原 Novel，因此打不开 localStorage 或保存失败不应让 `openNovel` 返回 false。
 
-- [ ] **Step 5: 添加可直接运行的迁移自检**
+- [x] **Step 5: 添加可直接运行的迁移自检**
 
 在 helper 中导出 pure validator；使用临时 TypeScript/Node 自检脚本或项目已有运行方式验证以下断言，脚本不作为产品文件提交：
 
@@ -390,7 +390,7 @@ return true;
 
 Expected: 所有断言通过，无未捕获异常。
 
-- [ ] **Step 6: 提交安全迁移链**
+- [x] **Step 6: 提交安全迁移链**
 
 ```powershell
 git add electron/main/index.ts src/services/rendererBridge.ts src/features/novel-creation/novelAnalysisPersistence.ts src/features/novel-creation/NovelCreation.tsx
@@ -409,7 +409,7 @@ git commit -m "feat: migrate legacy novel analysis safely"
 - Produces: `mergeEmotionPoints(novel, points): EmotionArc`（纯函数；沿用现有合并语义）。
 - Produces: Emotion panel prop `onUpdateNovel: (update: (novel: Novel) => Novel) => void`.
 
-- [ ] **Step 1: 把 emotionArc.ts 收敛为纯计算模块**
+- [x] **Step 1: 把 emotionArc.ts 收敛为纯计算模块**
 
 删除存储键、`readEmotionArc` 和任何 `localStorage.getItem/setItem`。把现有 upsert 的合并算法保留为纯函数：
 
@@ -433,7 +433,7 @@ export function mergeEmotionPoints(
 
 若现有 `upsertEmotionPoints` 还包含业务上必需的规范化逻辑，应迁入该纯函数，不保留任何 IO 或 `{ ok, message }` 保存返回模型。
 
-- [ ] **Step 2: EmotionArcPanel 直接派生 Novel 字段并通过父级更新**
+- [x] **Step 2: EmotionArcPanel 直接派生 Novel 字段并通过父级更新**
 
 Props 增加：
 
@@ -475,7 +475,7 @@ function confirm() {
 />
 ```
 
-- [ ] **Step 3: 删除图谱镜像 state 与 localStorage 正常读写**
+- [x] **Step 3: 删除图谱镜像 state 与 localStorage 正常读写**
 
 在 `NovelCreation.tsx`：
 
@@ -503,7 +503,7 @@ updateNovel((novel) => ({
 
 不得再调用 `setGraphData` 或 `saveCharacterGraph`。失败路径继续只设置 `graphError`，不得覆盖已有字段。
 
-- [ ] **Step 4: 扫描并证明旧键只剩迁移 helper 使用**
+- [x] **Step 4: 扫描并证明旧键只剩迁移 helper 使用**
 
 Run:
 
@@ -518,7 +518,7 @@ Expected:
 - 三个旧 IO 函数零命中。
 - 模型偏好/API provider 的 `readLocalStorage` 仍保留。
 
-- [ ] **Step 5: 构建并提交读写源切换**
+- [x] **Step 5: 构建并提交读写源切换**
 
 Run:
 
@@ -545,7 +545,7 @@ git commit -m "feat: use novel fields for analysis results"
 - Consumes: Tasks 1–3 的完整实现。
 - Produces: build 阶段可交给 Comet full verify 的新鲜证据。
 
-- [ ] **Step 1: 运行项目双端构建**
+- [x] **Step 1: 运行项目双端构建**
 
 ```powershell
 npm.cmd run build
@@ -553,7 +553,7 @@ npm.cmd run build
 
 Expected: Electron tsc 与 renderer Vite 全绿，exit code 0。
 
-- [ ] **Step 2: 运行权威文本完整性扫描**
+- [x] **Step 2: 运行权威文本完整性扫描**
 
 ```powershell
 python "C:\Users\x1176\.codex\skills\endless-creation-guardrails\scripts\scan_text_integrity.py" "F:\AIProject\Endless Creation\src"
@@ -561,7 +561,7 @@ python "C:\Users\x1176\.codex\skills\endless-creation-guardrails\scripts\scan_te
 
 Expected: `TEXT INTEGRITY OK`，无 U+FFFD 或乱码报告。
 
-- [ ] **Step 3: 校验 diff 与 OpenSpec**
+- [x] **Step 3: 校验 diff 与 OpenSpec**
 
 ```powershell
 git diff --check
@@ -570,7 +570,7 @@ npx.cmd openspec validate persist-emotion-graph --strict
 
 Expected: 两条命令 exit code 0。
 
-- [ ] **Step 4: 重跑迁移运行时自检**
+- [x] **Step 4: 重跑迁移运行时自检**
 
 至少覆盖：
 
@@ -585,11 +585,11 @@ saveNovel 失败时旧条目保留
 
 Expected: 全部 PASS。
 
-- [ ] **Step 5: 核对导出协议无需改代码**
+- [x] **Step 5: 核对导出协议无需改代码**
 
 确认 `src/features/novel-creation/novelExport.ts` 仍直接 `JSON.stringify(novel)`；用含两字段的 Novel 生成离线包，检查 `novel.json` 含 `emotionArc` 与 `characterGraph`。
 
-- [ ] **Step 6: 勾选 tasks.md 并提交验证产物状态**
+- [x] **Step 6: 勾选 tasks.md 并提交验证产物状态**
 
 仅在对应实现和命令已有证据后，将 `openspec/changes/persist-emotion-graph/tasks.md` 的 20 项全部改为 `[x]`。
 
@@ -598,7 +598,7 @@ git add openspec/changes/persist-emotion-graph/tasks.md
 git commit -m "chore: complete persist emotion graph tasks"
 ```
 
-- [ ] **Step 7: 保留 GUI/PO full verify 清单**
+- [x] **Step 7: 保留 GUI/PO full verify 清单**
 
 进入 verify 阶段后真机核验：
 
