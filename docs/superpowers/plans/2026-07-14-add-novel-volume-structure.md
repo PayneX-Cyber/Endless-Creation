@@ -46,7 +46,7 @@ base-ref: 6dc6c496a824fcacf9071cc2eaa54b296afb6cd9
 - Consumes: 既有 `Chapter`/`Novel` 全部字段保持不变。
 - Produces（main 内部）: `sanitizeVolumes(value: unknown, now: string): Volume[]`。
 
-- [ ] **Step 1: 在权威 renderer 类型文件新增 Volume、Chapter.volumeId 并升级版本**
+- [x] **Step 1: 在权威 renderer 类型文件新增 Volume、Chapter.volumeId 并升级版本**
 
 在 `src/types/novel.ts` 的 `Chapter` 接口之前加入 `Volume`：
 
@@ -68,7 +68,7 @@ export interface Volume {
 
 在 `Novel` 接口内 `chapters: Chapter[];` 之前加入 `volumes: Volume[];`，并把 `version: 6;` 改为 `version: 7;`。
 
-- [ ] **Step 2: 同步 preload、rendererBridge 两份协议副本到 v7**
+- [x] **Step 2: 同步 preload、rendererBridge 两份协议副本到 v7**
 
 在 `electron/preload/bridgeTypes.ts` 复制相同的 `Volume` 接口、`Chapter.volumeId?: string`、`Novel.volumes: Volume[]`，并把该文件内的 `version: 6;`（~195）改为 `version: 7;`。
 
@@ -76,7 +76,7 @@ export interface Volume {
 - `createNovel` fallback 的 novel 字面量（~345-359）加入 `volumes: []`，把 `version: 6`（~356）改为 `version: 7`。
 - `normalizeWebNovel`（~504-517）在返回对象里加入 `volumes: Array.isArray(value.volumes) ? sanitizeWebVolumes(value.volumes) : []`，把 `version: 6`（~515）改为 `version: 7`，并对章节做 `volumeId` 归属校验（见 Step 4 的同义逻辑）。
 
-- [ ] **Step 3: 主进程新增 sanitizeVolumes 并在 sanitizeNovel 接入卷 + 归属消毒**
+- [x] **Step 3: 主进程新增 sanitizeVolumes 并在 sanitizeNovel 接入卷 + 归属消毒**
 
 在 `electron/main/index.ts` 靠近其它 `sanitize*` 函数处加入卷消毒（合法条目归一 order 为 0..n-1，非法条目丢弃）：
 
@@ -156,7 +156,7 @@ function normalizeChapterGroupOrder(chapters: Chapter[], volumes: Volume[]): Cha
 
 在 `sanitizeNovel` 返回对象里 `chapters,` 之前加入 `volumes,`，把 `version: 6,`（~758）改为 `version: 7,`。删除原章节消毒尾部的 `.sort((a, b) => a.order - b.order)`（已由 `normalizeChapterGroupOrder` 接管）。
 
-- [ ] **Step 4: 主进程 createNovel 与 Web fallback 初始化 volumes: [] / v7**
+- [x] **Step 4: 主进程 createNovel 与 Web fallback 初始化 volumes: [] / v7**
 
 在 `electron/main/index.ts` 的 `createNovel`（~868-880）的 novel 字面量里 `chapters: [],` 之前加入 `volumes: [],`，把 `version: 6,`（~879）改为 `version: 7,`。
 
@@ -183,7 +183,7 @@ function sanitizeWebVolumes(value: unknown[]): Volume[] {
 
 并在 `normalizeWebNovel` 里对章节 `volumeId` 做“命中合法卷 id 才保留”的降级（与 Electron 同义）。若 `rendererBridge` 现有 `normalizeWebNovel` 直接透传 `value.chapters`，改为 map 一遍把无效 `volumeId` 置 `undefined`。
 
-- [ ] **Step 5: 构建确认四副本一致**
+- [x] **Step 5: 构建确认四副本一致**
 
 Run:
 
@@ -193,7 +193,7 @@ npm.cmd run build
 
 Expected: renderer Vite 与 Electron tsc 均成功，exit code 0；无 `version: 6` 残留导致的字面量类型不匹配错误。
 
-- [ ] **Step 6: 提交 schema v7 原子变更**
+- [x] **Step 6: 提交 schema v7 原子变更**
 
 ```powershell
 git add src/types/novel.ts electron/preload/bridgeTypes.ts electron/main/index.ts src/services/rendererBridge.ts
