@@ -1,6 +1,6 @@
 workflow: full
 language: zh-CN
-phase: verify
+phase: archive
 context_compression: off
 build_mode: direct
 build_pause: null
@@ -15,10 +15,10 @@ design_doc: docs/superpowers/specs/2026-07-13-persist-emotion-graph-design.md
 plan: docs/superpowers/plans/2026-07-13-persist-emotion-graph.md
 verify_result: pass
 verification_report: docs/superpowers/reports/2026-07-13-persist-emotion-graph-verify.md
-branch_status: pending
+branch_status: handled
 created_at: 2026-07-13
-verified_at: null
-archived: false
+verified_at: 2026-07-13
+archived: true
 direct_override: true
 handoff_context: openspec/changes/persist-emotion-graph/.comet/handoff/design-context.json
 handoff_hash: 5c0dff8f42d28b5208474837346145f4aacaa1a80fa735117bba6e0aa56d0be2

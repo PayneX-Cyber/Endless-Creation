@@ -2,6 +2,7 @@
 change: persist-emotion-graph
 design-doc: docs/superpowers/specs/2026-07-13-persist-emotion-graph-design.md
 base-ref: ad1fee0763d89d3ee262cac431d1034e1bb19f8c
+archived-with: 2026-07-14-persist-emotion-graph
 ---
 
 # 情感曲线与人物图谱统一持久化 Implementation Plan
@@ -23,6 +24,7 @@ base-ref: ad1fee0763d89d3ee262cac431d1034e1bb19f8c
 - 旧存储键只能使用全名 `endless-creation.novel-emotion-arcs` 与 `endless-creation.novel-character-graphs`。
 - 不新增依赖、IPC、导出格式或伏笔候选持久化；不得改动平台目录或 `skills-lock.json`。
 
+archived-with: 2026-07-14-persist-emotion-graph
 ---
 
 ### Task 1: 提升分析成果类型并同步 Novel v6 四副本
@@ -609,3 +611,4 @@ git commit -m "chore: complete persist emotion graph tasks"
 5. 字段已有且旧条目合法时清理崩溃残留；坏条目不删。
 6. 重开仍保留成果，导出 `novel.json` 含两字段。
 7. v4/v5 小说升为 v6，章节、设定、伏笔、钉选数据不丢。
+

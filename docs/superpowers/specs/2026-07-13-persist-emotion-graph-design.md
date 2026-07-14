@@ -2,6 +2,8 @@
 comet_change: persist-emotion-graph
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-07-14-persist-emotion-graph
+status: final
 ---
 
 # 情感曲线与人物图谱统一持久化技术设计
@@ -89,3 +91,4 @@ canonical_spec: openspec
 ## 非目标
 
 不持久化伏笔 AI 候选，不迁移模型/API 应用级配置，不新增 IPC、依赖、向量库或新的导出格式。
+
