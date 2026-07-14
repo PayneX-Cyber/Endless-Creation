@@ -503,32 +503,58 @@ function normalizeCharacterGraph(value: unknown): CharacterGraph | undefined {
 }
 
 function sanitizeWebVolumes(value: unknown[]): Volume[] {
+  const now = new Date().toISOString();
   return value
-    .filter((entry): entry is Volume =>
-      Boolean(entry) && typeof entry === 'object'
-      && typeof (entry as Volume).id === 'string'
-      && typeof (entry as Volume).title === 'string')
-    .map((volume) => ({
-      id: volume.id,
-      title: volume.title,
-      order: Number.isFinite(volume.order) ? Number(volume.order) : 0,
-      createdAt: typeof volume.createdAt === 'string' ? volume.createdAt : new Date().toISOString(),
-      updatedAt: typeof volume.updatedAt === 'string' ? volume.updatedAt : new Date().toISOString(),
-    }))
+    .map((entry): Volume | null => {
+      if (!entry || typeof entry !== 'object') return null;
+      const item = entry as Partial<Volume>;
+      if (typeof item.title !== 'string') return null;
+      return {
+        id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : crypto.randomUUID(),
+        title: item.title,
+        order: Number.isFinite(item.order) ? Number(item.order) : 0,
+        createdAt: typeof item.createdAt === 'string' ? item.createdAt : now,
+        updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : now,
+      };
+    })
+    .filter((volume): volume is Volume => volume !== null)
     .sort((a, b) => a.order - b.order)
     .map((volume, order) => ({ ...volume, order }));
+}
+
+function normalizeWebChapterGroupOrder<T extends { volumeId?: string; order: number }>(
+  chapters: T[],
+  volumes: Volume[],
+): T[] {
+  const volumeOrder = new Map(volumes.map((volume) => [volume.id, volume.order]));
+  const withPos = chapters.map((chapter, position) => ({ chapter, position }));
+  const groups = new Map<string, { chapter: T; position: number }[]>();
+  for (const item of withPos) {
+    const key = item.chapter.volumeId && volumeOrder.has(item.chapter.volumeId) ? item.chapter.volumeId : '__unassigned__';
+    const bucket = groups.get(key) ?? [];
+    bucket.push(item);
+    groups.set(key, bucket);
+  }
+  const result: T[] = [];
+  for (const bucket of groups.values()) {
+    bucket
+      .sort((a, b) => (a.chapter.order - b.chapter.order) || (a.position - b.position))
+      .forEach((item, order) => result.push({ ...item.chapter, order }));
+  }
+  return result;
 }
 
 function normalizeWebNovel(value: unknown): Novel | null {
   if (!isNovel(value)) return null;
   const volumes = Array.isArray(value.volumes) ? sanitizeWebVolumes(value.volumes) : [];
   const volumeIds = new Set(volumes.map((volume) => volume.id));
-  const chapters = (Array.isArray(value.chapters) ? value.chapters : []).map((chapter) => {
+  const remappedChapters = (Array.isArray(value.chapters) ? value.chapters : []).map((chapter) => {
     const volumeId = typeof chapter.volumeId === 'string' && chapter.volumeId.trim() && volumeIds.has(chapter.volumeId.trim())
       ? chapter.volumeId.trim()
       : undefined;
     return { ...chapter, volumeId };
   });
+  const chapters = normalizeWebChapterGroupOrder(remappedChapters, volumes);
   return {
     ...value,
     volumes,
