@@ -18,6 +18,7 @@ import { CHAPTER_STATUS_LABEL, CHAPTER_STATUS_ORDER, PROGRESS_LABELS, resolveCha
 import type { ChapterStatus as NovelChapterStatus } from '../../types/novel';
 import { copyWholeBookMarkdown, exportOfflinePackage, exportStoryboardDocFile, exportWholeBookMarkdownFile } from './novelExport';
 import { ChapterSearchPanel, reorderChapters, type ChapterLocateRequest, type ChapterSearchResult } from './novelNavigation';
+import { deleteChapterInStructure, orderedChapters } from './novelStructure';
 import { migrateLegacyNovelAnalysis } from './novelAnalysisPersistence';
 import './NovelCreation.css';
 
@@ -92,7 +93,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
   const graphRequestIdRef = useRef<string | null>(null);
   const graphRunRef = useRef(0);
 
-  const chapters = useMemo(() => [...(currentNovel?.chapters ?? [])].sort((a, b) => a.order - b.order), [currentNovel]);
+  const chapters = useMemo(() => (currentNovel ? orderedChapters(currentNovel) : []), [currentNovel]);
   const graphData = currentNovel?.characterGraph ?? null;
   const selectedTextModel = useMemo(() => resolveTextModel(modelPreferences, apiProviderStore), [apiProviderStore, modelPreferences]);
   const chatUserTurns = chatMessages.filter((message) => message.role === 'user').length;
@@ -363,12 +364,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
     if (index < 0) return;
     const chapter = chapters[index];
     if (!window.confirm(`确定删除「第 ${index + 1} 章 · ${chapter.title || '未命名章节'}」吗？本章大纲与正文将一并删除，不可恢复。`)) return;
-    const now = new Date().toISOString();
-    updateNovel((novel) => ({
-      ...novel,
-      updatedAt: now,
-      chapters: novel.chapters.filter((item) => item.id !== chapterId).sort((a, b) => a.order - b.order).map((item, order) => ({ ...item, order })),
-    }));
+    updateNovel((novel) => deleteChapterInStructure(novel, chapterId));
     setActiveChapterId((current) => current === chapterId ? null : current);
   }
 
@@ -377,7 +373,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
     const toIndex = fromIndex + offset;
     if (fromIndex < 0 || toIndex < 0 || toIndex >= chapters.length) return;
     const now = new Date().toISOString();
-    updateNovel((novel) => ({ ...novel, chapters: reorderChapters(novel.chapters, fromIndex, toIndex), updatedAt: now }));
+    updateNovel((novel) => ({ ...novel, chapters: reorderChapters(orderedChapters(novel), fromIndex, toIndex), updatedAt: now }));
   }
 
   function dropChapter(targetChapterId: string) {

@@ -107,6 +107,17 @@ export function deleteVolume(novel: Novel, volumeId: string): Novel {
   return { ...detached, chapters: reindexGroups(detached) };
 }
 
+// 删除指定章节后按分组归一各组 order（组内 order 单一事实源），返回新 Novel。
+export function deleteChapterInStructure(novel: Novel, chapterId: string): Novel {
+  if (!novel.chapters.some((chapter) => chapter.id === chapterId)) return novel;
+  const filtered: Novel = {
+    ...novel,
+    chapters: novel.chapters.filter((chapter) => chapter.id !== chapterId),
+    updatedAt: new Date().toISOString(),
+  };
+  return { ...filtered, chapters: reindexGroups(filtered) };
+}
+
 // 统计某卷下的章节数（删除确认文案用）。
 export function countChaptersInVolume(novel: Novel, volumeId: string): number {
   return novel.chapters.filter((chapter) => chapter.volumeId === volumeId).length;
@@ -197,6 +208,14 @@ export function assertNovelStructureSelfCheck(): void {
   const deleteOrderGroup = groupChaptersByVolume(afterDelete).find((g) => g.volume === null);
   if ((deleteOrderGroup?.chapters ?? []).some((c, order) => c.order !== order)) {
     throw new Error('structure self-check: delete volume chapter reindex');
+  }
+
+  // 删除章节后组内 order 归一：从含 3 章的卷删中间章，剩余两章 order 从 0 重排
+  const afterChapterDelete = deleteChapterInStructure(sourceHeavy, 'b');
+  const remainGroup = groupChaptersByVolume(afterChapterDelete).find((g) => g.volume?.id === 'v1');
+  if (afterChapterDelete.chapters.length !== 2
+    || remainGroup?.chapters.map((c) => `${c.id}:${c.order}`).join(',') !== 'a:0,c:1') {
+    throw new Error('structure self-check: delete chapter reindex');
   }
 }
 

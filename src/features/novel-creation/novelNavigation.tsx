@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Chapter, Novel } from '../../types/novel';
+import { orderedChapters } from './novelStructure';
 
 export type ChapterSearchField = 'content' | 'title' | 'outline';
 
@@ -28,7 +29,7 @@ const FIELD_LABEL: Record<ChapterSearchField, string> = {
 };
 
 export function reorderChapters(chapters: Chapter[], fromIndex: number, toIndex: number): Chapter[] {
-  const ordered = [...chapters].sort((a, b) => a.order - b.order);
+  const ordered = [...chapters];
   if (fromIndex < 0 || fromIndex >= ordered.length || toIndex < 0 || toIndex >= ordered.length) return ordered;
   const [moved] = ordered.splice(fromIndex, 1);
   ordered.splice(toIndex, 0, moved);
@@ -39,7 +40,7 @@ export function searchChapters(novel: Novel, keyword: string): ChapterSearchResu
   const query = keyword.trim();
   if (!query) return [];
   const normalizedQuery = query.toLocaleLowerCase();
-  return [...novel.chapters].sort((a, b) => a.order - b.order).flatMap((chapter, index) => {
+  return orderedChapters(novel).flatMap((chapter, index) => {
     const fields: [ChapterSearchField, string][] = [
       ['content', chapter.content],
       ['title', chapter.title],
@@ -108,8 +109,8 @@ function assertNovelNavigationSelfCheck(): void {
     { id: 'a', title: 'Alpha', content: 'First', outline: 'keyword outline', order: 0 },
   ] as Chapter[];
   const reordered = reorderChapters(chapters, 1, 0);
-  const results = searchChapters({ chapters } as Novel, 'keyword');
-  if (reordered.map((chapter) => `${chapter.id}:${chapter.order}`).join(',') !== 'b:0,a:1'
+  const results = searchChapters({ chapters, volumes: [] } as unknown as Novel, 'keyword');
+  if (reordered.map((chapter) => `${chapter.id}:${chapter.order}`).join(',') !== 'a:0,b:1'
     || results.length !== 2
     || results.some((result) => !result.snippet.toLocaleLowerCase().includes('keyword'))) {
     throw new Error('Novel navigation self-check failed.');

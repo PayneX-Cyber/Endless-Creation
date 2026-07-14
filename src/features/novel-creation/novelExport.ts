@@ -1,6 +1,7 @@
 import { rendererBridge } from '../../services/rendererBridge';
 import { assertStoreZipSelfCheck, createStoreZip, textToBytes, type StoreZipEntry } from '../../services/storeZip';
 import type { Novel } from '../../types/novel';
+import { orderedChapters } from './novelStructure';
 
 export async function copyWholeBookMarkdown(novel: Novel): Promise<void> {
   const markdown = buildWholeBookMarkdown(novel);
@@ -100,9 +101,11 @@ function buildOfflinePackageFiles(novel: Novel): StoreZipEntry[] {
 
 function buildStoryboardDocHtml(novel: Novel): string | null {
   const title = novel.title.trim() || '未命名小说';
-  const chapters = novel.chapters.slice().sort((a, b) => a.order - b.order);
+  const chapters = orderedChapters(novel);
   const chapterTitleById = new Map(chapters.map((chapter) => [chapter.id, chapter.title.trim() || '未命名章节']));
-  const filledChapters = chapters.filter((chapter) => chapter.content.trim() || chapter.outline?.trim());
+  const filledChapters = chapters
+    .map((chapter, index) => ({ chapter, index }))
+    .filter(({ chapter }) => chapter.content.trim() || chapter.outline?.trim());
   const hasOverview = Boolean(novel.summary.trim() || novel.idea?.trim() || novel.blueprint?.trim());
   if (!filledChapters.length && !hasOverview && !novel.foreshadowings.length) return null;
 
@@ -114,8 +117,8 @@ function buildStoryboardDocHtml(novel: Novel): string | null {
   if (novel.blueprint?.trim()) overview.push(`<h3>蓝图</h3>${docParagraphs(novel.blueprint)}`);
   if (overview.length) sections.push(overview.join(''));
 
-  for (const chapter of filledChapters) {
-    sections.push(`<h2>第 ${chapter.order + 1} 章 · ${escapeDocHtml(chapter.title.trim() || '未命名章节')}</h2>`);
+  for (const { chapter, index } of filledChapters) {
+    sections.push(`<h2>第 ${index + 1} 章 · ${escapeDocHtml(chapter.title.trim() || '未命名章节')}</h2>`);
     if (chapter.outline?.trim()) sections.push(`<h4>大纲</h4>${docParagraphs(chapter.outline)}`);
     if (chapter.content.trim()) sections.push(docParagraphs(chapter.content));
   }
@@ -138,12 +141,14 @@ function buildStoryboardDocHtml(novel: Novel): string | null {
 }
 
 function buildWholeBookMarkdown(novel: Novel): string | null {
-  const chapters = novel.chapters.filter((chapter) => chapter.content.trim()).sort((a, b) => a.order - b.order);
+  const chapters = orderedChapters(novel)
+    .map((chapter, index) => ({ chapter, index }))
+    .filter(({ chapter }) => chapter.content.trim());
   if (!chapters.length) return null;
   const parts = [`# ${novel.title.trim() || '未命名小说'}`];
   if (novel.summary.trim()) parts.push(novel.summary.trim());
-  for (const chapter of chapters) {
-    parts.push(`## 第 ${chapter.order + 1} 章 · ${chapter.title.trim() || '未命名章节'}`, chapter.content.trim());
+  for (const { chapter, index } of chapters) {
+    parts.push(`## 第 ${index + 1} 章 · ${chapter.title.trim() || '未命名章节'}`, chapter.content.trim());
   }
   return parts.join('\n\n');
 }
