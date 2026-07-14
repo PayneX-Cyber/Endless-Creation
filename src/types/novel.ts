@@ -6,6 +6,14 @@ export interface ChapterVersion {
 
 export type ChapterStatus = 'draft' | 'inProgress' | 'done';
 
+export interface Volume {
+  id: string;
+  title: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Chapter {
   id: string;
   title: string;
@@ -15,6 +23,7 @@ export interface Chapter {
   selectedVersionId?: string;
   status?: ChapterStatus;
   wordTarget?: number;
+  volumeId?: string;
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -80,6 +89,7 @@ export interface Novel {
   idea?: string;
   blueprint?: string;
   wordTarget?: number;
+  volumes: Volume[];
   chapters: Chapter[];
   foreshadowings: Foreshadowing[];
   settings?: SettingEntry[];
@@ -87,7 +97,7 @@ export interface Novel {
   pinnedForeshadowingIds?: string[];
   emotionArc?: EmotionArc;
   characterGraph?: CharacterGraph;
-  version: 6;
+  version: 7;
   createdAt: string;
   updatedAt: string;
 }

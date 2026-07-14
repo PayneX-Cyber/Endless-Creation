@@ -11,7 +11,7 @@ import type {
   ApiTextGenerationResult,
   TextStreamEvent,
 } from '../types/apiProvider';
-import type { CharacterGraph, EmotionArc, Novel, NovelListResult, NovelResult } from '../types/novel';
+import type { CharacterGraph, EmotionArc, Novel, NovelListResult, NovelResult, Volume } from '../types/novel';
 import type { ThemeMode } from '../types/workspace';
 
 const THEME_STORAGE_KEY = 'ec-theme';
@@ -348,12 +348,13 @@ export const rendererBridge = {
       summary: input.summary?.trim() ?? '',
       note: input.note?.trim() ?? '',
       projectId: input.projectId?.trim() || 'default',
+      volumes: [],
       chapters: [],
       foreshadowings: [],
       settings: [],
       pinnedSettingIds: [],
       pinnedForeshadowingIds: [],
-      version: 6,
+      version: 7,
       createdAt: now,
       updatedAt: now,
     };
@@ -501,18 +502,44 @@ function normalizeCharacterGraph(value: unknown): CharacterGraph | undefined {
     : undefined;
 }
 
+function sanitizeWebVolumes(value: unknown[]): Volume[] {
+  return value
+    .filter((entry): entry is Volume =>
+      Boolean(entry) && typeof entry === 'object'
+      && typeof (entry as Volume).id === 'string'
+      && typeof (entry as Volume).title === 'string')
+    .map((volume) => ({
+      id: volume.id,
+      title: volume.title,
+      order: Number.isFinite(volume.order) ? Number(volume.order) : 0,
+      createdAt: typeof volume.createdAt === 'string' ? volume.createdAt : new Date().toISOString(),
+      updatedAt: typeof volume.updatedAt === 'string' ? volume.updatedAt : new Date().toISOString(),
+    }))
+    .sort((a, b) => a.order - b.order)
+    .map((volume, order) => ({ ...volume, order }));
+}
+
 function normalizeWebNovel(value: unknown): Novel | null {
   if (!isNovel(value)) return null;
+  const volumes = Array.isArray(value.volumes) ? sanitizeWebVolumes(value.volumes) : [];
+  const volumeIds = new Set(volumes.map((volume) => volume.id));
+  const chapters = (Array.isArray(value.chapters) ? value.chapters : []).map((chapter) => {
+    const volumeId = typeof chapter.volumeId === 'string' && chapter.volumeId.trim() && volumeIds.has(chapter.volumeId.trim())
+      ? chapter.volumeId.trim()
+      : undefined;
+    return { ...chapter, volumeId };
+  });
   return {
     ...value,
-    chapters: Array.isArray(value.chapters) ? value.chapters : [],
+    volumes,
+    chapters,
     foreshadowings: Array.isArray(value.foreshadowings) ? value.foreshadowings : [],
     settings: Array.isArray(value.settings) ? value.settings : [],
     pinnedSettingIds: Array.isArray(value.pinnedSettingIds) ? value.pinnedSettingIds : [],
     pinnedForeshadowingIds: Array.isArray(value.pinnedForeshadowingIds) ? value.pinnedForeshadowingIds : [],
     emotionArc: normalizeEmotionArc(value.emotionArc),
     characterGraph: normalizeCharacterGraph(value.characterGraph),
-    version: 6,
+    version: 7,
   };
 }
 
