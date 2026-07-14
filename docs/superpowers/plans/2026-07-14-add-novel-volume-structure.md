@@ -690,7 +690,7 @@ git commit -m "fix: harden volume structure persistence boundaries"
 - Consumes: Task 1-5 全部实现。
 - Produces: 可交给 Comet verify 阶段的新鲜证据。
 
-- [ ] **Step 1: 双端构建**
+- [x] **Step 1: 双端构建**
 
 ```powershell
 npm.cmd run build
@@ -698,7 +698,7 @@ npm.cmd run build
 
 Expected: renderer tsc + Vite 与 Electron tsc 全部 exit 0。
 
-- [ ] **Step 2: 文本完整性扫描**
+- [x] **Step 2: 文本完整性扫描**
 
 ```powershell
 python "C:\Users\x1176\.codex\skills\endless-creation-guardrails\scripts\scan_text_integrity.py" "F:\AIProject\Endless Creation\src"
@@ -706,7 +706,7 @@ python "C:\Users\x1176\.codex\skills\endless-creation-guardrails\scripts\scan_te
 
 Expected: 输出 `TEXT INTEGRITY OK`，无 U+FFFD / 乱码。
 
-- [ ] **Step 3: diff 空白检查与 OpenSpec 校验**
+- [x] **Step 3: diff 空白检查与 OpenSpec 校验**
 
 ```powershell
 git diff --check
