@@ -175,12 +175,29 @@ export function assertNovelStructureSelfCheck(): void {
   const v1Group = groupChaptersByVolume(moved).find((g) => g.volume?.id === 'v1');
   if (v1Group?.chapters.map((c) => `${c.id}:${c.order}`).join(',') !== 'u:0,x:1') throw new Error('structure self-check: cross-volume move');
 
+  // 跨卷移动源侧归一：从含 3 章的卷移出首章，剩余两章 order 从 0 重排
+  const sourceHeavy = base({
+    volumes: [vol('v1', 0)],
+    chapters: [ch('a', 0, 'v1'), ch('b', 1, 'v1'), ch('c', 2, 'v1')],
+  });
+  const afterSourceMove = moveChapterInStructure(sourceHeavy, 'a', { volumeId: null, toIndex: 0 });
+  const sourceGroup = groupChaptersByVolume(afterSourceMove).find((g) => g.volume?.id === 'v1');
+  if (sourceGroup?.chapters.map((c) => `${c.id}:${c.order}`).join(',') !== 'b:0,c:1') {
+    throw new Error('structure self-check: source-side move reindex');
+  }
+
   // 删除卷不删章，章节移入未分卷
   const afterDelete = deleteVolume(mixed, 'v1');
   if (afterDelete.chapters.length !== 3 || afterDelete.chapters.find((c) => c.id === 'x')?.volumeId !== undefined) {
     throw new Error('structure self-check: delete volume keeps chapters');
   }
   if (afterDelete.volumes.length !== 1 || afterDelete.volumes[0].order !== 0) throw new Error('structure self-check: delete volume reindex');
+
+  // 删除卷后受影响分组 order 归一：脱卷章节在未分卷组内从 0 起连续
+  const deleteOrderGroup = groupChaptersByVolume(afterDelete).find((g) => g.volume === null);
+  if ((deleteOrderGroup?.chapters ?? []).some((c, order) => c.order !== order)) {
+    throw new Error('structure self-check: delete volume chapter reindex');
+  }
 }
 
 assertNovelStructureSelfCheck();
