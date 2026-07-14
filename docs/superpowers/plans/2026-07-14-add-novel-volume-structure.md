@@ -554,7 +554,7 @@ git commit -m "feat: route order consumers through orderedChapters"
 - Produces: `VolumeOutline` 组件 props：`{ novel: Novel; activeChapterId: string | null; onSelectChapter: (id: string) => void; onUpdateNovel: (update: (novel: Novel) => Novel) => void }`。
 - 中文文案放 `VolumeOutline.tsx` 内或同目录 `volumeLabels.ts`；`NovelCreation.tsx` 只做状态接线与回调传递，不写卷逻辑。
 
-- [ ] **Step 1: 实现 VolumeOutline 卷管理头部 + 分组列表 + 键盘路径**
+- [x] **Step 1: 实现 VolumeOutline 卷管理头部 + 分组列表 + 键盘路径**
 
 创建 `src/features/novel-creation/VolumeOutline.tsx`。核心结构：顶部“新建卷”按钮（点击 `window.prompt` 或内联输入取 trim 后非空标题，调 `createVolume`）；对 `groupChaptersByVolume(novel)` 渲染每个卷区（正式卷显示卷头：可就地重命名的标题、上移、下移、删除按钮；未分卷 `volume === null` 区无 CRUD 但可作放置目标）。每个卷头按钮带明确 aria-label，分组边界按钮禁用：
 
@@ -599,13 +599,13 @@ export function VolumeOutline({ novel, activeChapterId, onSelectChapter, onUpdat
 }
 ```
 
-- [ ] **Step 2: 实现原生拖拽卷内换位与跨卷放置**
+- [x] **Step 2: 实现原生拖拽卷内换位与跨卷放置**
 
 在 VolumeOutline 的章节行加 `draggable`、`onDragStart`（记录被拖 chapterId 到 `dataTransfer`）；卷区/未分卷区容器加 `onDragOver`（`event.preventDefault()` + 设置放置态视觉）与 `onDrop`（读取 chapterId，计算目标 volumeId 与落点 index，调 `moveChapterInStructure`）。三种入口（拖拽 / 上下移按钮 / 归属 select）都收敛到 `moveChapterInStructure` / `reorderVolumes`，不得出现第二套 order 语义。每个卷区在 `dragOver` 时给明确放置目标反馈（如高亮边框），`dragLeave`/`drop` 后清除。
 
 章节卷内上下移用 `moveChapterInStructure(novel, chapterId, { volumeId: currentGroupVolumeId, toIndex: currentIndex ± 1 })`，组边界（首/末）禁用对应按钮。
 
-- [ ] **Step 3: “章节大纲”页接入 VolumeOutline，工作台与“章节内容”页只读分组**
+- [x] **Step 3: “章节大纲”页接入 VolumeOutline，工作台与“章节内容”页只读分组**
 
 在 `NovelCreation.tsx`：
 - 导入 `import { VolumeOutline } from './VolumeOutline';`。
@@ -614,11 +614,11 @@ export function VolumeOutline({ novel, activeChapterId, onSelectChapter, onUpdat
 
 在 `ChapterWorkbench.tsx` 左栏章节导航（~1136 `chapters.map`）改为：接收/派生 `groupChaptersByVolume` 结果，渲染只读卷标题分组 + 章节，维持 active chapter 高亮、搜索定位、生成中 busy gate 与正文编辑流程；不改 `activeChapterId` 语义、不引入卷 CRUD。工作台需要的分组数据可从传入的 `novel` 现算，或由父级传 `groups`。
 
-- [ ] **Step 4: 卷区/放置目标/空态/响应式样式 + a11y**
+- [x] **Step 4: 卷区/放置目标/空态/响应式样式 + a11y**
 
 在 novel 相关 css 加入：卷区卡片样式、`dragOver` 放置目标高亮类、空卷占位文案样式（“本卷暂无章节”）、未分卷区样式、窄屏响应式（按钮换行不重叠）。确认上移/下移/删除/归属 select 均有 `aria-label`；分组边界按钮 `disabled`；键盘用户无需拖拽即可用“上移/下移 + 归属 select”完成全部结构操作。
 
-- [ ] **Step 5: 构建并提交卷管理 UI**
+- [x] **Step 5: 构建并提交卷管理 UI**
 
 ```powershell
 npm.cmd run build
