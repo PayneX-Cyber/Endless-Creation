@@ -643,7 +643,7 @@ git commit -m "feat: add volume management and grouped navigation UI"
 - Consumes: Task 1-4 的全部实现。
 - Produces: 无新代码；确认无卷专用 IPC、无新依赖。
 
-- [ ] **Step 1: 确认所有卷/结构变更走现有保存链，无新 IPC**
+- [x] **Step 1: 确认所有卷/结构变更走现有保存链，无新 IPC**
 
 Run:
 
@@ -653,7 +653,7 @@ Get-ChildItem src, electron -Recurse -File | Select-String -Pattern "createVolum
 
 Expected: 零命中——卷 CRUD/排序/归卷/重排全部经 `novelStructure.ts` 纯函数生成新 Novel → `updateNovel` → 600ms 自动保存 → `saveNovel(novel)`，未新增任何卷专用 IPC。确认 `VolumeOutline` 的 `onUpdateNovel` 最终连到 `NovelCreation` 的 `updateNovel`。
 
-- [ ] **Step 2: 边界回归自检（运行时或临时脚本，不提交脚本）**
+- [x] **Step 2: 边界回归自检（运行时或临时脚本，不提交脚本）**
 
 用临时 Node 脚本 import `novelStructure.ts` 与主进程 `sanitizeNovel` 的等价逻辑，覆盖：
 
@@ -668,7 +668,7 @@ Expected: 零命中——卷 CRUD/排序/归卷/重排全部经 `novelStructure.
 
 Expected: 全部通过，`chapterId`、正文、`versions`、伏笔/情感/图谱引用数据零丢失。
 
-- [ ] **Step 3: 提交边界确认（若无源码改动则跳过提交）**
+- [x] **Step 3: 提交边界确认（若无源码改动则跳过提交）**
 
 若 Step 1/2 暴露缺陷需修复，修复后：
 

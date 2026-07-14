@@ -220,7 +220,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
     }
     const novel = await migrateLegacyNovelAnalysis(result.novel, window.localStorage, (next) => novelService.saveNovel(next));
     setCurrentNovel(novel);
-    setActiveChapterId(novel.chapters[0]?.id ?? null);
+    setActiveChapterId(orderedChapters(novel)[0]?.id ?? null);
     setSaveStatus('saved');
     setFeedback('');
     return true;
