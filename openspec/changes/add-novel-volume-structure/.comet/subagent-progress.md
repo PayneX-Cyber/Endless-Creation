@@ -43,3 +43,11 @@ base_ref: 6dc6c496a824fcacf9071cc2eaa54b296afb6cd9
   - Residual `.sort((a, b) => a.order - b.order)` sites are volume sanitizers in Electron/Web migration, not whole-book chapter consumers.
   - Main build and text-integrity scan passed.
 - Task 3: COMPLETE — checked off OpenSpec 3.1-3.4 + plan Task 3 steps 1-7
+- Task 4: implementer DONE (757d7e9 add volume mgmt+grouped nav UI, 266146d fix preserve volume order on open); per-task review NOT recorded in ledger (prior session drift)
+- Task 4: COMPLETE per git — checked off OpenSpec 4.1-4.4 + plan Task 4
+- Task 5: COMPLETE per git — persistence via existing updateNovel->saveNovel chain; OpenSpec 5.1-5.2 checked
+- Task 6 (verify prep): build green + text-integrity OK + git diff --check clean recorded (5b3258a); 6.1/6.2/6.3 checked; 6.4 pending (this commit)
+- FINAL whole-branch thorough review DONE (base 6dc6c49 -> working tree incl uncommitted CSS): verdict READY TO MERGE = Yes
+  - Critical: none (prior wrong-chapter-move bug confirmed resolved: dropChapter/moveChapter deleted, routed through moveChapterInStructure)
+  - Important (1, non-blocking): novelStructure.ts self-check lacks explicit same-order intra-group stable-tiebreak fixture (brief lists "stable sort" as required coverage) -> dispatching fix
+  - Minor roll-up (final triage -> accept, no fix): (a) reorderChapters export now dead in novelNavigation.tsx (only self-check refs it); (b) VolumeOutline select options render in raw array order not Volume.order (cosmetic, assignment still correct); (c) addChapter sets order=chapters.length not group size (benign, renormalized next structure op); (d) migration flat-array cross-group order follows first-appearance (benign, orderedChapters re-derives display order)

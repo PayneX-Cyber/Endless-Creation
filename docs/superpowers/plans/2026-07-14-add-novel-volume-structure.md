@@ -715,7 +715,7 @@ npx.cmd openspec validate add-novel-volume-structure --strict
 
 Expected: 两条命令均 exit 0。
 
-- [ ] **Step 4: GUI 真机验收清单（进入 verify 阶段执行）**
+- [x] **Step 4: GUI 真机验收清单（进入 verify 阶段执行）**
 
 覆盖 spec 场景：
 1. 卷 CRUD：新建卷（空标题被拒）、就地重命名、删除卷弹 `window.confirm` 且文案含受影响章节数、章节移入未分卷、正文不删。

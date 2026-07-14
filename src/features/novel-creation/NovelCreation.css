@@ -880,6 +880,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .novel-outline-card__progress {
@@ -2226,6 +2227,20 @@
 .novel-outline-card__actions {
   display: flex;
   gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.novel-outline-card__actions .novel-flow__ghost {
+  flex: none;
+  padding-inline: 10px;
+  white-space: nowrap;
+}
+
+.novel-outline-card__actions select {
+  flex: 0 0 180px;
+  width: 180px;
 }
 
 .novel-outline-entry__marker {
@@ -2311,9 +2326,10 @@
 
 .novel-volume__head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  flex-wrap: wrap;
   padding: 12px 14px;
   border-bottom: 1px solid var(--border);
 }
@@ -2324,6 +2340,23 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.novel-volume__title {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.novel-volume__actions {
+  flex: none;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.novel-volume__actions .novel-flow__ghost {
+  padding-inline: 10px;
+  white-space: nowrap;
 }
 
 .novel-volume__title > span,

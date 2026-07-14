@@ -33,5 +33,5 @@
 
 - [x] 6.1 运行 `npm.cmd run build`，确保 renderer tsc + Vite 与 Electron tsc 全部 exit 0
 - [x] 6.2 运行文本完整性扫描 `python "C:\Users\x1176\.codex\skills\endless-creation-guardrails\scripts\scan_text_integrity.py" "F:\AIProject\Endless Creation\src"` 并得到 `TEXT INTEGRITY OK`；运行 `git diff --check` 无空白错误
-- [ ] 6.3 GUI 真机验收 spec 场景：卷 CRUD/确认删除、卷排序、归卷/移出/跨卷、拖拽与键盘路径、未分卷末尾、重启持久化、搜索章号及导出/Prompt/统计/图谱顺序一致
-- [ ] 6.4 逐项勾选 tasks 后，仅提交本 change 的源文件与 artifacts，保持平台/工具未跟踪目录不入库，并以单个 coherent feature commit 收口
+- [x] 6.3 GUI 真机验收 spec 场景：卷 CRUD/确认删除、卷排序、归卷/移出/跨卷、拖拽与键盘路径、未分卷末尾、重启持久化、搜索章号及导出/Prompt/统计/图谱顺序一致
+- [x] 6.4 逐项勾选 tasks 后，仅提交本 change 的源文件与 artifacts，保持平台/工具未跟踪目录不入库，并以单个 coherent feature commit 收口

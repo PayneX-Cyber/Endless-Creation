@@ -181,6 +181,15 @@ export function assertNovelStructureSelfCheck(): void {
   const orphan = base({ volumes: [vol('v1', 0)], chapters: [ch('o', 0, 'ghost'), ch('p', 0, 'v1')] });
   if (orderedChapters(orphan).map((c) => c.id).join(',') !== 'p,o') throw new Error('structure self-check: orphan volumeId');
 
+  // order 相同以原数组位置稳定兜底：同 order 卷按数组顺序，卷内同 order 章节按数组顺序
+  const tie = base({
+    volumes: [vol('vB', 0), vol('vA', 0)],
+    chapters: [ch('a', 5, 'vB'), ch('b', 5, 'vB'), ch('c', 5, 'vA')],
+  });
+  if (orderedChapters(tie).map((c) => c.id).join(',') !== 'a,b,c') {
+    throw new Error('structure self-check: equal-order position tiebreak');
+  }
+
   // 跨卷移动：双侧分组 order 归一
   const moved = moveChapterInStructure(mixed, 'u', { volumeId: 'v1', toIndex: 0 });
   const v1Group = groupChaptersByVolume(moved).find((g) => g.volume?.id === 'v1');
