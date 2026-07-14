@@ -726,11 +726,11 @@ Expected: 两条命令均 exit 0。
 6. 顺序一致性：跨章搜索章号、导出（HTML/md/离线包）章节顺序与章号、前一章 Prompt 上下文、统计“第 N 章”、情感曲线/人物图谱输入，均与卷序展开一致。
 7. 结构调整不中断编辑会话（Spec Patch 两场景）：归卷/跨卷移动保持编辑会话；删激活章所在卷后仍可继续编辑同一章（`activeChapterId` 不变、撤销/重做栈不清）。
 
-- [ ] **Step 5: 逐项勾选 OpenSpec tasks.md**
+- [x] **Step 5: 逐项勾选 OpenSpec tasks.md**
 
 仅在对应实现与命令已有证据后，把 `openspec/changes/add-novel-volume-structure/tasks.md` 的全部 6 组条目改为 `[x]`。
 
-- [ ] **Step 6: 单个 coherent feature commit 收口**
+- [x] **Step 6: 单个 coherent feature commit 收口**
 
 仅提交本 change 的源文件与 artifacts；平台/工具未跟踪目录（`.agent/`、`.agents/`、`.claude/`、`.codegraph/`、`.codex/`、`skills-lock.json` 等）不入库。
 
