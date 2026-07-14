@@ -217,7 +217,7 @@ git commit -m "feat: add novel volume schema v7 with compatible migration"
 - Produces: `countChaptersInVolume(novel: Novel, volumeId: string): number`（删除确认文案用）。
 - Produces: `assertNovelStructureSelfCheck(): void`（文件尾调用）。
 
-- [ ] **Step 1: 写展开与分组纯函数**
+- [x] **Step 1: 写展开与分组纯函数**
 
 创建 `src/features/novel-creation/novelStructure.ts`。先写 import 与分组核心：
 
@@ -263,7 +263,7 @@ export function orderedChapters(novel: Novel): Chapter[] {
 }
 ```
 
-- [ ] **Step 2: 写卷 CRUD 与章节结构变更纯函数**
+- [x] **Step 2: 写卷 CRUD 与章节结构变更纯函数**
 
 在同文件继续加入卷序归一辅助与全部变更函数。所有函数返回新 `Novel`，并刷新受影响对象 `updatedAt`：
 
@@ -363,7 +363,7 @@ export function moveChapterInStructure(
 }
 ```
 
-- [ ] **Step 3: 写模块自检并在文件尾调用**
+- [x] **Step 3: 写模块自检并在文件尾调用**
 
 沿用项目 `emotionArc.ts` 的 `assertXxxSelfCheck()` 模式。加入并在文件末尾直接调用：
 
@@ -409,7 +409,7 @@ export function assertNovelStructureSelfCheck(): void {
 assertNovelStructureSelfCheck();
 ```
 
-- [ ] **Step 4: 构建并运行自检（自检在模块导入时执行）**
+- [x] **Step 4: 构建并运行自检（自检在模块导入时执行）**
 
 Run:
 
@@ -419,7 +419,7 @@ npm.cmd run build
 
 Expected: exit code 0；若自检失败，Vite/tsc 之外的运行断言会在开发运行时抛错，构建期先确保类型与语法通过。另可选用临时 Node 脚本 import 该模块触发 `assertNovelStructureSelfCheck` 验证不抛错，脚本不提交。
 
-- [ ] **Step 5: 提交结构纯函数模块**
+- [x] **Step 5: 提交结构纯函数模块**
 
 ```powershell
 git add src/features/novel-creation/novelStructure.ts
@@ -440,7 +440,7 @@ git commit -m "feat: add volume-aware chapter structure functions"
 - Consumes: Task 2 的 `orderedChapters(novel)`。
 - Produces: 无新导出；所有全书顺序点改为 `orderedChapters(novel)` 结果的 `index + 1` 与切片。
 
-- [ ] **Step 1: 导航与搜索改走统一卷序**
+- [x] **Step 1: 导航与搜索改走统一卷序**
 
 在 `novelNavigation.tsx` 顶部加入 `import { orderedChapters } from './novelStructure';`。把 `searchChapters`（~42）的 `[...novel.chapters].sort((a, b) => a.order - b.order)` 改为 `orderedChapters(novel)`：
 
@@ -460,7 +460,7 @@ export function reorderChapters(chapters: Chapter[], fromIndex: number, toIndex:
 }
 ```
 
-- [ ] **Step 2: 导出改走统一卷序并用展开索引生成章号**
+- [x] **Step 2: 导出改走统一卷序并用展开索引生成章号**
 
 在 `novelExport.ts` 顶部加入 `import { orderedChapters } from './novelStructure';`。
 - HTML 导出（~103）`const chapters = novel.chapters.slice().sort((a, b) => a.order - b.order);` 改为 `const chapters = orderedChapters(novel);`。
@@ -477,7 +477,7 @@ export function reorderChapters(chapters: Chapter[], fromIndex: number, toIndex:
 
 （保证空正文章节不占用后续章号——若 spec 要求“第 N 章”对齐全书序号，则改为对全量展开数组取 index 后再 filter；按 D7“章号来自统一展开索引”，此处以过滤后连续编号即可，实现时与现状行为保持一致：现状 md 用 `chapter.order + 1` 即原全局序号，改为 `orderedChapters` 展开数组的全局 index + 1，filter 不改变 index。）确认最终写法：先 `orderedChapters(novel).map((chapter, index) => ({ chapter, index }))`，再 `.filter(({ chapter }) => chapter.content.trim())`，章号用 `index + 1`。
 
-- [ ] **Step 3: Prompt 前文上下文与章号 map 改走统一卷序**
+- [x] **Step 3: Prompt 前文上下文与章号 map 改走统一卷序**
 
 在 `novelPrompts.ts` 顶部加入 `import { orderedChapters } from './novelStructure';`。
 - 章号 label map（~448）`novel.chapters.map((item, index) => ...)` 改为 `orderedChapters(novel).map((item, index) => [item.id, ...])`。
@@ -499,11 +499,11 @@ function buildPreviousChapterContext(novel: Novel, currentChapter: Chapter): str
 
 章号 `第 ${chapter.order + 1} 章`（~541）改为该章在 `ordered` 中的 `index + 1`（用 `ordered.indexOf(chapter) + 1` 或在 slice 时保留 index）。
 
-- [ ] **Step 4: 统计改走统一卷序**
+- [x] **Step 4: 统计改走统一卷序**
 
 在 `NovelStats.tsx` 顶部加入 `import { orderedChapters } from './novelStructure';`，把 `const ordered = [...novel.chapters].sort((a, b) => a.order - b.order);`（~22）改为 `const ordered = orderedChapters(novel);`。其余 `ordered.map/reduce/filter` 逻辑不变（统计与顺序相关但字段引用不变）。
 
-- [ ] **Step 5: NovelCreation 顶层 chapters 派生与删章 reindex 改走卷序**
+- [x] **Step 5: NovelCreation 顶层 chapters 派生与删章 reindex 改走卷序**
 
 在 `NovelCreation.tsx` 顶部加入 `import { orderedChapters } from './novelStructure';`。
 - 顶层 `const chapters = useMemo(() => [...(currentNovel?.chapters ?? [])].sort((a, b) => a.order - b.order), [currentNovel]);`（~95）改为 `const chapters = useMemo(() => (currentNovel ? orderedChapters(currentNovel) : []), [currentNovel]);`。
@@ -515,7 +515,7 @@ function buildPreviousChapterContext(novel: Novel, currentChapter: Chapter): str
 
 其中在 `novelStructure.ts` 追加导出 `deleteChapterInStructure(novel: Novel, chapterId: string): Novel`（filter 掉该章后复用 `reindexGroups`），并在此调用替换。若不新增函数，则内联：filter 掉章节后按 `groupChaptersByVolume` 重排每组 order。优先追加 `deleteChapterInStructure` 到 Task 2 模块并在此调用（保持组内 order 单一事实源）。
 
-- [ ] **Step 6: 扫描残留全局 order 排序点并确认与顺序无关逻辑未误改**
+- [x] **Step 6: 扫描残留全局 order 排序点并确认与顺序无关逻辑未误改**
 
 Run:
 
@@ -528,7 +528,7 @@ Expected:
 - `characterGraph.ts:30`（无序拼接，D3 豁免）、`emotionArc.ts:30`（按 id 建集，与顺序无关）保持不变即可；如需稳定输出可选接入 `orderedChapters`。
 - 伏笔 `plantedChapterId`/`payoffChapterId`、`EmotionPoint.chapterId` 引用逻辑零改动。
 
-- [ ] **Step 7: 构建并提交顺序消费者统一**
+- [x] **Step 7: 构建并提交顺序消费者统一**
 
 ```powershell
 npm.cmd run build

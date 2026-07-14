@@ -6,16 +6,16 @@
 
 ## 2. 统一卷序与结构变更函数
 
-- [ ] 2.1 新建独立小模块实现 `orderedChapters(novel)` 与 UI 分组函数：正式卷按 volume order、卷内按 chapter order、未分卷恒定居末；排序不得原地修改 Novel
-- [ ] 2.2 在同一模块实现卷创建/重命名/重排/安全删除，以及章节卷内重排、跨卷移动、移入未分卷；所有入口共用同一归属更新与源/目标分组 order 归一逻辑
-- [ ] 2.3 为卷序和结构纯函数补充项目现有风格的自检，覆盖 v6 未分卷、稳定排序、组内归一、跨卷移动、删除卷不删章和无效 volumeId 降级
+- [x] 2.1 新建独立小模块实现 `orderedChapters(novel)` 与 UI 分组函数：正式卷按 volume order、卷内按 chapter order、未分卷恒定居末；排序不得原地修改 Novel
+- [x] 2.2 在同一模块实现卷创建/重命名/重排/安全删除，以及章节卷内重排、跨卷移动、移入未分卷；所有入口共用同一归属更新与源/目标分组 order 归一逻辑
+- [x] 2.3 为卷序和结构纯函数补充项目现有风格的自检，覆盖 v6 未分卷、稳定排序、组内归一、跨卷移动、删除卷不删章和无效 volumeId 降级
 
 ## 3. 顺序消费者统一接入
 
-- [ ] 3.1 改造 `NovelCreation`、`ChapterWorkbench` 与 `novelNavigation`：章节列表、激活首章、跨章搜索结果顺序和章号均来自统一卷序，不再自行全局按 chapter order 排序
-- [ ] 3.2 改造 `novelExport` 与 Prompt 调用链：整书导出、离线包结构、前一章上下文、缺失大纲等需要先后关系的输入统一按卷序展开
-- [ ] 3.3 改造 `NovelStats`、`EmotionArcPanel`、`characterGraph` 及其余顺序消费者，确保“第 N 章”和分析输入一致；扫描并清理遗留的直接全局 chapter order 排序点
-- [ ] 3.4 保持伏笔、情感曲线、人物图谱和分析持久化的 `chapterId` 引用原样，确认计数/按 id 查找等与顺序无关的逻辑没有被误改
+- [x] 3.1 改造 `NovelCreation`、`ChapterWorkbench` 与 `novelNavigation`：章节列表、激活首章、跨章搜索结果顺序和章号均来自统一卷序，不再自行全局按 chapter order 排序
+- [x] 3.2 改造 `novelExport` 与 Prompt 调用链：整书导出、离线包结构、前一章上下文、缺失大纲等需要先后关系的输入统一按卷序展开
+- [x] 3.3 改造 `NovelStats`、`EmotionArcPanel`、`characterGraph` 及其余顺序消费者，确保“第 N 章”和分析输入一致；扫描并清理遗留的直接全局 chapter order 排序点
+- [x] 3.4 保持伏笔、情感曲线、人物图谱和分析持久化的 `chapterId` 引用原样，确认计数/按 id 查找等与顺序无关的逻辑没有被误改
 
 ## 4. 卷管理与分组导航 UI
 
