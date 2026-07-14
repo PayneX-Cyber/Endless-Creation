@@ -1,4 +1,5 @@
 import type { CharacterGraph, GraphCharacter, GraphRelationship, Novel } from '../../types/novel';
+import { orderedChapters } from './novelStructure';
 export type { CharacterGraph, GraphCharacter, GraphRelationship } from '../../types/novel';
 
 export type TextMessage = { role: 'system' | 'user'; content: string };
@@ -26,8 +27,7 @@ function limitText(text: string, max: number): string {
 
 // 汇总用于推演的语料：蓝图 + 简介 + 创意 + 已完成章节正文（截断，控制 token）。
 function collectStoryContext(novel: Novel): string {
-  const doneChapters = [...novel.chapters]
-    .sort((a, b) => a.order - b.order)
+  const doneChapters = orderedChapters(novel)
     .filter((chapter) => chapter.content.trim());
   const chapterBlocks = doneChapters.map((chapter, index) => {
     const title = chapter.title.trim() || `第 ${index + 1} 章`;
