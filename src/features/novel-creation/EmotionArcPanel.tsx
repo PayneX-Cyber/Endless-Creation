@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { rendererBridge } from '../../services/rendererBridge';
 import type { Chapter, Novel } from '../../types/novel';
 import { createId } from './novelShared';
+import { orderedChapters } from './novelStructure';
 import {
   buildEmotionPrompt,
   mergeEmotionPoints,
@@ -54,7 +55,7 @@ function lineSegments(points: Array<{ x: number; y: number } | null>): string[] 
 }
 
 export function EmotionArcPanel({ novel, resolveModel, onUpdateNovel }: Props) {
-  const chapters = useMemo(() => [...novel.chapters].sort((a, b) => a.order - b.order), [novel.chapters]);
+  const chapters = useMemo(() => orderedChapters(novel), [novel]);
   const arc = novel.emotionArc ?? null;
   const [results, setResults] = useState<AnalysisResult[] | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());

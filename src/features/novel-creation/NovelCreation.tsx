@@ -383,7 +383,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
     setDragOverChapterId(null);
     if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return;
     const now = new Date().toISOString();
-    updateNovel((novel) => ({ ...novel, chapters: reorderChapters(novel.chapters, fromIndex, toIndex), updatedAt: now }));
+    updateNovel((novel) => ({ ...novel, chapters: reorderChapters(orderedChapters(novel), fromIndex, toIndex), updatedAt: now }));
   }
 
   async function openSearchResult(result: ChapterSearchResult) {
