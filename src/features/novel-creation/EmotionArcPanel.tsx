@@ -4,10 +4,8 @@ import type { Chapter, Novel } from '../../types/novel';
 import { createId } from './novelShared';
 import {
   buildEmotionPrompt,
+  mergeEmotionPoints,
   parseEmotionResult,
-  readEmotionArc,
-  upsertEmotionPoints,
-  type EmotionArc,
   type EmotionPointCandidate,
 } from './emotionArc';
 import './EmotionArcPanel.css';
@@ -27,6 +25,7 @@ interface ReadyModel {
 interface Props {
   novel: Novel;
   resolveModel: (onIssue: (message: string) => void) => ReadyModel | null;
+  onUpdateNovel: (update: (novel: Novel) => Novel) => void;
 }
 
 const WIDTH = 900;
@@ -54,9 +53,9 @@ function lineSegments(points: Array<{ x: number; y: number } | null>): string[] 
   return segments;
 }
 
-export function EmotionArcPanel({ novel, resolveModel }: Props) {
+export function EmotionArcPanel({ novel, resolveModel, onUpdateNovel }: Props) {
   const chapters = useMemo(() => [...novel.chapters].sort((a, b) => a.order - b.order), [novel.chapters]);
-  const [arc, setArc] = useState<EmotionArc | null>(() => readEmotionArc(novel.id));
+  const arc = novel.emotionArc ?? null;
   const [results, setResults] = useState<AnalysisResult[] | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
@@ -68,7 +67,6 @@ export function EmotionArcPanel({ novel, resolveModel }: Props) {
   const activeChapterIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    setArc(readEmotionArc(novel.id));
     setResults(null);
     setSelectedIds(new Set());
     return () => {
@@ -174,12 +172,12 @@ export function EmotionArcPanel({ novel, resolveModel }: Props) {
   function confirm() {
     if (!results || !selectedIds.size) return;
     const points = results.flatMap((result) => result.candidate && selectedIds.has(result.chapter.id) ? [result.candidate] : []);
-    const saved = upsertEmotionPoints(novel, points);
-    if (!saved.ok) {
-      setError(saved.message || '保存失败，请重试。');
-      return;
-    }
-    setArc(saved.arc ?? null);
+    const now = new Date().toISOString();
+    onUpdateNovel((current) => ({
+      ...current,
+      emotionArc: mergeEmotionPoints(current.emotionArc ?? null, current, points, now),
+      updatedAt: now,
+    }));
     setResults(null);
     setSelectedIds(new Set());
     setError('');

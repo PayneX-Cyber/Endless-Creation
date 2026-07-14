@@ -42,6 +42,35 @@ export interface Foreshadowing {
   updatedAt: string;
 }
 
+export interface EmotionPoint {
+  chapterId: string;
+  score: number;
+  reason: string;
+  updatedAt: string;
+}
+
+export interface EmotionArc {
+  points: EmotionPoint[];
+  updatedAt: string;
+}
+
+export interface GraphCharacter {
+  name: string;
+  role: string;
+  description: string;
+}
+
+export interface GraphRelationship {
+  from: string;
+  to: string;
+  label: string;
+}
+
+export interface CharacterGraph {
+  characters: GraphCharacter[];
+  relationships: GraphRelationship[];
+}
+
 export interface Novel {
   id: string;
   projectId?: string;
@@ -56,7 +85,9 @@ export interface Novel {
   settings?: SettingEntry[];
   pinnedSettingIds?: string[];
   pinnedForeshadowingIds?: string[];
-  version: 5;
+  emotionArc?: EmotionArc;
+  characterGraph?: CharacterGraph;
+  version: 6;
   createdAt: string;
   updatedAt: string;
 }

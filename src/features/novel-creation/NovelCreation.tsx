@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { ArrowLeftIcon, BoltIcon, BookIcon, ChartIcon, ChevronDownIcon, GlobeIcon, ListIcon, PenBookIcon, ProjectIcon, ScriptIcon, UserIcon, UsersIcon } from '../../app/icons';
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
-import type { Chapter, Foreshadowing, Novel, NovelSummary, SettingEntry, SettingType } from '../../types/novel';
+import type { CharacterGraph, Chapter, Foreshadowing, Novel, NovelSummary, SettingEntry, SettingType } from '../../types/novel';
 import { buildBlueprintFromConversationPrompt, buildInspirationChatPrompt, buildOutlinePrompt, INSPIRATION_OPENING_MESSAGE, parseImportedManuscript, parseOutlineText, PINNED_CONTEXT_LIMIT, type InspirationChatMessage, type TextMessage } from './novelPrompts';
-import { buildCharacterGraphPrompt, parseCharacterGraph, type CharacterGraph } from './characterGraph';
+import { buildCharacterGraphPrompt, parseCharacterGraph } from './characterGraph';
 import { NovelCharacterGraphPanel } from './NovelCharacterGraph';
 import { NovelErrorBanner, NovelListSkeleton } from './NovelSkeletons';
 import { ChapterWorkbench } from './ChapterWorkbench';
@@ -18,6 +18,7 @@ import { CHAPTER_STATUS_LABEL, CHAPTER_STATUS_ORDER, PROGRESS_LABELS, resolveCha
 import type { ChapterStatus as NovelChapterStatus } from '../../types/novel';
 import { copyWholeBookMarkdown, exportOfflinePackage, exportStoryboardDocFile, exportWholeBookMarkdownFile } from './novelExport';
 import { ChapterSearchPanel, reorderChapters, type ChapterLocateRequest, type ChapterSearchResult } from './novelNavigation';
+import { migrateLegacyNovelAnalysis } from './novelAnalysisPersistence';
 import './NovelCreation.css';
 
 type NovelView = 'creationCenter' | 'projectList' | 'projectView' | 'inspirationIntro' | 'inspirationPreparing' | 'inspirationChat' | 'inspirationBlueprint' | 'inspirationOutline' | 'workbench';
@@ -32,7 +33,6 @@ interface ApiProviderStore { channels?: ApiProviderChannel[]; activeChannelId?: 
 const emptyForm: NovelForm = { title: '', summary: '', note: '' };
 const MODEL_PREFERENCES_STORAGE_KEY = 'endless-creation.model-preferences';
 const API_PROVIDER_STORAGE_KEY = 'endless-creation.api-provider-config';
-const CHARACTER_GRAPH_STORAGE_KEY = 'endless-creation.novel-character-graphs';
 const INSPIRATION_STAGES = ['灵感收集', '故事核心', '角色冲突', '蓝图确认'];
 const MAX_CHAT_TURNS = 8;
 const WORLD_SETTING_TYPES = ['location', 'organization', 'item', 'term', 'rule', 'other'] satisfies SettingType[];
@@ -87,13 +87,13 @@ export function NovelCreation({ projectId }: { projectId: string }) {
   const projectPanelRef = useRef<HTMLElement | null>(null);
   const lastProjectIdRef = useRef(projectId);
   const lastValidChapterRef = useRef(new Map<string, string>());
-  const [graphData, setGraphData] = useState<CharacterGraph | null>(null);
   const [graphBusy, setGraphBusy] = useState(false);
   const [graphError, setGraphError] = useState('');
   const graphRequestIdRef = useRef<string | null>(null);
   const graphRunRef = useRef(0);
 
   const chapters = useMemo(() => [...(currentNovel?.chapters ?? [])].sort((a, b) => a.order - b.order), [currentNovel]);
+  const graphData = currentNovel?.characterGraph ?? null;
   const selectedTextModel = useMemo(() => resolveTextModel(modelPreferences, apiProviderStore), [apiProviderStore, modelPreferences]);
   const chatUserTurns = chatMessages.filter((message) => message.role === 'user').length;
   const chatStage = Math.min(chatUserTurns, INSPIRATION_STAGES.length - 1);
@@ -107,7 +107,6 @@ export function NovelCreation({ projectId }: { projectId: string }) {
   }, []);
 
   useEffect(() => {
-    setGraphData(currentNovel ? readCharacterGraph(currentNovel.id) : null);
     setGraphError('');
   }, [currentNovel?.id]);
 
@@ -220,8 +219,9 @@ export function NovelCreation({ projectId }: { projectId: string }) {
       setActiveChapterId(null);
       return false;
     }
-    setCurrentNovel(result.novel);
-    setActiveChapterId(result.novel.chapters[0]?.id ?? null);
+    const novel = await migrateLegacyNovelAnalysis(result.novel, window.localStorage, (next) => novelService.saveNovel(next));
+    setCurrentNovel(novel);
+    setActiveChapterId(novel.chapters[0]?.id ?? null);
     setSaveStatus('saved');
     setFeedback('');
     return true;
@@ -724,14 +724,16 @@ export function NovelCreation({ projectId }: { projectId: string }) {
       return;
     }
     if (parsed.kind === 'empty') {
-      const emptyGraph = { characters: [], relationships: [] };
-      setGraphData(emptyGraph);
-      saveCharacterGraph(currentNovel.id, emptyGraph);
+      updateCharacterGraph({ characters: [], relationships: [] });
       setGraphError('');
       return;
     }
-    setGraphData(parsed.graph);
-    saveCharacterGraph(currentNovel.id, parsed.graph);
+    updateCharacterGraph(parsed.graph);
+  }
+
+  function updateCharacterGraph(graph: CharacterGraph) {
+    const now = new Date().toISOString();
+    updateNovel((novel) => ({ ...novel, characterGraph: graph, updatedAt: now }));
   }
 
   function updateProjectField(field: 'blueprint' | 'summary' | 'idea', value: string) {
@@ -1065,7 +1067,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                   </>
                 )}
                 {projectViewTab === 'emotion' && (
-                  <EmotionArcPanel novel={currentNovel} resolveModel={ensureTextModelReady} />
+                  <EmotionArcPanel novel={currentNovel} resolveModel={ensureTextModelReady} onUpdateNovel={updateNovel} />
                 )}
                 {projectViewTab === 'foreshadowing' && (
                   <ForeshadowingPanel
@@ -1291,19 +1293,5 @@ function readLocalStorage<T>(key: string, fallback: T): T {
     return rawValue ? JSON.parse(rawValue) as T : fallback;
   } catch {
     return fallback;
-  }
-}
-
-function readCharacterGraph(novelId: string): CharacterGraph | null {
-  const graphs = readLocalStorage<Record<string, CharacterGraph>>(CHARACTER_GRAPH_STORAGE_KEY, {});
-  return graphs[novelId] ?? null;
-}
-
-function saveCharacterGraph(novelId: string, graph: CharacterGraph) {
-  try {
-    const graphs = readLocalStorage<Record<string, CharacterGraph>>(CHARACTER_GRAPH_STORAGE_KEY, {});
-    window.localStorage.setItem(CHARACTER_GRAPH_STORAGE_KEY, JSON.stringify({ ...graphs, [novelId]: graph }));
-  } catch {
-    return;
   }
 }

@@ -1,0 +1,14 @@
+{
+  "change": "persist-emotion-graph",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "5c0dff8f42d28b5208474837346145f4aacaa1a80fa735117bba6e0aa56d0be2",
+  "files": [
+    { "path": "openspec/changes/persist-emotion-graph/proposal.md", "sha256": "96c72b572e0b37ece1bae99fccb30bdc36295ee6b790f67dc6da0cb6575bb6e4" },
+    { "path": "openspec/changes/persist-emotion-graph/design.md", "sha256": "20e8d62adaa6492a68c224278602a423da95f1f8dfe7d53cf6b250a9d30556cf" },
+    { "path": "openspec/changes/persist-emotion-graph/tasks.md", "sha256": "3e9085cee985ed0b035aa779224b58c5ae4e6797e557e851d1c5fbf2a0ab9b66" },
+    { "path": "openspec/changes/persist-emotion-graph/specs/novel-analysis-persistence/spec.md", "sha256": "4bd15e1ee4118950aea1d6174e9ead46d460daf33341c6b84da3a1203553b9a0" }
+  ]
+}

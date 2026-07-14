@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import type { CharacterGraph } from './characterGraph';
+import type { CharacterGraph } from '../../types/novel';
 
-// 人物关系图谱 V0：AI 从蓝图 + 正文推演，仅 session 态展示，不落库、不建模。
+// 人物关系图谱：AI 从蓝图 + 正文推演，确认成果随 Novel 持久化。
 // 本文件同时导出面板壳（NovelCharacterGraphPanel，含按钮/骨架/错误/空态）与纯渲染（NovelCharacterGraph）。
 // 面板壳独占所有中文文案，让 NovelCreation.tsx 的接入点保持纯 ASCII（规避该文件的编辑字节坑）。
 

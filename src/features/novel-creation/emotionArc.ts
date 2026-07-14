@@ -1,6 +1,5 @@
-import type { Chapter, Novel } from '../../types/novel';
+import type { Chapter, EmotionArc, EmotionPoint, Novel } from '../../types/novel';
 
-const STORAGE_KEY = 'endless-creation.novel-emotion-arcs';
 const CODE_FENCE_PATTERN = /^```(?:json)?\s*([\s\S]*?)\s*```$/;
 
 export interface EmotionPointCandidate {
@@ -9,14 +8,7 @@ export interface EmotionPointCandidate {
   reason: string;
 }
 
-export interface EmotionPoint extends EmotionPointCandidate {
-  updatedAt: string;
-}
-
-export interface EmotionArc {
-  points: EmotionPoint[];
-  updatedAt: string;
-}
+export type { EmotionArc, EmotionPoint } from '../../types/novel';
 
 export type ParsedEmotionPoint =
   | { kind: 'ok'; point: EmotionPointCandidate }
@@ -49,51 +41,6 @@ export function mergeEmotionPoints(
     });
   }
   return { points: [...merged.values()], updatedAt: now };
-}
-
-function parseStoredArc(value: unknown): EmotionArc | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  if (!Array.isArray(record.points)) return null;
-  const points: EmotionPoint[] = [];
-  for (const valuePoint of record.points) {
-    if (!valuePoint || typeof valuePoint !== 'object') continue;
-    const point = valuePoint as Record<string, unknown>;
-    if (typeof point.chapterId !== 'string' || !point.chapterId) continue;
-    if (typeof point.score !== 'number' || !Number.isFinite(point.score) || point.score < -100 || point.score > 100) continue;
-    if (typeof point.reason !== 'string' || typeof point.updatedAt !== 'string') continue;
-    points.push({ chapterId: point.chapterId, score: point.score, reason: point.reason, updatedAt: point.updatedAt });
-  }
-  return { points, updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : '' };
-}
-
-function readAllArcs(): Record<string, unknown> {
-  const raw = globalThis.localStorage?.getItem(STORAGE_KEY);
-  if (!raw) return {};
-  const parsed: unknown = JSON.parse(raw);
-  return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
-}
-
-export function readEmotionArc(novelId: string): EmotionArc | null {
-  try {
-    return parseStoredArc(readAllArcs()[novelId]);
-  } catch {
-    return null;
-  }
-}
-
-export function upsertEmotionPoints(
-  novel: Novel,
-  points: EmotionPointCandidate[],
-): { ok: boolean; arc?: EmotionArc; message?: string } {
-  try {
-    const allArcs = readAllArcs();
-    const nextArc = mergeEmotionPoints(parseStoredArc(allArcs[novel.id]), novel, points, new Date().toISOString());
-    globalThis.localStorage?.setItem(STORAGE_KEY, JSON.stringify({ ...allArcs, [novel.id]: nextArc }));
-    return { ok: true, arc: nextArc };
-  } catch (error) {
-    return { ok: false, message: error instanceof Error ? error.message : '保存失败，请重试' };
-  }
 }
 
 function limitText(text: string, max: number): string {
