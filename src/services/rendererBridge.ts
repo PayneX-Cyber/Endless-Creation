@@ -502,7 +502,22 @@ function normalizeCharacterGraph(value: unknown): CharacterGraph | undefined {
     : undefined;
 }
 
-function sanitizeWebScene(value: unknown, index: number): Scene | null {
+// versions per-entry validation (symmetric with electron sanitizeChapterVersions): validate id/content/createdAt, keep latest 5.
+function sanitizeWebChapterVersions(value: unknown, fallbackTime: string): ChapterVersion[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.map((entry): ChapterVersion | null => {
+    if (!entry || typeof entry !== 'object') return null;
+    const item = entry as Partial<ChapterVersion>;
+    if (typeof item.content !== 'string') return null;
+    return {
+      id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : crypto.randomUUID(),
+      content: item.content,
+      createdAt: typeof item.createdAt === 'string' ? item.createdAt : fallbackTime,
+    };
+  }).filter((entry): entry is ChapterVersion => entry !== null).slice(-5);
+}
+
+function sanitizeWebScene(value: unknown, index: number, now: string): Scene | null {
   if (!value || typeof value !== 'object') return null;
   const item = value as Partial<Scene>;
   if (typeof item.content !== 'string' && typeof item.title !== 'string') return null;
@@ -511,13 +526,13 @@ function sanitizeWebScene(value: unknown, index: number): Scene | null {
     title: typeof item.title === 'string' ? item.title : '',
     content: typeof item.content === 'string' ? item.content : '',
     order: Number.isFinite(item.order) ? Number(item.order) : index,
-    versions: Array.isArray(item.versions) ? item.versions : undefined,
+    versions: sanitizeWebChapterVersions(item.versions, now),
     selectedVersionId: typeof item.selectedVersionId === 'string' ? item.selectedVersionId : undefined,
   };
 }
 
 // v7->v8 chapter migration (symmetric with electron sanitizeChapterScenes): each chapter gets at least one scene (D3).
-function normalizeWebChapterScenes(chapter: unknown): Scene[] {
+function normalizeWebChapterScenes(chapter: unknown, now: string): Scene[] {
   const item = (chapter && typeof chapter === 'object' ? chapter : {}) as {
     scenes?: unknown;
     content?: unknown;
@@ -526,7 +541,7 @@ function normalizeWebChapterScenes(chapter: unknown): Scene[] {
   };
   if (Array.isArray(item.scenes) && item.scenes.length > 0) {
     const scenes = item.scenes
-      .map((scene, index) => sanitizeWebScene(scene, index))
+      .map((scene, index) => sanitizeWebScene(scene, index, now))
       .filter((scene): scene is Scene => scene !== null)
       .sort((a, b) => a.order - b.order)
       .map((scene, order) => ({ ...scene, order }));
@@ -538,7 +553,7 @@ function normalizeWebChapterScenes(chapter: unknown): Scene[] {
     title: '',
     content: typeof item.content === 'string' ? item.content : '',
     order: 0,
-    versions: Array.isArray(item.versions) ? (item.versions as ChapterVersion[]) : undefined,
+    versions: sanitizeWebChapterVersions(item.versions, now),
     selectedVersionId: typeof item.selectedVersionId === 'string' ? item.selectedVersionId : undefined,
   }];
 }
@@ -596,13 +611,28 @@ function normalizeWebChapterGroupOrder<T extends { volumeId?: string; order: num
 
 function normalizeWebNovel(value: unknown): Novel | null {
   if (!isNovel(value)) return null;
+  const now = new Date().toISOString();
   const volumes = Array.isArray(value.volumes) ? sanitizeWebVolumes(value.volumes) : [];
   const volumeIds = new Set(volumes.map((volume) => volume.id));
-  const remappedChapters = (Array.isArray(value.chapters) ? value.chapters : []).map((chapter) => {
-    const volumeId = typeof chapter.volumeId === 'string' && chapter.volumeId.trim() && volumeIds.has(chapter.volumeId.trim())
-      ? chapter.volumeId.trim()
+  // v7->v8 chapter rebuild via field whitelist (symmetric with electron sanitizeNovel chapter map):
+  // never spread the raw chapter, so legacy content/versions/selectedVersionId are dropped (D3).
+  const remappedChapters = (Array.isArray(value.chapters) ? value.chapters : []).map((chapter, index): Chapter => {
+    const item = chapter as Partial<Chapter>;
+    const volumeId = typeof item.volumeId === 'string' && item.volumeId.trim() && volumeIds.has(item.volumeId.trim())
+      ? item.volumeId.trim()
       : undefined;
-    return { ...chapter, volumeId, scenes: normalizeWebChapterScenes(chapter) };
+    return {
+      id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : crypto.randomUUID(),
+      title: typeof item.title === 'string' ? item.title : '',
+      scenes: normalizeWebChapterScenes(chapter, now),
+      outline: typeof item.outline === 'string' ? item.outline : undefined,
+      status: item.status === 'draft' || item.status === 'inProgress' || item.status === 'done' ? item.status : undefined,
+      wordTarget: typeof item.wordTarget === 'number' && Number.isFinite(item.wordTarget) && item.wordTarget > 0 ? item.wordTarget : undefined,
+      volumeId,
+      order: Number.isFinite(item.order) ? Number(item.order) : index,
+      createdAt: typeof item.createdAt === 'string' ? item.createdAt : now,
+      updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : now,
+    };
   });
   const chapters = normalizeWebChapterGroupOrder(remappedChapters, volumes);
   return {
