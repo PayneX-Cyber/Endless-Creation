@@ -131,6 +131,7 @@ interface Volume {
 interface Scene {
   id: string;
   title: string;
+  outline?: string;
   content: string;
   order: number;
   versions?: ChapterVersion[];
@@ -887,6 +888,7 @@ function sanitizeScene(value: unknown, index: number, now: string): Scene | null
   return {
     id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : randomUUID(),
     title: typeof item.title === 'string' ? item.title : '',
+    outline: typeof item.outline === 'string' ? item.outline : undefined,
     content: typeof item.content === 'string' ? item.content : '',
     order: Number.isFinite(item.order) ? Number(item.order) : index,
     versions: sanitizeChapterVersions(item.versions, now),

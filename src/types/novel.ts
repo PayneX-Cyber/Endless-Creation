@@ -17,6 +17,7 @@ export interface Volume {
 export interface Scene {
   id: string;
   title: string;          // 默认场景持久化留空字符串，UI 派生"场景 N"
+  outline?: string;
   content: string;
   order: number;
   versions?: ChapterVersion[];

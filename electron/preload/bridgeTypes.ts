@@ -123,6 +123,7 @@ export interface Volume {
 export interface Scene {
   id: string;
   title: string;
+  outline?: string;
   content: string;
   order: number;
   versions?: ChapterVersion[];

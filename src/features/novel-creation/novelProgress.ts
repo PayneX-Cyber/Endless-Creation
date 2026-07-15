@@ -1,5 +1,6 @@
 import type { Chapter, ChapterStatus, Novel } from '../../types/novel';
 import { countWords } from './novelShared';
+import { chapterText } from './sceneStructure';
 
 export const CHAPTER_STATUS_ORDER: ChapterStatus[] = ['draft', 'inProgress', 'done'];
 
@@ -34,7 +35,7 @@ export function resolveChapterStatus(chapter: Chapter): ChapterStatus {
   if (chapter.status === 'draft' || chapter.status === 'inProgress' || chapter.status === 'done') {
     return chapter.status;
   }
-  return chapter.content.trim() ? 'inProgress' : 'draft';
+  return chapterText(chapter).trim() ? 'inProgress' : 'draft';
 }
 
 export interface ProgressSummary {
@@ -52,7 +53,7 @@ export function summarizeProgress(novel: Novel): ProgressSummary {
   let totalWords = 0;
   for (const chapter of novel.chapters) {
     statusCounts[resolveChapterStatus(chapter)] += 1;
-    totalWords += countWords(chapter.content);
+    totalWords += countWords(chapterText(chapter));
   }
   const totalChapters = novel.chapters.length;
   const doneCount = statusCounts.done;

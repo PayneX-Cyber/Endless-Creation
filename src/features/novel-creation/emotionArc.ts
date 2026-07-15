@@ -1,4 +1,5 @@
 import type { Chapter, EmotionArc, EmotionPoint, Novel } from '../../types/novel';
+import { chapterText } from './sceneStructure';
 
 const CODE_FENCE_PATTERN = /^```(?:json)?\s*([\s\S]*?)\s*```$/;
 
@@ -65,7 +66,7 @@ export function buildEmotionPrompt(novel: Novel, chapter: Chapter, index: number
         novel.idea ? `创意：${limitText(novel.idea, 600)}` : '',
         `章节位置：第 ${index + 1} 章 / 共 ${total} 章`,
         `本章标题：${chapter.title || '未命名章节'}`,
-        `本章正文：\n${limitText(chapter.content, 6000)}`,
+        `本章正文：\n${limitText(chapterText(chapter), 6000)}`,
       ].filter(Boolean).join('\n'),
     },
   ];

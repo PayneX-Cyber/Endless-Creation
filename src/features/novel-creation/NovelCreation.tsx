@@ -18,6 +18,7 @@ import { CHAPTER_STATUS_LABEL, PROGRESS_LABELS, resolveChapterStatus } from './n
 import { copyWholeBookMarkdown, exportOfflinePackage, exportStoryboardDocFile, exportWholeBookMarkdownFile } from './novelExport';
 import { ChapterSearchPanel, type ChapterLocateRequest, type ChapterSearchResult } from './novelNavigation';
 import { deleteChapterInStructure, groupChaptersByVolume, orderedChapters } from './novelStructure';
+import { chapterText, initialScenes } from './sceneStructure';
 import { VolumeOutline } from './VolumeOutline';
 import { migrateLegacyNovelAnalysis } from './novelAnalysisPersistence';
 import './NovelCreation.css';
@@ -318,12 +319,12 @@ export function NovelCreation({ projectId }: { projectId: string }) {
 
   function addChapter() {
     const now = new Date().toISOString();
-    const chapter: Chapter = { id: createId('chapter'), title: '未命名章节', content: '', order: chapters.length, createdAt: now, updatedAt: now };
+    const chapter: Chapter = { id: createId('chapter'), title: '未命名章节', scenes: initialScenes(), order: chapters.length, createdAt: now, updatedAt: now };
     updateNovel((novel) => ({ ...novel, chapters: [...novel.chapters, chapter], updatedAt: now }));
     setActiveChapterId(chapter.id);
   }
 
-  function updateChapterById(chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId' | 'status' | 'wordTarget'>>) {
+  function updateChapterById(chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'scenes' | 'outline' | 'status' | 'wordTarget'>>) {
     const now = new Date().toISOString();
     updateNovel((novel) => ({
       ...novel,
@@ -332,7 +333,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
     }));
   }
 
-  function updateChapterByIdAndSave(chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId' | 'status' | 'wordTarget'>>) {
+  function updateChapterByIdAndSave(chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'scenes' | 'outline' | 'status' | 'wordTarget'>>) {
     if (!currentNovel) return;
     const now = new Date().toISOString();
     const nextNovel: Novel = {
@@ -367,12 +368,12 @@ export function NovelCreation({ projectId }: { projectId: string }) {
   }
 
   async function openSearchResult(result: ChapterSearchResult) {
-    setPendingLocate(result.field === 'content' ? {
+    setPendingLocate({
       chapterId: result.chapterId,
-      offset: result.matchOffset,
-      text: result.matchedText,
+      sceneId: result.sceneId,
+      ...(result.field === 'content' ? { offset: result.matchOffset, text: result.matchedText } : {}),
       requestId: Date.now(),
-    } : null);
+    });
     await openProjectWorkbench(currentNovel?.id ?? '', result.chapterId);
   }
 
@@ -411,7 +412,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
     const nextChapters: Chapter[] = parsed.map((item, index) => ({
       id: createId('chapter'),
       title: item.title,
-      content: '',
+      scenes: initialScenes(),
       outline: item.outline,
       order: index,
       createdAt: now,
@@ -612,7 +613,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
     const chapters: Chapter[] = parsed.chapters.map((chapter, index) => ({
       id: createId('chapter'),
       title: chapter.title,
-      content: chapter.content,
+      scenes: [{ ...initialScenes()[0], content: chapter.content }],
       order: index,
       createdAt: now,
       updatedAt: now,
@@ -653,8 +654,8 @@ export function NovelCreation({ projectId }: { projectId: string }) {
   function openAnalyzeChapterPicker() {
     if (!currentNovel) return;
     const lastValidId = lastValidChapterRef.current.get(currentNovel.id);
-    const selected = chapters.find((chapter) => chapter.id === lastValidId && chapter.content.trim())
-      ?? chapters.find((chapter) => chapter.content.trim());
+    const selected = chapters.find((chapter) => chapter.id === lastValidId && chapterText(chapter).trim())
+      ?? chapters.find((chapter) => chapterText(chapter).trim());
     setAnalyzeChapterId(selected?.id ?? null);
     setChapterPickerOpen(true);
   }
@@ -1008,9 +1009,9 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                               <span className="novel-content-card__index">{index + 1}</span>
                               <span className="novel-content-card__copy">
                                 <strong>{chapter.title || '未命名章节'}</strong>
-                                <span>{countWords(chapter.content)} 字 · {CHAPTER_STATUS_LABEL[resolveChapterStatus(chapter)]}</span>
+                                <span>{countWords(chapterText(chapter))} 字 · {CHAPTER_STATUS_LABEL[resolveChapterStatus(chapter)]}</span>
                                 <p>{chapter.outline?.trim() || '暂无章节大纲'}</p>
-                                <small>{chapter.content.trim() ? chapter.content.trim().slice(0, 120) : '暂无正文'}</small>
+                                <small>{chapterText(chapter).trim() ? chapterText(chapter).trim().slice(0, 120) : '暂无正文'}</small>
                               </span>
                             </button>
                           );
@@ -1038,7 +1039,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
                     pinLimitReached={(currentNovel.pinnedSettingIds?.length ?? 0) + (currentNovel.pinnedForeshadowingIds?.length ?? 0) >= PINNED_CONTEXT_LIMIT}
                     onTogglePin={togglePinnedForeshadowing}
                     onAnalyzeChapter={openAnalyzeChapterPicker}
-                    analyzeDisabled={!chapters.some((chapter) => chapter.content.trim())}
+                    analyzeDisabled={!chapters.some((chapter) => chapterText(chapter).trim())}
                     analyzeDisabledHint="请先完成章节正文"
                   />
                 )}
@@ -1188,13 +1189,13 @@ export function NovelCreation({ projectId }: { projectId: string }) {
             <p className="novel-workbench__preview-sub">伏笔 AI 会分析所选章节的正文，识别新埋线索与可回收伏笔。</p>
             <div className="novel-chapter-picker__list">
               {chapters.map((chapter, index) => {
-                const empty = chapter.content.trim() === '';
+                const empty = chapterText(chapter).trim() === '';
                 return (
                   <label className={empty ? 'novel-chapter-picker__item novel-chapter-picker__item--disabled' : 'novel-chapter-picker__item'} key={chapter.id}>
                     <input checked={chapter.id === analyzeChapterId} disabled={empty} name="analyze-chapter" onChange={() => setAnalyzeChapterId(chapter.id)} type="radio" value={chapter.id} />
                     <span className="novel-chapter-picker__index">{index + 1}</span>
                     <span className="novel-chapter-picker__title">{chapter.title || '未命名章节'}</span>
-                    <span className="novel-chapter-picker__meta">{countWords(chapter.content)} 字 · {CHAPTER_STATUS_LABEL[resolveChapterStatus(chapter)]}{empty ? ' · 暂无正文' : ''}</span>
+                    <span className="novel-chapter-picker__meta">{countWords(chapterText(chapter))} 字 · {CHAPTER_STATUS_LABEL[resolveChapterStatus(chapter)]}{empty ? ' · 暂无正文' : ''}</span>
                   </label>
                 );
               })}

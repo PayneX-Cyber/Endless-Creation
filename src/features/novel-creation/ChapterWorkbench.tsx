@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { rendererBridge } from '../../services/rendererBridge';
 import { novelService } from '../../services/novelService';
-import type { Chapter, ChapterVersion, Foreshadowing, Novel } from '../../types/novel';
-import { buildChapterFromOutlinePrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, buildChapterConsistencyPrompt, buildChapterRhythmPrompt, buildForeshadowingCandidatesPrompt, parseForeshadowingCandidates, buildForeshadowingPayoffCandidatesPrompt, parseForeshadowingPayoffCandidates, PINNED_CONTEXT_LIMIT, type OptimizeType, type TextMessage } from './novelPrompts';
+import type { Chapter, ChapterVersion, Foreshadowing, Novel, Scene } from '../../types/novel';
+import { buildChapterFromOutlinePrompt, buildContinueChapterPrompt, buildMissingOutlinePrompt, parseOutlineText, buildChapterReviewPrompt, buildOptimizeSelectionPrompt, buildChapterConsistencyPrompt, buildChapterRhythmPrompt, buildForeshadowingCandidatesPrompt, parseForeshadowingCandidates, buildForeshadowingPayoffCandidatesPrompt, parseForeshadowingPayoffCandidates, PINNED_CONTEXT_LIMIT, type OptimizeType, type TextMessage } from './novelPrompts';
 import { countWords, createId, formatTime, saveStatusLabel, type SaveStatus } from './novelShared';
 import { CHAPTER_STATUS_LABEL, CHAPTER_STATUS_ORDER, PROGRESS_LABELS, SOFT_GATE_HINTS, resolveChapterStatus } from './novelProgress';
 import { SETTING_LABELS, groupSettingsByType } from './novelSettings';
@@ -11,14 +11,15 @@ import { ForeshadowingPanel, type ForeshadowingDraft, type ForeshadowingAiCandid
 import type { ChapterLocateRequest } from './novelNavigation';
 import { ChapterFindReplace, pushEditorHistory, redoEditorHistory, resetEditorHistory, undoEditorHistory, type EditorHistory, type EditorSnapshot, type TextMatch } from './novelEditorTools';
 import { groupChaptersByVolume } from './novelStructure';
+import { adjacentSceneId, canRemoveScene, chapterText, createScene, orderedScenes, removeScene, renameScene, reorderScenes } from './sceneStructure';
 import './ChapterWorkbench.css';
 
 export type ReadyTextModel = { channelId: string; channelLabel?: string; baseUrl: string; apiKey: string; model: string };
 
 type ChapterStatus = 'done' | 'generating' | 'pending';
-type VersionPreviewState = { chapterId: string; activeVersionId: string; contentSnapshot: string };
+type VersionPreviewState = { chapterId: string; sceneId: string; activeVersionId: string; contentSnapshot: string };
 type OutlinePreviewEntry = { chapterId: string; label: string; title: string; outline: string };
-type SelectionState = { chapterId: string; start: number; end: number; text: string };
+type SelectionState = { chapterId: string; sceneId: string; start: number; end: number; text: string };
 type OptimizeJob = SelectionState & {
   status: 'loading' | 'success';
   chapterId: string;
@@ -42,8 +43,8 @@ interface ChapterWorkbenchProps {
   saveStatus: SaveStatus;
   onSelectChapter: (chapterId: string) => void;
   onLocateConsumed?: (requestId: number) => void;
-  onUpdateChapter: (chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId' | 'status' | 'wordTarget'>>) => void;
-  onUpdateChapterAndSave: (chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'content' | 'outline' | 'versions' | 'selectedVersionId' | 'status' | 'wordTarget'>>) => void;
+  onUpdateChapter: (chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'scenes' | 'outline' | 'status' | 'wordTarget'>>) => void;
+  onUpdateChapterAndSave: (chapterId: string, patch: Partial<Pick<Chapter, 'title' | 'scenes' | 'outline' | 'status' | 'wordTarget'>>) => void;
   onUpdateNovel: (update: (novel: Novel) => Novel) => void;
   onRetrySave: () => void;
   onBackToProjects: () => void;
@@ -112,10 +113,12 @@ function useAiCheck(config: {
 
 export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, locateRequest, saveStatus, onSelectChapter, onLocateConsumed, onUpdateChapter, onUpdateChapterAndSave, onUpdateNovel, onRetrySave, onBackToProjects, onOpenProjectView, initialForeshadowPanel = false, onConsumeInitialPanel, onValidChapter, ensureTextModel }: ChapterWorkbenchProps) {
   const [generatingChapterId, setGeneratingChapterId] = useState<string | null>(null);
+  const [generatingSceneId, setGeneratingSceneId] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState('');
   const [cancelledVersionId, setCancelledVersionId] = useState<string | null>(null);
   const [generationError, setGenerationError] = useState<{ chapterId: string; message: string } | null>(null);
   const [preview, setPreview] = useState<VersionPreviewState | null>(null);
+  const [activeSceneId, setActiveSceneId] = useState<string>();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [outlineBusy, setOutlineBusy] = useState(false);
   const [outlineError, setOutlineError] = useState('');
@@ -138,6 +141,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
   const runRef = useRef(0);
   const confirmBusyRef = useRef(false);
   const streamTextRef = useRef('');
+  const generationPrefixRef = useRef('');
   const historyRef = useRef<EditorHistory>(resetEditorHistory({ content: '', selectionStart: 0, selectionEnd: 0 }));
   const pendingManualSnapshotRef = useRef<EditorSnapshot | null>(null);
   const manualHistoryTimerRef = useRef(0);
@@ -178,15 +182,23 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
 
   const activeIndex = chapters.findIndex((chapter) => chapter.id === activeChapterId);
   const activeChapter = activeIndex >= 0 ? chapters[activeIndex] : null;
+  const activeScenes = activeChapter ? orderedScenes(activeChapter) : [];
+  const activeScene = activeScenes.find((scene) => scene.id === activeSceneId) ?? activeScenes[0];
   const chapterGroups = groupChaptersByVolume(novel);
+
+  useEffect(() => {
+    setActiveSceneId(activeChapter ? orderedScenes(activeChapter)[0]?.id : undefined);
+  }, [activeChapterId]);
 
   useEffect(() => {
     flushManualHistory();
     window.clearTimeout(manualHistoryTimerRef.current);
     pendingManualSnapshotRef.current = null;
-    const content = activeChapter?.content ?? '';
+    setSelection(null);
+    setHistoryOpen(false);
+    const content = activeScene?.content ?? '';
     historyRef.current = resetEditorHistory({ content, selectionStart: content.length, selectionEnd: content.length });
-  }, [activeChapterId]);
+  }, [activeSceneId]);
 
   useEffect(() => () => {
     window.clearTimeout(manualHistoryTimerRef.current);
@@ -194,6 +206,20 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
 
   useEffect(() => {
     if (!locateRequest || locateRequest.chapterId !== activeChapter?.id) return;
+    if (!activeChapter.scenes.some((scene) => scene.id === locateRequest.sceneId)) {
+      onLocateConsumed?.(locateRequest.requestId);
+      return;
+    }
+    if (activeScene?.id !== locateRequest.sceneId) {
+      setActiveSceneId(locateRequest.sceneId);
+      return;
+    }
+    if (locateRequest.offset === undefined || locateRequest.text === undefined) {
+      onLocateConsumed?.(locateRequest.requestId);
+      return;
+    }
+    const offset = locateRequest.offset;
+    const text = locateRequest.text;
     let timeout = 0;
     let frame = 0;
     const locate = (attempt: number) => {
@@ -203,13 +229,13 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
         else onLocateConsumed?.(locateRequest.requestId);
         return;
       }
-      const end = locateRequest.offset + locateRequest.text.length;
-      const currentText = textarea.value.slice(locateRequest.offset, end);
-      if (currentText.toLocaleLowerCase() === locateRequest.text.toLocaleLowerCase()) {
+      const end = offset + text.length;
+      const currentText = textarea.value.slice(offset, end);
+      if (currentText.toLocaleLowerCase() === text.toLocaleLowerCase()) {
         textarea.focus({ preventScroll: true });
-        textarea.setSelectionRange(locateRequest.offset, end);
+        textarea.setSelectionRange(offset, end);
         const maxScroll = Math.max(0, textarea.scrollHeight - textarea.clientHeight);
-        textarea.scrollTop = maxScroll * (locateRequest.offset / Math.max(1, textarea.value.length));
+        textarea.scrollTop = maxScroll * (offset / Math.max(1, textarea.value.length));
         recordSelection(textarea);
       }
       onLocateConsumed?.(locateRequest.requestId);
@@ -219,7 +245,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
       window.cancelAnimationFrame(frame);
       window.clearTimeout(timeout);
     };
-  }, [activeChapter?.content, activeChapter?.id, locateRequest, onLocateConsumed]);
+  }, [activeScene?.content, activeScene?.id, activeChapter, locateRequest, onLocateConsumed]);
 
   useEffect(() => {
     if (!initialForeshadowPanel) return;
@@ -228,26 +254,26 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
   }, [initialForeshadowPanel, onConsumeInitialPanel]);
 
   useEffect(() => {
-    if (activeChapter?.content.trim()) onValidChapter?.(activeChapter.id);
-  }, [activeChapter?.content, activeChapter?.id, onValidChapter]);
+    if (activeChapter && chapterText(activeChapter).trim()) onValidChapter?.(activeChapter.id);
+  }, [activeChapter, onValidChapter]);
 
-  const doneCount = chapters.filter((chapter) => chapter.content.trim() !== '').length;
+  const doneCount = chapters.filter((chapter) => chapterText(chapter).trim() !== '').length;
   const pendingCount = chapters.length - doneCount;
   const progress = chapters.length ? Math.round((doneCount / chapters.length) * 100) : 0;
-  const firstPendingIndex = chapters.findIndex((chapter) => chapter.content.trim() === '');
+  const firstPendingIndex = chapters.findIndex((chapter) => chapterText(chapter).trim() === '');
   const missingOutlineCount = chapters.filter((chapter) => !chapter.outline?.trim()).length;
   const settingGroups = groupSettingsByType(novel.settings ?? []);
   const otherAiBusy = generatingChapterId !== null || outlineBusy || review.busy || consistency.busy || rhythm.busy || optimizeTypeOpen || optimizeJob !== null;
   const busy = otherAiBusy || foreshadowAiBusy;
   const plantedForeshadowings = novel.foreshadowings.filter((item) => item.status === 'planted');
-  const foreshadowGenerateDisabledReason = (!activeChapter || !activeChapter.content.trim()) ? '请先选择有正文的章节' : otherAiBusy ? 'AI 正在忙，请稍候' : '';
-  const foreshadowPayoffGenerateDisabledReason = (!activeChapter || !activeChapter.content.trim()) ? '请先选择有正文的章节' : otherAiBusy ? 'AI 正在忙，请稍候' : plantedForeshadowings.length === 0 ? '暂无待回收伏笔' : '';
+  const foreshadowGenerateDisabledReason = (!activeChapter || !chapterText(activeChapter).trim()) ? '请先选择有正文的章节' : otherAiBusy ? 'AI 正在忙，请稍候' : '';
+  const foreshadowPayoffGenerateDisabledReason = (!activeChapter || !chapterText(activeChapter).trim()) ? '请先选择有正文的章节' : otherAiBusy ? 'AI 正在忙，请稍候' : plantedForeshadowings.length === 0 ? '暂无待回收伏笔' : '';
   const summaryBrief = brief(novel.summary, 42);
   const blueprintBrief = brief(novel.blueprint?.trim() || novel.summary.trim() || novel.idea?.trim() || '', 130);
 
   function chapterStatus(chapter: Chapter): ChapterStatus {
     if (chapter.id === generatingChapterId) return 'generating';
-    return chapter.content.trim() ? 'done' : 'pending';
+    return chapterText(chapter).trim() ? 'done' : 'pending';
   }
 
   function locateFirstPending() {
@@ -262,11 +288,53 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     onSelectChapter(chapterId);
   }
 
+  function updateScene(
+    chapterId: string,
+    sceneId: string,
+    patch: Partial<Pick<Scene, 'title' | 'outline' | 'content' | 'versions' | 'selectedVersionId'>>,
+    save = false,
+  ) {
+    const chapter = chapters.find((item) => item.id === chapterId);
+    if (!chapter) return;
+    const scenes = chapter.scenes.map((scene) => (scene.id === sceneId ? { ...scene, ...patch } : scene));
+    (save ? onUpdateChapterAndSave : onUpdateChapter)(chapterId, { scenes });
+  }
+
+  function addScene() {
+    if (!activeChapter || busy) return;
+    const scene = createScene(activeChapter.scenes);
+    onUpdateChapter(activeChapter.id, { scenes: [...activeChapter.scenes, scene] });
+    setActiveSceneId(scene.id);
+  }
+
+  function handleRenameScene(sceneId: string, title: string) {
+    if (!activeChapter || busy) return;
+    onUpdateChapter(activeChapter.id, { scenes: renameScene(activeChapter.scenes, sceneId, title) });
+  }
+
+  function handleSceneOutline(sceneId: string, outline: string) {
+    if (!activeChapter || busy) return;
+    updateScene(activeChapter.id, sceneId, { outline });
+  }
+
+  function moveScene(sceneId: string, direction: 'up' | 'down') {
+    if (!activeChapter || busy) return;
+    onUpdateChapter(activeChapter.id, { scenes: reorderScenes(activeChapter.scenes, sceneId, direction) });
+  }
+
+  function deleteScene(sceneId: string, sceneNumber: number) {
+    if (!activeChapter || busy || !canRemoveScene(activeChapter.scenes)) return;
+    if (!window.confirm(`确定删除场景 ${sceneNumber} 吗？该场景正文与版本历史将无法恢复。`)) return;
+    const nextActiveId = sceneId === activeSceneId ? adjacentSceneId(activeChapter.scenes, sceneId) : activeSceneId;
+    onUpdateChapter(activeChapter.id, { scenes: removeScene(activeChapter.scenes, sceneId) });
+    if (nextActiveId !== activeSceneId) setActiveSceneId(nextActiveId);
+  }
+
   function recordSelection(target: HTMLTextAreaElement) {
-    if (!activeChapter) return;
+    if (!activeChapter || !activeScene) return;
     const start = target.selectionStart;
     const end = target.selectionEnd;
-    setSelection(start < end ? { chapterId: activeChapter.id, start, end, text: target.value.slice(start, end) } : null);
+    setSelection(start < end ? { chapterId: activeChapter.id, sceneId: activeScene.id, start, end, text: target.value.slice(start, end) } : null);
   }
 
   function flushManualHistory() {
@@ -298,36 +366,44 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     });
   }
 
-  function writeChapterContent(chapterId: string, content: string, source: ContentWriteSource, selectionStart: number, selectionEnd: number) {
+  function writeSceneContent(
+    chapterId: string,
+    sceneId: string,
+    content: string,
+    source: ContentWriteSource,
+    selectionStart: number,
+    selectionEnd: number,
+    selectedVersionId?: string,
+  ) {
     flushManualHistory();
     contentWriteSourceRef.current = source;
     const writeSource = contentWriteSourceRef.current;
     if (writeSource === 'replace') {
       historyRef.current = pushEditorHistory(historyRef.current, { content, selectionStart, selectionEnd });
-    } else if (writeSource === 'ai' && chapterId === activeChapterId) {
+    } else if (writeSource === 'ai' && sceneId === activeSceneId) {
       historyRef.current = resetEditorHistory({ content, selectionStart, selectionEnd });
     } else if (writeSource === 'history') {
       isApplyingHistoryRef.current = true;
     }
-    onUpdateChapter(chapterId, { content });
+    updateScene(chapterId, sceneId, { content, ...(selectedVersionId ? { selectedVersionId } : {}) });
     restoreEditorSelection(selectionStart, selectionEnd);
   }
 
   function handleManualContentChange(target: HTMLTextAreaElement) {
-    if (!activeChapter || isApplyingHistoryRef.current) return;
+    if (!activeChapter || !activeScene || isApplyingHistoryRef.current) return;
     contentWriteSourceRef.current = 'manual';
-    onUpdateChapter(activeChapter.id, { content: target.value });
+    updateScene(activeChapter.id, activeScene.id, { content: target.value });
     queueManualHistory({ content: target.value, selectionStart: target.selectionStart, selectionEnd: target.selectionEnd });
     contentWriteSourceRef.current = null;
   }
 
   function applyHistory(direction: 'undo' | 'redo') {
-    if (!activeChapter || busy) return;
+    if (!activeChapter || !activeScene || busy) return;
     flushManualHistory();
     const result = direction === 'undo' ? undoEditorHistory(historyRef.current) : redoEditorHistory(historyRef.current);
     historyRef.current = result.history;
     if (result.snapshot) {
-      writeChapterContent(activeChapter.id, result.snapshot.content, 'history', result.snapshot.selectionStart, result.snapshot.selectionEnd);
+      writeSceneContent(activeChapter.id, activeScene.id, result.snapshot.content, 'history', result.snapshot.selectionStart, result.snapshot.selectionEnd);
     }
   }
 
@@ -345,13 +421,15 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
   }
 
   function getValidSelection(): SelectionState | null {
-    if (!activeChapter || !selection?.text.trim() || selection.chapterId !== activeChapter.id) return null;
-    return activeChapter.content.slice(selection.start, selection.end) === selection.text ? selection : null;
+    if (!activeChapter || !activeScene || !selection?.text.trim()
+      || selection.chapterId !== activeChapter.id || selection.sceneId !== activeScene.id) return null;
+    return activeScene.content.slice(selection.start, selection.end) === selection.text ? selection : null;
   }
 
   function openOptimizeType() {
     if (busy) return;
-    if (!activeChapter || !selection?.text.trim() || selection.chapterId !== activeChapter.id) {
+    if (!activeChapter || !activeScene || !selection?.text.trim()
+      || selection.chapterId !== activeChapter.id || selection.sceneId !== activeScene.id) {
       window.alert('请先选择要优化的正文');
       return;
     }
@@ -365,7 +443,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
 
   async function startOptimize(type: OptimizeType) {
     const currentSelection = getValidSelection();
-    if (!activeChapter || !currentSelection) {
+    if (!activeChapter || !activeScene || !currentSelection) {
       window.alert('原文范围已变化，请重新选择后生成。');
       return;
     }
@@ -378,7 +456,8 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
       ...currentSelection,
       status: 'loading',
       chapterId: activeChapter.id,
-      contentSnapshot: activeChapter.content,
+      sceneId: activeScene.id,
+      contentSnapshot: activeScene.content,
       selectedText: currentSelection.text,
       type,
     };
@@ -421,9 +500,10 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
   }
 
   function confirmOptimizeWrite() {
-    if (!activeChapter || optimizeJob?.status !== 'success' || optimizeJob.optimizedText === undefined) return;
-    const { chapterId, contentSnapshot, selectionStart, selectionEnd, selectedText, optimizedText } = {
+    if (!activeChapter || !activeScene || optimizeJob?.status !== 'success' || optimizeJob.optimizedText === undefined) return;
+    const { chapterId, sceneId, contentSnapshot, selectionStart, selectionEnd, selectedText, optimizedText } = {
       chapterId: optimizeJob.chapterId,
+      sceneId: optimizeJob.sceneId,
       contentSnapshot: optimizeJob.contentSnapshot,
       selectionStart: optimizeJob.start,
       selectionEnd: optimizeJob.end,
@@ -432,16 +512,17 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     };
     const contentValid =
       activeChapter.id === chapterId &&
-      activeChapter.content === contentSnapshot &&
-      activeChapter.content.slice(selectionStart, selectionEnd) === selectedText;
+      activeScene.id === sceneId &&
+      activeScene.content === contentSnapshot &&
+      activeScene.content.slice(selectionStart, selectionEnd) === selectedText;
     if (!contentValid) {
       window.alert('原文范围已变化，请重新选择后生成。');
       setOptimizeJob(null);
       return;
     }
-    const nextContent = activeChapter.content.slice(0, selectionStart) + optimizedText + activeChapter.content.slice(selectionEnd);
+    const nextContent = activeScene.content.slice(0, selectionStart) + optimizedText + activeScene.content.slice(selectionEnd);
     const nextEnd = selectionStart + optimizedText.length;
-    writeChapterContent(chapterId, nextContent, 'ai', selectionStart, nextEnd);
+    writeSceneContent(chapterId, sceneId, nextContent, 'ai', selectionStart, nextEnd);
     setOptimizeJob(null);
     requestAnimationFrame(() => {
       textareaRef.current?.focus();
@@ -449,11 +530,13 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     });
   }
 
-  async function generateChapterBody() {
-    if (busy || firstPendingIndex < 0) return;
-    const chapter = chapters[firstPendingIndex];
-    if (!chapter.outline?.trim()) return;
-    if ((chapter.versions?.length ?? 0) >= MAX_CHAPTER_VERSIONS) return;
+  async function generateChapterBody(mode: 'draft' | 'continue' = 'draft') {
+    if (busy || (mode === 'draft' && firstPendingIndex < 0)) return;
+    const chapter = mode === 'continue' ? activeChapter : chapters[firstPendingIndex];
+    if (!chapter) return;
+    const scene = chapter.id === activeChapter?.id ? activeScene : orderedScenes(chapter)[0];
+    if (mode === 'draft' && !chapter.outline?.trim()) return;
+    if (!scene || (scene.versions?.length ?? 0) >= MAX_CHAPTER_VERSIONS) return;
     const previousChapter = firstPendingIndex > 0 ? chapters[firstPendingIndex - 1] : undefined;
     const ready = ensureTextModel((message) => setGenerationError({ chapterId: chapter.id, message }));
     if (!ready) return;
@@ -462,20 +545,24 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     runRef.current = runId;
     requestIdRef.current = requestId;
     setGeneratingChapterId(chapter.id);
+    setGeneratingSceneId(scene.id);
     setGenerationError(null);
     streamTextRef.current = '';
+    generationPrefixRef.current = mode === 'continue' && scene.content ? `${scene.content}\n\n` : '';
     setStreamingText('');
-    const contentSnapshot = chapter.content;
+    const contentSnapshot = scene.content;
     const result = await rendererBridge.generateText({
       requestId,
       channelId: ready.channelId,
       channelLabel: ready.channelLabel,
       projectId: novel.id,
-      requestType: 'novel.generateChapter',
+      requestType: mode === 'continue' ? 'novel.continueChapter' : 'novel.generateChapter',
       baseUrl: ready.baseUrl,
       apiKey: ready.apiKey,
       model: ready.model,
-      messages: buildChapterFromOutlinePrompt(novel, chapter, previousChapter),
+      messages: mode === 'continue'
+        ? buildContinueChapterPrompt(novel, chapter, scene.id)
+        : buildChapterFromOutlinePrompt(novel, chapter, previousChapter),
       temperature: 0.8,
       maxTokens: 1500,
       stream: true,
@@ -483,26 +570,34 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     if (runRef.current !== runId) return;
     requestIdRef.current = null;
     setGeneratingChapterId(null);
+    setGeneratingSceneId(null);
     if (!result.ok || !result.text) {
+      streamTextRef.current = '';
+      generationPrefixRef.current = '';
+      setStreamingText('');
       setGenerationError({ chapterId: chapter.id, message: result.message || '生成章节正文失败，请稍后重试。' });
       return;
     }
     streamTextRef.current = '';
     setStreamingText('');
     setCancelledVersionId(null);
-    const version: ChapterVersion = { id: createId('version'), content: result.text, createdAt: new Date().toISOString() };
-    const updatedVersions = [...(chapter.versions ?? []), version].slice(-MAX_CHAPTER_VERSIONS);
-    onUpdateChapterAndSave(chapter.id, { versions: updatedVersions });
-    setPreview({ chapterId: chapter.id, activeVersionId: version.id, contentSnapshot });
+    const version: ChapterVersion = { id: createId('version'), content: generationPrefixRef.current + result.text, createdAt: new Date().toISOString() };
+    generationPrefixRef.current = '';
+    const updatedVersions = [...(scene.versions ?? []), version].slice(-MAX_CHAPTER_VERSIONS);
+    updateScene(chapter.id, scene.id, { versions: updatedVersions }, true);
+    setPreview({ chapterId: chapter.id, sceneId: scene.id, activeVersionId: version.id, contentSnapshot });
   }
 
   function cancelGeneration() {
     const requestId = requestIdRef.current;
     const cancelledChapterId = generatingChapterId;
-    const halfText = streamTextRef.current;
+    const cancelledSceneId = generatingSceneId;
+    const streamedHalf = streamTextRef.current;
+    const halfText = generationPrefixRef.current + streamedHalf;
     runRef.current += 1;
     requestIdRef.current = null;
     setGeneratingChapterId(null);
+    setGeneratingSceneId(null);
     setOutlineBusy(false);
     review.setBusy(false);
     consistency.setBusy(false);
@@ -515,28 +610,31 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     if (requestId) void rendererBridge.cancelTextGeneration(requestId);
     // PO 拍板：取消后保留已流式生成的半截正文（不回滚），落为一个草稿版本并标记“已取消”，用户可继续编辑或手动清空。
     const cancelledChapter = cancelledChapterId ? chapters.find((chapter) => chapter.id === cancelledChapterId) : undefined;
-    if (cancelledChapter && halfText.trim()) {
+    const cancelledScene = cancelledChapter?.scenes.find((scene) => scene.id === cancelledSceneId);
+    if (cancelledChapter && cancelledScene && streamedHalf.trim()) {
       const version: ChapterVersion = { id: createId('version'), content: halfText, createdAt: new Date().toISOString() };
-      const updatedVersions = [...(cancelledChapter.versions ?? []), version].slice(-MAX_CHAPTER_VERSIONS);
-      onUpdateChapterAndSave(cancelledChapter.id, { versions: updatedVersions });
+      const updatedVersions = [...(cancelledScene.versions ?? []), version].slice(-MAX_CHAPTER_VERSIONS);
+      updateScene(cancelledChapter.id, cancelledScene.id, { versions: updatedVersions }, true);
       setCancelledVersionId(version.id);
-      setPreview({ chapterId: cancelledChapter.id, activeVersionId: version.id, contentSnapshot: cancelledChapter.content });
+      setPreview({ chapterId: cancelledChapter.id, sceneId: cancelledScene.id, activeVersionId: version.id, contentSnapshot: cancelledScene.content });
     }
     streamTextRef.current = '';
+    generationPrefixRef.current = '';
     setStreamingText('');
   }
 
   async function confirmPreviewWrite() {
     if (!preview || confirmBusyRef.current) return;
     const target = chapters.find((chapter) => chapter.id === preview.chapterId);
-    const version = target?.versions?.find((item) => item.id === preview.activeVersionId);
-    if (!target || !version) {
+    const targetScene = target?.scenes.find((scene) => scene.id === preview.sceneId);
+    const version = targetScene?.versions?.find((item) => item.id === preview.activeVersionId);
+    if (!target || !targetScene || !version) {
       setPreview(null);
       return;
     }
     confirmBusyRef.current = true;
     try {
-      await writeVersionToChapter(novel.id, target, version, preview.contentSnapshot);
+      await writeVersionToScene(novel.id, target, targetScene, version, preview.contentSnapshot);
       setPreview(null);
       setGenerationError(null);
     } catch (error) {
@@ -547,9 +645,9 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     }
   }
 
-  async function restoreVersion(chapter: Chapter, version: ChapterVersion) {
+  async function restoreVersion(chapter: Chapter, scene: Scene, version: ChapterVersion) {
     try {
-      await writeVersionToChapter(novel.id, chapter, version, chapter.content);
+      await writeVersionToScene(novel.id, chapter, scene, version, scene.content);
       setHistoryOpen(false);
     } catch (error) {
       if (error instanceof Error && error.message.includes('取消')) return;
@@ -557,7 +655,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     }
   }
 
-  async function writeVersionToChapter(novelId: string, chapter: Chapter, version: ChapterVersion, contentSnapshot: string) {
+  async function writeVersionToScene(novelId: string, chapter: Chapter, scene: Scene, version: ChapterVersion, contentSnapshot: string) {
     const stored = await novelService.loadNovel(novelId);
     if (!stored.ok || !stored.novel) {
       window.alert('无法确认最新正文状态，请重新加载后再试。');
@@ -568,11 +666,15 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
       window.alert('章节不存在，请重新加载后再试。');
       throw new Error('章节不存在，写入已取消。');
     }
-    if (storedChapter.content !== contentSnapshot && !window.confirm('正文已被修改，写入将覆盖当前内容。仍要写入吗？')) {
+    const storedScene = storedChapter.scenes.find((item) => item.id === scene.id);
+    if (!storedScene) {
+      window.alert('场景不存在，请重新加载后再试。');
+      throw new Error('场景不存在，写入已取消。');
+    }
+    if (storedScene.content !== contentSnapshot && !window.confirm('正文已被修改，写入将覆盖当前内容。仍要写入吗？')) {
       throw new Error('用户取消写入。');
     }
-    writeChapterContent(chapter.id, version.content, 'ai', version.content.length, version.content.length);
-    onUpdateChapter(chapter.id, { selectedVersionId: version.id });
+    writeSceneContent(chapter.id, scene.id, version.content, 'ai', version.content.length, version.content.length, version.id);
   }
 
   async function generateMissingOutlines() {
@@ -639,7 +741,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
   }
 
   async function generateChapterReview(chapter: Chapter) {
-    if (busy || !chapter.content.trim()) return;
+    if (busy || !chapterText(chapter).trim()) return;
     const ready = ensureTextModel((message) => review.setError(message));
     if (!ready) return;
     await review.run(chapter, { novel, ready, runRef, requestIdRef });
@@ -650,7 +752,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
   }
 
   async function generateChapterConsistency(chapter: Chapter) {
-    if (busy || !chapter.content.trim()) return;
+    if (busy || !chapterText(chapter).trim()) return;
     const ready = ensureTextModel(consistency.setError);
     if (!ready) return;
     await consistency.run(chapter, { novel, ready, runRef, requestIdRef });
@@ -661,7 +763,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
   }
 
   async function generateChapterRhythm(chapter: Chapter) {
-    if (busy || !chapter.content.trim()) return;
+    if (busy || !chapterText(chapter).trim()) return;
     const ready = ensureTextModel(rhythm.setError);
     if (!ready) return;
     await rhythm.run(chapter, { novel, ready, runRef, requestIdRef });
@@ -673,7 +775,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
 
   // 伏笔 AI 候选状态机：调 generateText + 解析 + 兜底，全部在此层（面板不碰 AI）。写入复用下方 addForeshadowing。
   async function generateForeshadowingCandidates() {
-    if (!activeChapter || !activeChapter.content.trim()) {
+    if (!activeChapter || !chapterText(activeChapter).trim()) {
       setForeshadowAiError('请先选择有正文的章节');
       return;
     }
@@ -746,7 +848,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
 
   // 回收候选只给出建议，真正写入仍走 5d.1 的 onUpdateNovel 链；候选绑定生成时章节，避免切章后误挂。
   async function generateForeshadowingPayoffCandidates() {
-    if (!activeChapter || !activeChapter.content.trim()) {
+    if (!activeChapter || !chapterText(activeChapter).trim()) {
       setForeshadowAiError('请先选择有正文的章节');
       return;
     }
@@ -917,12 +1019,20 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
         </div>
       );
     }
+    if (!activeScene) {
+      return (
+        <div className="novel-workbench__state">
+          <strong>场景数据不可用</strong>
+          <span>请重新打开小说以修复场景结构。</span>
+        </div>
+      );
+    }
     const status = chapterStatus(activeChapter);
     const isFirstPending = activeIndex === firstPendingIndex;
     const hasOutline = Boolean(activeChapter.outline?.trim());
     const chapterError = generationError && generationError.chapterId === activeChapter.id ? generationError.message : '';
-    const versions = activeChapter.versions ?? [];
-    const chapterPreview = preview && preview.chapterId === activeChapter.id ? preview : null;
+    const versions = activeScene.versions ?? [];
+    const chapterPreview = preview && preview.chapterId === activeChapter.id && preview.sceneId === activeScene.id ? preview : null;
     const activeVersion = chapterPreview ? versions.find((item) => item.id === chapterPreview.activeVersionId) ?? null : null;
     const atVersionCap = versions.length >= MAX_CHAPTER_VERSIONS;
     return (
@@ -934,6 +1044,55 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
           </div>
           <p className={activeChapter.outline?.trim() ? 'novel-workbench__outline' : 'novel-workbench__outline novel-workbench__outline--empty'}>{activeChapter.outline?.trim() || '本章暂无大纲'}</p>
         </header>
+        <section className="novel-workbench__scenes" aria-label="章内场景">
+          <div className="novel-workbench__scenes-head">
+            <strong>场景</strong>
+            <button aria-label="新建场景" className="novel-flow__ghost" disabled={busy} onClick={addScene} type="button">新建场景</button>
+          </div>
+          <div className="novel-workbench__scene-list">
+            {activeScenes.map((scene, index) => {
+              const label = scene.title.trim() || `场景 ${index + 1}`;
+              const isActive = scene.id === activeScene.id;
+              return (
+                <div className={isActive ? 'novel-workbench__scene novel-workbench__scene--active' : 'novel-workbench__scene'} key={scene.id}>
+                  <button
+                    aria-label={`切换到${label}`}
+                    aria-pressed={isActive}
+                    className="novel-workbench__scene-select"
+                    disabled={busy}
+                    onClick={() => setActiveSceneId(scene.id)}
+                    type="button"
+                  >
+                    <strong>{label}</strong>
+                    <span>{countWords(scene.content)} 字</span>
+                  </button>
+                  <input
+                    aria-label={`重命名场景 ${index + 1}`}
+                    className="novel-workbench__scene-title"
+                    disabled={busy}
+                    onBlur={(event) => handleRenameScene(scene.id, event.target.value.trim())}
+                    onChange={(event) => handleRenameScene(scene.id, event.target.value)}
+                    onFocus={() => setActiveSceneId(scene.id)}
+                    placeholder={`场景 ${index + 1}`}
+                    value={scene.title}
+                  />
+                  <input
+                    aria-label={`场景 ${index + 1} 大纲`}
+                    className="novel-workbench__scene-outline"
+                    disabled={busy}
+                    onChange={(event) => handleSceneOutline(scene.id, event.target.value)}
+                    onFocus={() => setActiveSceneId(scene.id)}
+                    placeholder="场景大纲（可选）"
+                    value={scene.outline ?? ''}
+                  />
+                  <button aria-label={`上移场景 ${index + 1}`} className="novel-flow__ghost" disabled={busy || index === 0} onClick={() => moveScene(scene.id, 'up')} type="button">上移</button>
+                  <button aria-label={`下移场景 ${index + 1}`} className="novel-flow__ghost" disabled={busy || index === activeScenes.length - 1} onClick={() => moveScene(scene.id, 'down')} type="button">下移</button>
+                  <button aria-label={`删除场景 ${index + 1}`} className="novel-flow__ghost" disabled={busy || !canRemoveScene(activeChapter.scenes)} onClick={() => deleteScene(scene.id, index + 1)} type="button">删除</button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
         {status === 'generating' ? (
           <div className="novel-workbench__state novel-workbench__state--streaming">
             <div className="novel-workbench__stream-head">
@@ -978,16 +1137,17 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
           <div className="novel-workbench__editor">
             <div className="novel-workbench__editor-meta">
               <span>{saveStatusLabel(saveStatus)}</span>
-              <span>{countWords(activeChapter.content)} 字</span>
+              <span>{countWords(activeScene.content)} 字（当前场景）</span>
               {saveStatus === 'failed' && <button className="novel-flow__ghost" onClick={onRetrySave} type="button">重试保存</button>}
               {versions.length > 0 && <button className="novel-flow__ghost" onClick={() => setHistoryOpen(true)} type="button">历史版本</button>}
-              {activeChapter.content.trim() && (
+              <button className="novel-flow__ghost" disabled={busy || atVersionCap} onClick={() => void generateChapterBody('continue')} type="button">AI 续写</button>
+              {chapterText(activeChapter).trim() && (
                 <button className="novel-flow__ghost" disabled={busy} onClick={() => void generateChapterReview(activeChapter)} type="button">章节评审</button>
               )}
-              {activeChapter.content.trim() && (
+              {chapterText(activeChapter).trim() && (
                 <button className="novel-flow__ghost" disabled={busy} onClick={() => void generateChapterConsistency(activeChapter)} type="button">一致性检查</button>
               )}
-              {activeChapter.content.trim() && (
+              {chapterText(activeChapter).trim() && (
                 <button className="novel-flow__ghost" disabled={busy} onClick={() => void generateChapterRhythm(activeChapter)} type="button">节奏检查</button>
               )}
               <button className="novel-flow__ghost" disabled={busy} onClick={openOptimizeType} type="button">优化选区</button>
@@ -1025,10 +1185,10 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
             {rhythm.error && <p className="novel-flow__error">{rhythm.error}</p>}
             {optimizeError && <p className="novel-flow__error">{optimizeError}</p>}
             <ChapterFindReplace
-              content={activeChapter.content}
+              content={activeScene.content}
               disabled={busy}
               onLocate={locateEditorMatch}
-              onReplace={(content, selectionStart, selectionEnd) => writeChapterContent(activeChapter.id, content, 'replace', selectionStart, selectionEnd)}
+              onReplace={(content, selectionStart, selectionEnd) => writeSceneContent(activeChapter.id, activeScene.id, content, 'replace', selectionStart, selectionEnd)}
             />
             <div className="novel-workbench__progress-bar">
               <label className="novel-workbench__progress-field">
@@ -1060,11 +1220,11 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
                 />
               </label>
               <span className="novel-workbench__progress-count">
-                {countWords(activeChapter.content)}{activeChapter.wordTarget ? ` / ${activeChapter.wordTarget}` : ''}
+                {countWords(chapterText(activeChapter))}{activeChapter.wordTarget ? ` / ${activeChapter.wordTarget}` : ''}
               </span>
             </div>
             {(() => {
-              const words = countWords(activeChapter.content);
+              const words = countWords(chapterText(activeChapter));
               const target = activeChapter.wordTarget;
               if (target && words < target) return <p className="novel-workbench__soft-hint">{SOFT_GATE_HINTS.belowTarget(target - words)}</p>;
               if (target && words >= target && resolveChapterStatus(activeChapter) !== 'done') return <p className="novel-workbench__soft-hint">{SOFT_GATE_HINTS.reachedTarget}</p>;
@@ -1073,14 +1233,14 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
             })()}
             <textarea
               ref={textareaRef}
-              value={activeChapter.content}
+              value={activeScene.content}
               onChange={(event) => handleManualContentChange(event.currentTarget)}
               onKeyDown={handleEditorKeyDown}
               onKeyUp={(event) => recordSelection(event.currentTarget)}
               onMouseUp={(event) => recordSelection(event.currentTarget)}
               onSelect={(event) => recordSelection(event.currentTarget)}
               readOnly={busy}
-              placeholder="继续打磨本章正文…"
+              placeholder="继续打磨当前场景正文…"
             />
           </div>
         ) : isFirstPending ? (
@@ -1090,7 +1250,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
             {chapterError && <p className="novel-flow__error">{chapterError}</p>}
             {atVersionCap && <span className="novel-workbench__hint">已达 {MAX_CHAPTER_VERSIONS} 个版本上限，请从已有草稿版本中选定写入。</span>}
             {versions.length > 0 && (
-              <button className="novel-flow__ghost" onClick={() => setPreview({ chapterId: activeChapter.id, activeVersionId: versions[versions.length - 1].id, contentSnapshot: activeChapter.content })} type="button">
+              <button className="novel-flow__ghost" onClick={() => setPreview({ chapterId: activeChapter.id, sceneId: activeScene.id, activeVersionId: versions[versions.length - 1].id, contentSnapshot: activeScene.content })} type="button">
                 查看草稿版本（{versions.length}）
               </button>
             )}
@@ -1189,7 +1349,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
           </section>
         </aside>
         <section className="novel-workbench__main" aria-label="章节创作区">
-          <div className="novel-workbench__main-inner" key={activeChapterId ?? 'none'}>{renderMain()}</div>
+          <div className="novel-workbench__main-inner" key={`${activeChapterId ?? 'none'}:${activeSceneId ?? 'none'}`}>{renderMain()}</div>
         </section>
       </div>
       {outlinePreview && (
@@ -1212,18 +1372,18 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
           </div>
         </div>
       )}
-      {historyOpen && activeChapter && (activeChapter.versions?.length ?? 0) > 0 && (
+      {historyOpen && activeChapter && activeScene && (activeScene.versions?.length ?? 0) > 0 && (
         <div className="novel-modal" role="dialog" aria-modal="true" aria-label="历史版本" onClick={() => setHistoryOpen(false)}>
           <div className="novel-workbench__preview" onClick={(event) => event.stopPropagation()}>
             <h2>历史版本</h2>
             <p className="novel-workbench__preview-sub">写回会用所选版本覆盖当前正文，需再次确认；手动编辑不会改动这些版本。</p>
             <div className="novel-workbench__preview-list">
-              {(activeChapter.versions ?? []).map((version, index) => (
+              {(activeScene.versions ?? []).map((version, index) => (
                 <article key={version.id}>
                   <div className="novel-workbench__version-row">
                     <strong>版本 {index + 1} · {countWords(version.content)} 字 · {formatTime(version.createdAt)}</strong>
-                    {activeChapter.selectedVersionId === version.id && <span className="novel-workbench__pill novel-workbench__pill--done">当前选定</span>}
-                    <button className="novel-flow__ghost" onClick={() => restoreVersion(activeChapter, version)} type="button">写回正文</button>
+                    {activeScene.selectedVersionId === version.id && <span className="novel-workbench__pill novel-workbench__pill--done">当前选定</span>}
+                    <button className="novel-flow__ghost" onClick={() => restoreVersion(activeChapter, activeScene, version)} type="button">写回正文</button>
                   </div>
                   <p>{brief(version.content, 120)}</p>
                 </article>

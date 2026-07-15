@@ -524,6 +524,7 @@ function sanitizeWebScene(value: unknown, index: number, now: string): Scene | n
   return {
     id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : crypto.randomUUID(),
     title: typeof item.title === 'string' ? item.title : '',
+    outline: typeof item.outline === 'string' ? item.outline : undefined,
     content: typeof item.content === 'string' ? item.content : '',
     order: Number.isFinite(item.order) ? Number(item.order) : index,
     versions: sanitizeWebChapterVersions(item.versions, now),

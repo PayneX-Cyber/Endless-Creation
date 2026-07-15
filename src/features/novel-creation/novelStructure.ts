@@ -160,10 +160,10 @@ export function assertNovelStructureSelfCheck(): void {
   const now = '2026-01-01T00:00:00.000Z';
   const base = (over: Partial<Novel>): Novel => ({
     id: 'n', title: '', summary: '', note: '', chapters: [], foreshadowings: [], volumes: [],
-    version: 7, createdAt: now, updatedAt: now, ...over,
+    version: 8, createdAt: now, updatedAt: now, ...over,
   }) as Novel;
   const ch = (id: string, order: number, volumeId?: string): Chapter =>
-    ({ id, title: id, content: '', order, volumeId, createdAt: now, updatedAt: now }) as Chapter;
+    ({ id, title: id, scenes: [{ id: `scene-${id}`, title: '', content: '', order: 0 }], order, volumeId, createdAt: now, updatedAt: now }) as Chapter;
   const vol = (id: string, order: number): Volume => ({ id, title: id, order, createdAt: now, updatedAt: now });
 
   // v6 未分卷保持相对顺序

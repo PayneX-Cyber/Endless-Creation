@@ -107,7 +107,7 @@ export function ChapterFindReplace({ content, disabled, onLocate, onReplace }: C
   const status = !query.trim() ? '输入关键词开始查找' : matches.length ? `${safeIndex + 1} / ${matches.length}` : '无匹配';
 
   return (
-    <section className="novel-editor-find" aria-label="章内查找替换">
+    <section className="novel-editor-find" aria-label="场景内查找替换">
       <div className="novel-editor-find__fields">
         <input aria-label="查找关键词" disabled={disabled} onChange={(event) => updateQuery(event.target.value)} placeholder="查找正文…" type="search" value={query} />
         <input aria-label="替换文本" disabled={disabled} onChange={(event) => setReplacement(event.target.value)} placeholder="替换为…" value={replacement} />
