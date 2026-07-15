@@ -1,6 +1,6 @@
 workflow: full
 language: zh-CN
-phase: verify
+phase: archive
 context_compression: off
 build_mode: executing-plans
 build_pause: null
@@ -13,11 +13,11 @@ auto_transition: true
 base_ref: 6dbd5c629fec524310f30308a2f1a2daab4e9fa2
 design_doc: docs/superpowers/specs/2026-07-15-add-chapter-scene-structure-design.md
 plan: docs/superpowers/plans/2026-07-15-add-chapter-scene-structure.md
-verify_result: pending
+verify_result: pass
 verification_report: docs/superpowers/reports/2026-07-15-add-chapter-scene-structure-verify.md
-branch_status: pending
+branch_status: handled
 created_at: 2026-07-15
-verified_at: null
+verified_at: 2026-07-15
 archived: false
 direct_override: null
 handoff_context: openspec/changes/add-chapter-scene-structure/.comet/handoff/design-context.json
