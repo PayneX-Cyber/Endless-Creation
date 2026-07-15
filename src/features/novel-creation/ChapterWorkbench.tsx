@@ -1080,6 +1080,9 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
                     placeholder={`场景 ${index + 1}`}
                     value={scene.title}
                   />
+                  <button aria-label={`上移场景 ${index + 1}`} className="novel-flow__ghost" disabled={busy || index === 0} onClick={() => moveScene(scene.id, 'up')} type="button">上移</button>
+                  <button aria-label={`下移场景 ${index + 1}`} className="novel-flow__ghost" disabled={busy || index === activeScenes.length - 1} onClick={() => moveScene(scene.id, 'down')} type="button">下移</button>
+                  <button aria-label={`删除场景 ${index + 1}`} className="novel-flow__ghost" disabled={busy || !canRemoveScene(activeChapter.scenes)} onClick={() => deleteScene(scene.id, index + 1)} type="button">删除</button>
                   <input
                     aria-label={`场景 ${index + 1} 大纲`}
                     className="novel-workbench__scene-outline"
@@ -1089,9 +1092,6 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
                     placeholder="场景大纲（可选）"
                     value={scene.outline ?? ''}
                   />
-                  <button aria-label={`上移场景 ${index + 1}`} className="novel-flow__ghost" disabled={busy || index === 0} onClick={() => moveScene(scene.id, 'up')} type="button">上移</button>
-                  <button aria-label={`下移场景 ${index + 1}`} className="novel-flow__ghost" disabled={busy || index === activeScenes.length - 1} onClick={() => moveScene(scene.id, 'down')} type="button">下移</button>
-                  <button aria-label={`删除场景 ${index + 1}`} className="novel-flow__ghost" disabled={busy || !canRemoveScene(activeChapter.scenes)} onClick={() => deleteScene(scene.id, index + 1)} type="button">删除</button>
                 </div>
               );
             })}

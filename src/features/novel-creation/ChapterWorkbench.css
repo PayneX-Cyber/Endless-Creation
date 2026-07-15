@@ -587,8 +587,14 @@
 
 .novel-workbench__editor-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.novel-workbench__editor-meta .novel-flow__ghost {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .novel-workbench__editor-meta span {

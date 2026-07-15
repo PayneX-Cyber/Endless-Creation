@@ -246,7 +246,7 @@ export function NovelCreation({ projectId }: { projectId: string }) {
       setWorkbenchReturnTab(null);
       return;
     }
-    setActiveChapterId(chapterId ?? null);
+    if (chapterId) setActiveChapterId(chapterId);
     setInitialForeshadowPanel(Boolean(intent?.foreshadowPanel));
     setWorkbenchReturnTab(intent?.returnTab ?? null);
     setExportMenuOpen(false);
