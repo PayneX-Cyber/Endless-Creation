@@ -11,7 +11,7 @@ import type {
   ApiTextGenerationResult,
   TextStreamEvent,
 } from '../types/apiProvider';
-import type { CharacterGraph, EmotionArc, Novel, NovelListResult, NovelResult, Volume } from '../types/novel';
+import type { Chapter, CharacterGraph, ChapterVersion, EmotionArc, Novel, NovelListResult, NovelResult, Scene, Volume } from '../types/novel';
 import type { ThemeMode } from '../types/workspace';
 
 const THEME_STORAGE_KEY = 'ec-theme';
@@ -502,6 +502,56 @@ function normalizeCharacterGraph(value: unknown): CharacterGraph | undefined {
     : undefined;
 }
 
+function sanitizeWebScene(value: unknown, index: number): Scene | null {
+  if (!value || typeof value !== 'object') return null;
+  const item = value as Partial<Scene>;
+  if (typeof item.content !== 'string' && typeof item.title !== 'string') return null;
+  return {
+    id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : crypto.randomUUID(),
+    title: typeof item.title === 'string' ? item.title : '',
+    content: typeof item.content === 'string' ? item.content : '',
+    order: Number.isFinite(item.order) ? Number(item.order) : index,
+    versions: Array.isArray(item.versions) ? item.versions : undefined,
+    selectedVersionId: typeof item.selectedVersionId === 'string' ? item.selectedVersionId : undefined,
+  };
+}
+
+// v7->v8 chapter migration (symmetric with electron sanitizeChapterScenes): each chapter gets at least one scene (D3).
+function normalizeWebChapterScenes(chapter: unknown): Scene[] {
+  const item = (chapter && typeof chapter === 'object' ? chapter : {}) as {
+    scenes?: unknown;
+    content?: unknown;
+    versions?: unknown;
+    selectedVersionId?: unknown;
+  };
+  if (Array.isArray(item.scenes) && item.scenes.length > 0) {
+    const scenes = item.scenes
+      .map((scene, index) => sanitizeWebScene(scene, index))
+      .filter((scene): scene is Scene => scene !== null)
+      .sort((a, b) => a.order - b.order)
+      .map((scene, order) => ({ ...scene, order }));
+    if (scenes.length > 0) return scenes;
+  }
+  // v7 or corrupted: migrate legacy chapter body into a single default scene.
+  return [{
+    id: crypto.randomUUID(),
+    title: '',
+    content: typeof item.content === 'string' ? item.content : '',
+    order: 0,
+    versions: Array.isArray(item.versions) ? (item.versions as ChapterVersion[]) : undefined,
+    selectedVersionId: typeof item.selectedVersionId === 'string' ? item.selectedVersionId : undefined,
+  }];
+}
+
+// D1 scene-content aggregation (symmetric with electron aggregateChapterContent).
+function aggregateWebChapterContent(chapter: Chapter): string {
+  return [...chapter.scenes]
+    .sort((a, b) => a.order - b.order)
+    .map((scene) => scene.content)
+    .filter((content) => content.trim() !== '')
+    .join('\n\n');
+}
+
 function sanitizeWebVolumes(value: unknown[]): Volume[] {
   const now = new Date().toISOString();
   return value
@@ -552,7 +602,7 @@ function normalizeWebNovel(value: unknown): Novel | null {
     const volumeId = typeof chapter.volumeId === 'string' && chapter.volumeId.trim() && volumeIds.has(chapter.volumeId.trim())
       ? chapter.volumeId.trim()
       : undefined;
-    return { ...chapter, volumeId };
+    return { ...chapter, volumeId, scenes: normalizeWebChapterScenes(chapter) };
   });
   const chapters = normalizeWebChapterGroupOrder(remappedChapters, volumes);
   return {
@@ -577,8 +627,8 @@ function toNovelSummary(novel: Novel) {
     createdAt: novel.createdAt,
     updatedAt: novel.updatedAt,
     chapterCount: novel.chapters.length,
-    wordCount: novel.chapters.reduce((sum, chapter) => sum + countWords(chapter.content), 0),
-    filledChapterCount: novel.chapters.filter((chapter) => chapter.content.trim() !== '').length,
+    wordCount: novel.chapters.reduce((sum, chapter) => sum + countWords(aggregateWebChapterContent(chapter)), 0),
+    filledChapterCount: novel.chapters.filter((chapter) => aggregateWebChapterContent(chapter).trim() !== '').length,
   };
 }
 

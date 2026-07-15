@@ -788,10 +788,8 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
     return {
       id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : randomUUID(),
       title: typeof item.title === 'string' ? item.title : '',
-      content: typeof item.content === 'string' ? item.content : '',
+      scenes: sanitizeChapterScenes(chapter, now),
       outline: typeof item.outline === 'string' ? item.outline : undefined,
-      versions: sanitizeChapterVersions(item.versions, now),
-      selectedVersionId: typeof item.selectedVersionId === 'string' ? item.selectedVersionId : undefined,
       status: item.status === 'draft' || item.status === 'inProgress' || item.status === 'done' ? item.status : undefined,
       wordTarget: typeof item.wordTarget === 'number' && Number.isFinite(item.wordTarget) && item.wordTarget > 0 ? item.wordTarget : undefined,
       volumeId,
@@ -882,6 +880,55 @@ function sanitizeChapterVersions(value: unknown, fallbackTime: string): ChapterV
   }).filter((entry): entry is ChapterVersion => entry !== null).slice(-5);
 }
 
+function sanitizeScene(value: unknown, index: number, now: string): Scene | null {
+  if (!value || typeof value !== 'object') return null;
+  const item = value as Partial<Scene>;
+  if (typeof item.content !== 'string' && typeof item.title !== 'string') return null;
+  return {
+    id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : randomUUID(),
+    title: typeof item.title === 'string' ? item.title : '',
+    content: typeof item.content === 'string' ? item.content : '',
+    order: Number.isFinite(item.order) ? Number(item.order) : index,
+    versions: sanitizeChapterVersions(item.versions, now),
+    selectedVersionId: typeof item.selectedVersionId === 'string' ? item.selectedVersionId : undefined,
+  };
+}
+
+// v7->v8 chapter migration: normalize each chapter to at least one scene (invariant D3).
+function sanitizeChapterScenes(chapter: unknown, now: string): Scene[] {
+  const item = (chapter && typeof chapter === 'object' ? chapter : {}) as Partial<Chapter> & {
+    content?: unknown;
+    versions?: unknown;
+    selectedVersionId?: unknown;
+  };
+  if (Array.isArray(item.scenes) && item.scenes.length > 0) {
+    const scenes = item.scenes
+      .map((scene, index) => sanitizeScene(scene, index, now))
+      .filter((scene): scene is Scene => scene !== null)
+      .sort((a, b) => a.order - b.order)
+      .map((scene, order) => ({ ...scene, order }));
+    if (scenes.length > 0) return scenes;
+  }
+  // v7 or corrupted: migrate legacy chapter body into a single default scene.
+  return [{
+    id: randomUUID(),
+    title: '',
+    content: typeof item.content === 'string' ? item.content : '',
+    order: 0,
+    versions: Array.isArray(item.versions) ? sanitizeChapterVersions(item.versions, now) : undefined,
+    selectedVersionId: typeof item.selectedVersionId === 'string' ? item.selectedVersionId : undefined,
+  }];
+}
+
+// D1 scene-content aggregation: ordered scene content -> drop trim-empty -> join, without trimming kept bodies.
+function aggregateChapterContent(chapter: Chapter): string {
+  return [...chapter.scenes]
+    .sort((a, b) => a.order - b.order)
+    .map((scene) => scene.content)
+    .filter((content) => content.trim() !== '')
+    .join('\n\n');
+}
+
 function toNovelSummary(novel: Novel): NovelSummary {
   return {
     id: novel.id,
@@ -891,8 +938,8 @@ function toNovelSummary(novel: Novel): NovelSummary {
     createdAt: novel.createdAt,
     updatedAt: novel.updatedAt,
     chapterCount: novel.chapters.length,
-    wordCount: novel.chapters.reduce((sum, chapter) => sum + countNovelWords(chapter.content), 0),
-    filledChapterCount: novel.chapters.filter((chapter) => chapter.content.trim() !== '').length,
+    wordCount: novel.chapters.reduce((sum, chapter) => sum + countNovelWords(aggregateChapterContent(chapter)), 0),
+    filledChapterCount: novel.chapters.filter((chapter) => aggregateChapterContent(chapter).trim() !== '').length,
   };
 }
 
