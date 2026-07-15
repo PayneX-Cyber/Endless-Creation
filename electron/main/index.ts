@@ -789,7 +789,7 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
     return {
       id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : randomUUID(),
       title: typeof item.title === 'string' ? item.title : '',
-      scenes: sanitizeChapterScenes(chapter, now),
+      scenes: sanitizeChapterScenes(chapter, now, Number(candidate.version) !== 8),
       outline: typeof item.outline === 'string' ? item.outline : undefined,
       status: item.status === 'draft' || item.status === 'inProgress' || item.status === 'done' ? item.status : undefined,
       wordTarget: typeof item.wordTarget === 'number' && Number.isFinite(item.wordTarget) && item.wordTarget > 0 ? item.wordTarget : undefined,
@@ -897,13 +897,13 @@ function sanitizeScene(value: unknown, index: number, now: string): Scene | null
 }
 
 // v7->v8 chapter migration: normalize each chapter to at least one scene (invariant D3).
-function sanitizeChapterScenes(chapter: unknown, now: string): Scene[] {
+function sanitizeChapterScenes(chapter: unknown, now: string, migrateLegacy = false): Scene[] {
   const item = (chapter && typeof chapter === 'object' ? chapter : {}) as Partial<Chapter> & {
     content?: unknown;
     versions?: unknown;
     selectedVersionId?: unknown;
   };
-  if (Array.isArray(item.scenes) && item.scenes.length > 0) {
+  if (!migrateLegacy && Array.isArray(item.scenes) && item.scenes.length > 0) {
     const scenes = item.scenes
       .map((scene, index) => sanitizeScene(scene, index, now))
       .filter((scene): scene is Scene => scene !== null)
@@ -929,7 +929,8 @@ function assertChapterSceneMigrationSelfCheck(): void {
     content: '旧正文',
     versions,
     selectedVersionId: 'version-1',
-  }, now);
+    scenes: [{ id: 'stale-scene', title: '', content: '不应保留', order: 0 }],
+  }, now, true);
   const empty = sanitizeChapterScenes({}, now);
   if (migrated.length !== 1 || migrated[0].title !== '' || migrated[0].content !== '旧正文'
     || migrated[0].order !== 0 || migrated[0].versions?.[0]?.content !== '旧版本'
@@ -989,8 +990,14 @@ async function listNovels(projectId?: unknown): Promise<{ ok: boolean; message?:
 
 async function readNovelFile(id: string): Promise<Novel> {
   const raw = await fs.readFile(getNovelPath(id), 'utf-8');
-  const novel = sanitizeNovel(JSON.parse(raw), id);
+  const parsed = JSON.parse(raw) as { version?: unknown };
+  const novel = sanitizeNovel(parsed, id);
   if (!novel) throw new Error('\u5c0f\u8bf4\u6587\u4ef6\u635f\u574f\u3002');
+  if (parsed.version !== 8) {
+    const saved = await saveNovel(novel);
+    if (!saved.ok || !saved.novel) throw new Error(saved.message);
+    return saved.novel;
+  }
   return novel;
 }
 

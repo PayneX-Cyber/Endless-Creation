@@ -72,7 +72,7 @@ export function searchChapters(novel: Novel, keyword: string): ChapterSearchResu
         field,
         matchOffset,
         matchedText: value.slice(matchOffset, matchOffset + query.length),
-        snippet: `${snippetStart ? '…' : ''}${value.slice(snippetStart, snippetEnd).replace(/\s+/g, ' ')}${snippetEnd < value.length ? '…' : ''}`,
+        snippet: `${snippetStart ? '…' : ''}${value.slice(snippetStart, snippetEnd)}${snippetEnd < value.length ? '…' : ''}`,
         snippetMatchOffset: matchOffset - snippetStart + (snippetStart ? 1 : 0),
       }];
     });
@@ -119,7 +119,7 @@ export function ChapterSearchPanel({ novel, onSelect }: { novel: Novel; onSelect
 
 function assertNovelNavigationSelfCheck(): void {
   const chapters = [
-    { id: 'b', title: 'Beta', scenes: [{ id: 'sb', title: '', content: 'Second KEYWORD', order: 0 }], outline: '', order: 1 },
+    { id: 'b', title: 'Beta', scenes: [{ id: 'sb', title: '', content: 'Second \n\n KEYWORD', order: 0 }], outline: '', order: 1 },
     { id: 'a', title: 'Alpha', scenes: [{ id: 'sa', title: '', outline: 'scene keyword', content: 'First', order: 0 }], outline: 'keyword outline', order: 0 },
   ] as Chapter[];
   const reordered = reorderChapters(chapters, 1, 0);
@@ -127,6 +127,7 @@ function assertNovelNavigationSelfCheck(): void {
   if (reordered.map((chapter) => `${chapter.id}:${chapter.order}`).join(',') !== 'a:0,b:1'
     || results.length !== 3
     || results.some((result) => !result.sceneId || !result.snippet.toLocaleLowerCase().includes('keyword'))
+    || results.some((result) => result.snippet.slice(result.snippetMatchOffset, result.snippetMatchOffset + result.matchedText.length).toLocaleLowerCase() !== 'keyword')
     || !results.some((result) => result.field === 'content' && result.sceneId === 'sb')) {
     throw new Error('Novel navigation self-check failed.');
   }

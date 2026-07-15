@@ -76,6 +76,37 @@ export function buildContinueChapterPrompt(novel: Novel, chapter: Chapter, scene
   ];
 }
 
+function assertSceneContinueContextSelfCheck(): void {
+  const chapter = {
+    id: 'chapter-1',
+    title: '章节',
+    scenes: [
+      { id: 'scene-1', title: '', content: '前序场景', order: 0 },
+      { id: 'scene-2', title: '', content: '当前场景', order: 1 },
+      { id: 'scene-3', title: '', content: '后续场景不应出现', order: 2 },
+    ],
+    order: 0,
+  } as Chapter;
+  const novel: Novel = {
+    id: 'novel-1',
+    title: '小说',
+    summary: '',
+    note: '',
+    volumes: [],
+    chapters: [chapter],
+    foreshadowings: [],
+    version: 8,
+    createdAt: '',
+    updatedAt: '',
+  };
+  const prompt = buildContinueChapterPrompt(novel, chapter, 'scene-2')[1].content;
+  if (!prompt.includes('前序场景') || !prompt.includes('当前场景') || prompt.includes('后续场景不应出现')) {
+    throw new Error('Scene continuation context self-check failed.');
+  }
+}
+
+assertSceneContinueContextSelfCheck();
+
 export function buildPolishChapterPrompt(novel: Novel, chapter: Chapter, text: string): TextMessage[] {
   return buildEditPrompt(novel, chapter, text, '润色下面正文：保持原意，优化表达、节奏和错别字，直接输出润色后的正文，不解释，不加标题。');
 }

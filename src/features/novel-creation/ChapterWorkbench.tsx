@@ -116,7 +116,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
   const [generatingSceneId, setGeneratingSceneId] = useState<string | null>(null);
   const [streamingText, setStreamingText] = useState('');
   const [cancelledVersionId, setCancelledVersionId] = useState<string | null>(null);
-  const [generationError, setGenerationError] = useState<{ chapterId: string; message: string } | null>(null);
+  const [generationError, setGenerationError] = useState<{ chapterId: string; sceneId?: string; message: string } | null>(null);
   const [preview, setPreview] = useState<VersionPreviewState | null>(null);
   const [activeSceneId, setActiveSceneId] = useState<string>();
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -538,7 +538,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     if (mode === 'draft' && !chapter.outline?.trim()) return;
     if (!scene || (scene.versions?.length ?? 0) >= MAX_CHAPTER_VERSIONS) return;
     const previousChapter = firstPendingIndex > 0 ? chapters[firstPendingIndex - 1] : undefined;
-    const ready = ensureTextModel((message) => setGenerationError({ chapterId: chapter.id, message }));
+    const ready = ensureTextModel((message) => setGenerationError({ chapterId: chapter.id, sceneId: scene.id, message }));
     if (!ready) return;
     const requestId = createId('text-request');
     const runId = runRef.current + 1;
@@ -575,7 +575,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
       streamTextRef.current = '';
       generationPrefixRef.current = '';
       setStreamingText('');
-      setGenerationError({ chapterId: chapter.id, message: result.message || '生成章节正文失败，请稍后重试。' });
+      setGenerationError({ chapterId: chapter.id, sceneId: scene.id, message: result.message || '生成章节正文失败，请稍后重试。' });
       return;
     }
     streamTextRef.current = '';
@@ -1030,7 +1030,11 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
     const status = chapterStatus(activeChapter);
     const isFirstPending = activeIndex === firstPendingIndex;
     const hasOutline = Boolean(activeChapter.outline?.trim());
-    const chapterError = generationError && generationError.chapterId === activeChapter.id ? generationError.message : '';
+    const chapterError = generationError
+      && generationError.chapterId === activeChapter.id
+      && (!generationError.sceneId || generationError.sceneId === activeScene.id)
+      ? generationError.message
+      : '';
     const versions = activeScene.versions ?? [];
     const chapterPreview = preview && preview.chapterId === activeChapter.id && preview.sceneId === activeScene.id ? preview : null;
     const activeVersion = chapterPreview ? versions.find((item) => item.id === chapterPreview.activeVersionId) ?? null : null;
@@ -1097,7 +1101,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
           <div className="novel-workbench__state novel-workbench__state--streaming">
             <div className="novel-workbench__stream-head">
               <span className="novel-workbench__spinner" aria-hidden="true" />
-              <strong>正在生成章节正文…</strong>
+              <strong>正在生成场景正文…</strong>
             </div>
             {streamingText ? (
               <p className="novel-workbench__stream-text">{streamingText}</p>
@@ -1110,7 +1114,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
           <div className="novel-workbench__draft">
             <div className="novel-workbench__draft-head">
               <strong>正文草稿{activeVersion.id === cancelledVersionId ? '（已取消）' : ''}</strong>
-              <span>{countWords(activeVersion.content)} 字 · {activeVersion.id === cancelledVersionId ? '已取消生成，可编辑后写入或另生成一版' : '确认后写入本章正文'}</span>
+               <span>{countWords(activeVersion.content)} 字 · {activeVersion.id === cancelledVersionId ? '已取消生成，可编辑后写入或另生成一版' : '确认后写入当前场景正文'}</span>
             </div>
             <div className="novel-workbench__versions">
               {versions.map((version, index) => (
@@ -1184,6 +1188,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
             {consistency.error && <p className="novel-flow__error">{consistency.error}</p>}
             {rhythm.error && <p className="novel-flow__error">{rhythm.error}</p>}
             {optimizeError && <p className="novel-flow__error">{optimizeError}</p>}
+            {chapterError && <p className="novel-flow__error">{chapterError}</p>}
             <ChapterFindReplace
               content={activeScene.content}
               disabled={busy}
@@ -1376,7 +1381,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
         <div className="novel-modal" role="dialog" aria-modal="true" aria-label="历史版本" onClick={() => setHistoryOpen(false)}>
           <div className="novel-workbench__preview" onClick={(event) => event.stopPropagation()}>
             <h2>历史版本</h2>
-            <p className="novel-workbench__preview-sub">写回会用所选版本覆盖当前正文，需再次确认；手动编辑不会改动这些版本。</p>
+            <p className="novel-workbench__preview-sub">写回会用所选版本覆盖当前场景正文，需再次确认；手动编辑不会改动这些版本。</p>
             <div className="novel-workbench__preview-list">
               {(activeScene.versions ?? []).map((version, index) => (
                 <article key={version.id}>

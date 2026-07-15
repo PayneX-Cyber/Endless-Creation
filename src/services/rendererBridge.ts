@@ -453,7 +453,12 @@ function readWebNovels(): Novel[] {
   try {
     const raw = globalThis.localStorage?.getItem(WEB_NOVELS_STORAGE_KEY);
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.map(normalizeWebNovel).filter((novel): novel is Novel => novel !== null) : [];
+    if (!Array.isArray(parsed)) return [];
+    const novels = parsed.map(normalizeWebNovel).filter((novel): novel is Novel => novel !== null);
+    if (parsed.some((novel) => !novel || typeof novel !== 'object' || (novel as { version?: unknown }).version !== 8)) {
+      writeWebNovels(novels);
+    }
+    return novels;
   } catch {
     return [];
   }
@@ -533,14 +538,14 @@ function sanitizeWebScene(value: unknown, index: number, now: string): Scene | n
 }
 
 // v7->v8 chapter migration (symmetric with electron sanitizeChapterScenes): each chapter gets at least one scene (D3).
-function normalizeWebChapterScenes(chapter: unknown, now: string): Scene[] {
+function normalizeWebChapterScenes(chapter: unknown, now: string, migrateLegacy = false): Scene[] {
   const item = (chapter && typeof chapter === 'object' ? chapter : {}) as {
     scenes?: unknown;
     content?: unknown;
     versions?: unknown;
     selectedVersionId?: unknown;
   };
-  if (Array.isArray(item.scenes) && item.scenes.length > 0) {
+  if (!migrateLegacy && Array.isArray(item.scenes) && item.scenes.length > 0) {
     const scenes = item.scenes
       .map((scene, index) => sanitizeWebScene(scene, index, now))
       .filter((scene): scene is Scene => scene !== null)
@@ -566,7 +571,8 @@ function assertWebChapterSceneMigrationSelfCheck(): void {
     content: '旧正文',
     versions,
     selectedVersionId: 'version-1',
-  }, now);
+    scenes: [{ id: 'stale-scene', title: '', content: '不应保留', order: 0 }],
+  }, now, true);
   const empty = normalizeWebChapterScenes({}, now);
   if (migrated.length !== 1 || migrated[0].title !== '' || migrated[0].content !== '旧正文'
     || migrated[0].order !== 0 || migrated[0].versions?.[0]?.content !== '旧版本'
@@ -644,7 +650,7 @@ function normalizeWebNovel(value: unknown): Novel | null {
     return {
       id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : crypto.randomUUID(),
       title: typeof item.title === 'string' ? item.title : '',
-      scenes: normalizeWebChapterScenes(chapter, now),
+      scenes: normalizeWebChapterScenes(chapter, now, Number((value as { version?: unknown }).version) !== 8),
       outline: typeof item.outline === 'string' ? item.outline : undefined,
       status: item.status === 'draft' || item.status === 'inProgress' || item.status === 'done' ? item.status : undefined,
       wordTarget: typeof item.wordTarget === 'number' && Number.isFinite(item.wordTarget) && item.wordTarget > 0 ? item.wordTarget : undefined,
