@@ -558,6 +558,25 @@ function normalizeWebChapterScenes(chapter: unknown, now: string): Scene[] {
   }];
 }
 
+function assertWebChapterSceneMigrationSelfCheck(): void {
+  const now = '2026-01-01T00:00:00.000Z';
+  const versions: ChapterVersion[] = [{ id: 'version-1', content: '旧版本', createdAt: now }];
+  const migrated = normalizeWebChapterScenes({
+    content: '旧正文',
+    versions,
+    selectedVersionId: 'version-1',
+  }, now);
+  const empty = normalizeWebChapterScenes({}, now);
+  if (migrated.length !== 1 || migrated[0].title !== '' || migrated[0].content !== '旧正文'
+    || migrated[0].order !== 0 || migrated[0].versions?.[0]?.content !== '旧版本'
+    || migrated[0].selectedVersionId !== 'version-1'
+    || empty.length !== 1 || empty[0].title !== '' || empty[0].content !== '' || empty[0].order !== 0) {
+    throw new Error('web chapter scene migration self-check');
+  }
+}
+
+assertWebChapterSceneMigrationSelfCheck();
+
 // D1 scene-content aggregation (symmetric with electron aggregateChapterContent).
 function aggregateWebChapterContent(chapter: Chapter): string {
   return [...chapter.scenes]
