@@ -128,13 +128,20 @@ interface Volume {
   updatedAt: string;
 }
 
-interface Chapter {
+interface Scene {
   id: string;
   title: string;
   content: string;
-  outline?: string;
+  order: number;
   versions?: ChapterVersion[];
   selectedVersionId?: string;
+}
+
+interface Chapter {
+  id: string;
+  title: string;
+  scenes: Scene[];
+  outline?: string;
   status?: ChapterStatus;
   wordTarget?: number;
   volumeId?: string;
@@ -211,7 +218,7 @@ interface Novel {
   pinnedForeshadowingIds?: string[];
   emotionArc?: EmotionArc;
   characterGraph?: CharacterGraph;
-  version: 7;
+  version: 8;
   createdAt: string;
   updatedAt: string;
 }
@@ -812,7 +819,7 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
     pinnedForeshadowingIds: sanitizeStringIds(candidate.pinnedForeshadowingIds),
     emotionArc: sanitizeEmotionArc(candidate.emotionArc),
     characterGraph: sanitizeCharacterGraph(candidate.characterGraph),
-    version: 7,
+    version: 8,
     createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : now,
     updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : now,
   };
@@ -934,7 +941,7 @@ async function createNovel(input: unknown): Promise<{ ok: boolean; message: stri
     settings: [],
     pinnedSettingIds: [],
     pinnedForeshadowingIds: [],
-    version: 7,
+    version: 8,
     createdAt: now,
     updatedAt: now,
   };

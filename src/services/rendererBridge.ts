@@ -354,7 +354,7 @@ export const rendererBridge = {
       settings: [],
       pinnedSettingIds: [],
       pinnedForeshadowingIds: [],
-      version: 7,
+      version: 8,
       createdAt: now,
       updatedAt: now,
     };
@@ -565,7 +565,7 @@ function normalizeWebNovel(value: unknown): Novel | null {
     pinnedForeshadowingIds: Array.isArray(value.pinnedForeshadowingIds) ? value.pinnedForeshadowingIds : [],
     emotionArc: normalizeEmotionArc(value.emotionArc),
     characterGraph: normalizeCharacterGraph(value.characterGraph),
-    version: 7,
+    version: 8,
   };
 }
 

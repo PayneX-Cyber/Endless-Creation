@@ -14,13 +14,20 @@ export interface Volume {
   updatedAt: string;
 }
 
+export interface Scene {
+  id: string;
+  title: string;          // 默认场景持久化留空字符串，UI 派生"场景 N"
+  content: string;
+  order: number;
+  versions?: ChapterVersion[];
+  selectedVersionId?: string;
+}
+
 export interface Chapter {
   id: string;
   title: string;
-  content: string;
+  scenes: Scene[];        // 不变量 length >= 1
   outline?: string;
-  versions?: ChapterVersion[];
-  selectedVersionId?: string;
   status?: ChapterStatus;
   wordTarget?: number;
   volumeId?: string;
@@ -97,7 +104,7 @@ export interface Novel {
   pinnedForeshadowingIds?: string[];
   emotionArc?: EmotionArc;
   characterGraph?: CharacterGraph;
-  version: 7;
+  version: 8;
   createdAt: string;
   updatedAt: string;
 }

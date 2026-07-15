@@ -120,13 +120,20 @@ export interface Volume {
   updatedAt: string;
 }
 
-export interface Chapter {
+export interface Scene {
   id: string;
   title: string;
   content: string;
-  outline?: string;
+  order: number;
   versions?: ChapterVersion[];
   selectedVersionId?: string;
+}
+
+export interface Chapter {
+  id: string;
+  title: string;
+  scenes: Scene[];
+  outline?: string;
   status?: ChapterStatus;
   wordTarget?: number;
   volumeId?: string;
@@ -202,7 +209,7 @@ export interface Novel {
   pinnedForeshadowingIds?: string[];
   emotionArc?: EmotionArc;
   characterGraph?: CharacterGraph;
-  version: 7;
+  version: 8;
   createdAt: string;
   updatedAt: string;
 }
