@@ -2,6 +2,8 @@
 comet_change: add-novel-volume-structure
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-07-15-add-novel-volume-structure
+status: final
 ---
 
 # add-novel-volume-structure 技术设计
@@ -143,3 +145,4 @@ interface Novel {
 - 不新增卷专用 IPC / 数据库 / 索引 / 第三方拖拽依赖。
 - 不为 `NovelSummary` 加 `volumeCount`。
 - 不实现 v7→v8 或完整四级结构。
+

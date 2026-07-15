@@ -2,6 +2,7 @@
 change: add-novel-volume-structure
 design-doc: docs/superpowers/specs/2026-07-14-add-novel-volume-structure-design.md
 base-ref: 6dc6c496a824fcacf9071cc2eaa54b296afb6cd9
+archived-with: 2026-07-15-add-novel-volume-structure
 ---
 
 # 小说卷（Volume）层级结构 Implementation Plan
@@ -30,6 +31,7 @@ base-ref: 6dc6c496a824fcacf9071cc2eaa54b296afb6cd9
 - 删除卷始终使用现有 `window.confirm`，文案必须显示受影响章节数并说明章节仅移入“未分卷”、正文不删。
 - 交付验证命令固定：`npm.cmd run build`（renderer tsc+Vite / Electron tsc 均 exit 0）；`python "C:\Users\x1176\.codex\skills\endless-creation-guardrails\scripts\scan_text_integrity.py" "F:\AIProject\Endless Creation\src"` 得 `TEXT INTEGRITY OK`；`git diff --check` 无空白错误。
 
+archived-with: 2026-07-15-add-novel-volume-structure
 ---
 
 ### Task 1: Schema v7 类型与兼容迁移消毒（对齐 tasks.md 组 1）
@@ -764,3 +766,4 @@ Plan complete and saved to `docs/superpowers/plans/2026-07-14-add-novel-volume-s
 2. **Inline Execution** - execute tasks in this session using executing-plans, batch execution with checkpoints.
 
 Which approach?
+
