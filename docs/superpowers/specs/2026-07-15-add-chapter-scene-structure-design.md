@@ -2,6 +2,8 @@
 comet_change: add-chapter-scene-structure
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-07-15-add-chapter-scene-structure
+status: final
 ---
 
 # Design Doc：add-chapter-scene-structure（正文权威模型下沉到 Scene）

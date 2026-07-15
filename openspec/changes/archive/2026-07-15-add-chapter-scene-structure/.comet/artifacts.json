@@ -3,5 +3,6 @@
   "openspec_design": "openspec/changes/add-chapter-scene-structure/design.md",
   "openspec_delta_spec": "openspec/changes/add-chapter-scene-structure/specs/chapter-find-replace/spec.md",
   "handoff_context": "openspec/changes/add-chapter-scene-structure/.comet/handoff/design-context.json",
-  "handoff_markdown": "openspec/changes/add-chapter-scene-structure/.comet/handoff/design-context.md"
+  "handoff_markdown": "openspec/changes/add-chapter-scene-structure/.comet/handoff/design-context.md",
+  "archive_directory": "openspec/changes/archive/2026-07-15-add-chapter-scene-structure"
 }

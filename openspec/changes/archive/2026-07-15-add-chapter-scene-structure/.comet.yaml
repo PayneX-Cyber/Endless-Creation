@@ -18,7 +18,7 @@ verification_report: docs/superpowers/reports/2026-07-15-add-chapter-scene-struc
 branch_status: handled
 created_at: 2026-07-15
 verified_at: 2026-07-15
-archived: false
+archived: true
 direct_override: null
 handoff_context: openspec/changes/add-chapter-scene-structure/.comet/handoff/design-context.json
 handoff_hash: 0a47e15930724b319cad1147dd86637cba40f1dd67d675fa2c28019a9c06c984

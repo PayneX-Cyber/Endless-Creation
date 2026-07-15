@@ -2,6 +2,7 @@
 change: add-chapter-scene-structure
 design-doc: docs/superpowers/specs/2026-07-15-add-chapter-scene-structure-design.md
 base-ref: 6dbd5c629fec524310f30308a2f1a2daab4e9fa2
+archived-with: 2026-07-15-add-chapter-scene-structure
 ---
 
 # 正文权威模型下沉到 Scene 实现计划
@@ -32,6 +33,7 @@ base-ref: 6dbd5c629fec524310f30308a2f1a2daab4e9fa2
 - **不新增 IPC、不新增第三方依赖、不改卷层、不做 v8→v9**；复用现有 `saveNovel(novel)` 整体持久化链与原子写入。
 - **大 tsx 文件红线**：`ChapterWorkbench.tsx` / `NovelCreation.tsx` 用 Read 工具会渲染幻影字节。实现者必须靠 **Grep 锚点 + tsc/CodeGraph 验证**定位与确认，改文件锚 **ASCII-only 行**，**禁止硬怼多行 sed 插入**。
 
+archived-with: 2026-07-15-add-chapter-scene-structure
 ---
 
 ## 文件结构总览
@@ -49,6 +51,7 @@ base-ref: 6dbd5c629fec524310f30308a2f1a2daab4e9fa2
 | `src/features/novel-creation/novelEditorTools.tsx` | 编辑历史/查找替换工具 | 视需要调整 `EditorHistory` 调用锚点（不改核心算法） |
 | `novelExport.ts` / `novelProgress.ts` / `NovelStats.tsx` / `novelPrompts.ts` / `characterGraph.ts` / `emotionArc.ts` / `EmotionArcPanel.tsx` / `novelNavigation.tsx` | 正文消费者 | 全部改读 `chapterText(chapter)` / `orderedScenes(chapter)` |
 
+archived-with: 2026-07-15-add-chapter-scene-structure
 ---
 
 ## Task 1: Scene schema v8 与四份协议副本同步（tasks 1.1）
@@ -121,6 +124,7 @@ git add src/types/novel.ts electron/preload/bridgeTypes.ts electron/main/index.t
 git commit -m "feat: add Scene schema and bump novel version to v8"
 ```
 
+archived-with: 2026-07-15-add-chapter-scene-structure
 ---
 
 ## Task 2: v7→v8 迁移与新章默认场景（tasks 1.2 / 1.3）
@@ -183,6 +187,7 @@ git add electron/main/index.ts src/services/rendererBridge.ts
 git commit -m "feat: migrate chapters to scenes on load and init default scene on create"
 ```
 
+archived-with: 2026-07-15-add-chapter-scene-structure
 ---
 
 ## Task 3: sceneStructure 纯函数模块 + 自检（tasks 2.1 / 2.2 / 2.3 / 2.4）
@@ -262,6 +267,7 @@ git add src/features/novel-creation/sceneStructure.ts src/features/novel-creatio
 git commit -m "feat: add sceneStructure pure functions with self-tests"
 ```
 
+archived-with: 2026-07-15-add-chapter-scene-structure
 ---
 
 ## Task 4: 分场景编辑器与场景管理 UI（tasks 3.1 / 3.2）
@@ -308,6 +314,7 @@ git add src/features/novel-creation/ChapterWorkbench.tsx src/features/novel-crea
 git commit -m "feat: per-scene editing with scene management UI"
 ```
 
+archived-with: 2026-07-15-add-chapter-scene-structure
 ---
 
 ## Task 5: 撤销栈按 sceneId 隔离 + 查找替换落场景（tasks 3.3 / 3.4）
@@ -350,6 +357,7 @@ git add src/features/novel-creation/ChapterWorkbench.tsx src/features/novel-crea
 git commit -m "feat: isolate undo history and find/replace by scene"
 ```
 
+archived-with: 2026-07-15-add-chapter-scene-structure
 ---
 
 ## Task 6: 版本历史与 AI 续写下沉 scene 粒度（tasks 4.1 / 4.2）
@@ -391,6 +399,7 @@ git add src/features/novel-creation/ChapterWorkbench.tsx
 git commit -m "feat: sink version history and AI continuation to scene granularity"
 ```
 
+archived-with: 2026-07-15-add-chapter-scene-structure
 ---
 
 ## Task 7: 正文消费者编译期迁移（tasks 5.1 / 5.2 / 5.3）
@@ -445,6 +454,7 @@ git add src/features/novel-creation/novelExport.ts src/features/novel-creation/n
 git commit -m "feat: migrate body consumers to chapterText aggregate"
 ```
 
+archived-with: 2026-07-15-add-chapter-scene-structure
 ---
 
 ## Task 8: 搜索纳入场景与场景内定位（tasks 6.1 / 6.2）
@@ -482,6 +492,7 @@ git add src/features/novel-creation/novelNavigation.tsx src/features/novel-creat
 git commit -m "feat: include scenes in search and locate hits within scene"
 ```
 
+archived-with: 2026-07-15-add-chapter-scene-structure
 ---
 
 ## Task 9: 验证与交付（tasks 7.1 / 7.2 / 7.3 / 7.4）
@@ -530,6 +541,7 @@ git status   # 核对无平台/工具未跟踪目录被 add
 git commit -m "feat: sink novel body model to scene (v7->v8)"
 ```
 
+archived-with: 2026-07-15-add-chapter-scene-structure
 ---
 
 ## Self-Review
