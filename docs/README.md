@@ -32,9 +32,10 @@
 
 - V1 Beta 收口、AI usage 持久化和情感曲线均已完成并推送。
 - Phase 4 商业化仍后置；情感曲线只解除其中一项门槛。
-- 当前活动 OpenSpec change：`ai-workflow-governance`，build 已完成，等待 verify。
+- 当前无活动 OpenSpec change；`ai-workflow-governance`、卷结构与场景结构均已归档。
 - [AI 工作流治理与防腐化基建设计](superpowers/specs/2026-07-12-ai-workflow-governance-design.md) 已实现至 Observe 阶段；[QA 台账](qa/2026-07-12-ai-workflow-governance.md) 已记录验证证据和 Skill 来源基线。
-- 下一阶段优先做内部全链路狗粮验证，不把内部验证冒充真实种子用户反馈。
+- 当前执行 V1 本地种子版最终全链路验收，不把内部验证冒充真实种子用户反馈。
+- [V1 本地种子版最终收口 QA](qa/2026-07-16-v1-local-seed-final-closure.md) 已覆盖四个当前可用模块与桌面壳。
 
 ## 架构
 
@@ -103,6 +104,7 @@
 | 文档 | 用途 | 状态 |
 | --- | --- | --- |
 | [localStorage 隔离规则](qa/local-storage-isolation.md) | QA 不污染真实 Electron profile | 当前规则 |
+| [V1 本地种子版最终收口](qa/2026-07-16-v1-local-seed-final-closure.md) | 小说、生图、资产、画布与桌面壳整包验收 | 当前 |
 | [P0 狗粮记录](qa/p0-dogfood-2026-07-09.md) | 早期主链路验收结果 | 历史记录 |
 | [V1 Beta 收口复核](qa/v1-beta-closure-review-2026-07-09.md) | Beta 收口审查 | 历史记录 |
 | [v0.1 框架清单](qa/v0.1-framework-checklist.md) | 初始框架验收 | 历史清单 |

@@ -14,18 +14,14 @@ import {
   CollapseIcon,
   FolderIcon,
   HelpIcon,
-  HomeIcon,
   ImageWorkbenchIcon,
   LogoutIcon,
   MoonIcon,
   PenBookIcon,
   ProjectIcon,
-  PromptIcon,
-  ScriptIcon,
   SettingsIcon,
   SunIcon,
   UserIcon,
-  VideoIcon,
 } from './icons';
 import {
   mockProjects,
@@ -39,25 +35,17 @@ import './App.css';
 
 type SidebarIcon = ComponentType<SVGProps<SVGSVGElement>>;
 type ActiveNavId =
-  | 'home'
   | 'canvas'
   | 'novel'
-  | 'script-workbench'
   | 'image-workbench'
-  | 'video-workbench'
-  | 'prompts'
   | 'assets';
 
 type PrimaryNavId = ActiveNavId;
 
 const sidebarNavItems: Array<{ id: PrimaryNavId; Icon: SidebarIcon; label: string }> = [
-  { id: 'home', Icon: HomeIcon, label: '首页' },
   { id: 'canvas', Icon: ProjectIcon, label: '无限画布' },
   { id: 'novel', Icon: PenBookIcon, label: '小说创作' },
-  { id: 'script-workbench', Icon: ScriptIcon, label: '剧本工作台' },
   { id: 'image-workbench', Icon: ImageWorkbenchIcon, label: '生图工作台' },
-  { id: 'video-workbench', Icon: VideoIcon, label: '视频工作台' },
-  { id: 'prompts', Icon: PromptIcon, label: '提示词库' },
   { id: 'assets', Icon: FolderIcon, label: '资产管理' },
 ];
 
@@ -67,7 +55,7 @@ const mockUser = { name: 'John Doe', email: 'john@example.com', initials: 'JD' }
 export function App() {
   const [theme, setTheme] = usePersistentTheme();
   const [isSidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [activeNavId, setActiveNavId] = useState<ActiveNavId>('home');
+  const [activeNavId, setActiveNavId] = useState<ActiveNavId>('novel');
   const [activeCanvasIdsByProject, setActiveCanvasIdsByProject] = useState<Record<string, string>>({});
   const [isUserMenuOpen, setUserMenuOpen] = useState(false);
   const [isSettingsOpen, setSettingsOpen] = useState(false);
@@ -332,9 +320,7 @@ export function App() {
         ) : (
           <CanvasLibrary canvasCount={activeProject?.stats.canvasCount ?? 0} projectName={activeProject?.name} onOpenCanvas={openCanvas} onCreateCanvas={() => openCanvas('new-canvas')} onImportCanvas={() => window.alert('第一版暂未接入：导入画布')} onClearAll={() => window.alert('第一版暂未接入：删除全部画布')} />
         )
-      ) : (
-        <main className="blank-workspace" aria-label="空白工作区" />
-      )}
+      ) : null}
 
       {isSettingsOpen && (
         <SettingsPage
