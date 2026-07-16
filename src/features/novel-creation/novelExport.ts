@@ -2,6 +2,7 @@ import { rendererBridge } from '../../services/rendererBridge';
 import { assertStoreZipSelfCheck, createStoreZip, textToBytes, type StoreZipEntry } from '../../services/storeZip';
 import type { Novel } from '../../types/novel';
 import { orderedChapters } from './novelStructure';
+import { chapterText } from './sceneStructure';
 
 export async function copyWholeBookMarkdown(novel: Novel): Promise<void> {
   const markdown = buildWholeBookMarkdown(novel);
@@ -105,7 +106,7 @@ function buildStoryboardDocHtml(novel: Novel): string | null {
   const chapterTitleById = new Map(chapters.map((chapter) => [chapter.id, chapter.title.trim() || '未命名章节']));
   const filledChapters = chapters
     .map((chapter, index) => ({ chapter, index }))
-    .filter(({ chapter }) => chapter.content.trim() || chapter.outline?.trim());
+    .filter(({ chapter }) => chapterText(chapter).trim() || chapter.outline?.trim());
   const hasOverview = Boolean(novel.summary.trim() || novel.idea?.trim() || novel.blueprint?.trim());
   if (!filledChapters.length && !hasOverview && !novel.foreshadowings.length) return null;
 
@@ -120,7 +121,7 @@ function buildStoryboardDocHtml(novel: Novel): string | null {
   for (const { chapter, index } of filledChapters) {
     sections.push(`<h2>第 ${index + 1} 章 · ${escapeDocHtml(chapter.title.trim() || '未命名章节')}</h2>`);
     if (chapter.outline?.trim()) sections.push(`<h4>大纲</h4>${docParagraphs(chapter.outline)}`);
-    if (chapter.content.trim()) sections.push(docParagraphs(chapter.content));
+    if (chapterText(chapter).trim()) sections.push(docParagraphs(chapterText(chapter)));
   }
 
   if (novel.foreshadowings.length) {
@@ -143,12 +144,12 @@ function buildStoryboardDocHtml(novel: Novel): string | null {
 function buildWholeBookMarkdown(novel: Novel): string | null {
   const chapters = orderedChapters(novel)
     .map((chapter, index) => ({ chapter, index }))
-    .filter(({ chapter }) => chapter.content.trim());
+    .filter(({ chapter }) => chapterText(chapter).trim());
   if (!chapters.length) return null;
   const parts = [`# ${novel.title.trim() || '未命名小说'}`];
   if (novel.summary.trim()) parts.push(novel.summary.trim());
   for (const { chapter, index } of chapters) {
-    parts.push(`## 第 ${index + 1} 章 · ${chapter.title.trim() || '未命名章节'}`, chapter.content.trim());
+    parts.push(`## 第 ${index + 1} 章 · ${chapter.title.trim() || '未命名章节'}`, chapterText(chapter));
   }
   return parts.join('\n\n');
 }

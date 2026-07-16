@@ -367,7 +367,7 @@
 
 .novel-workbench__main {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   gap: 16px;
   align-content: start;
   padding: 26px 30px;
@@ -401,6 +401,92 @@
 
 .novel-workbench__outline--empty {
   color: #b3bdcc;
+}
+
+.novel-workbench__scenes {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  max-height: 190px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 10px;
+  background: #f8fafc;
+}
+
+.novel-workbench__scenes-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.novel-workbench__scene-list {
+  display: grid;
+  gap: 6px;
+}
+
+.novel-workbench__scene {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(120px, 1fr) auto auto auto;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  padding: 6px;
+}
+
+.novel-workbench__scene--active {
+  border-color: #93b4eb;
+  background: #fff;
+}
+
+.novel-workbench__scene-select {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 0;
+  padding: 4px 6px;
+  background: transparent;
+  color: #172033;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.novel-workbench__scene-select strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.novel-workbench__scene-select span {
+  flex: 0 0 auto;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.novel-workbench__scene input {
+  min-width: 0;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: #fff;
+  color: #172033;
+  font: inherit;
+}
+
+.novel-workbench__scene-outline {
+  grid-column: 1 / -1;
+}
+
+.novel-workbench__scene button:focus-visible,
+.novel-workbench__scene input:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
 }
 
 .novel-workbench__state {
@@ -501,8 +587,14 @@
 
 .novel-workbench__editor-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+}
+
+.novel-workbench__editor-meta .novel-flow__ghost {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .novel-workbench__editor-meta span {
@@ -771,6 +863,26 @@
   color: #94a3b8;
 }
 
+.app-shell[data-theme='dark'] .novel-workbench__scenes {
+  border-color: #1e293b;
+  background: #111822;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__scene--active {
+  border-color: #365b91;
+  background: #1b2536;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__scene-select,
+.app-shell[data-theme='dark'] .novel-workbench__scene input {
+  color: #edf2fa;
+}
+
+.app-shell[data-theme='dark'] .novel-workbench__scene input {
+  border-color: #334155;
+  background: #0b111a;
+}
+
 .app-shell[data-theme='dark'] .novel-workbench__review-loading {
   background: #1b2536;
 }
@@ -861,6 +973,19 @@
 
   .novel-workbench__editor textarea {
     min-height: 320px;
+  }
+
+  .novel-workbench__scene {
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+  }
+
+  .novel-workbench__scene-title {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .novel-workbench__scene-outline {
+    grid-row: 3;
   }
 }
 
@@ -1137,7 +1262,7 @@
   color: #cbd5e1;
 }
 
-/* 章节切换过渡：key=activeChapterId 触发 remount，淡入避免硬切（Phase 3 演示体验包收尾）。 */
+/* 章节或场景切换时淡入，避免编辑目标硬切。 */
 .novel-workbench__main-inner {
   display: contents;
   animation: novel-workbench-fade 0.26s ease both;

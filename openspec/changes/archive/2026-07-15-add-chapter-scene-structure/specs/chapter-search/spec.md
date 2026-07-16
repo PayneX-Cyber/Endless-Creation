@@ -1,8 +1,5 @@
-# chapter-search Specification
+## MODIFIED Requirements
 
-## Purpose
-为长篇小说提供跨章全文搜索：按关键词扫描当前小说所有章节的标题、正文与大纲，列出命中章节及摘要片段；点击结果切换到该章节，正文命中时在编辑器中选中并滚动到命中字符位置。搜索为纯读操作，不修改小说数据、不改 schema、无外部索引或依赖。
-## Requirements
 ### Requirement: 跨章全文搜索
 
 系统 SHALL 提供搜索入口，接受关键词，按统一卷序展开当前小说的所有章节，并对每章按 `orderedScenes(chapter)` 展开其场景，扫描章节 `title`、`outline` 与各场景的 `title`、`outline`、`content`，返回命中列表。每条结果 MUST 包含基于统一卷序计算的章号、命中场景在章内的场景号、章节标题与包含关键词的摘要片段。搜索为纯读操作，MUST NOT 修改小说数据。
@@ -69,4 +66,3 @@
 
 - **WHEN** 搜索后正文被编辑导致命中偏移不再有效，用户点击该结果
 - **THEN** 系统仍切换到该章节与场景，定位失败时不报错、不选中错误位置
-

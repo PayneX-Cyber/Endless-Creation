@@ -1,8 +1,5 @@
-# chapter-find-replace Specification
+## MODIFIED Requirements
 
-## Purpose
-为当前激活场景正文提供查找、逐项定位、替换当前项与全部替换，并使替换操作可通过场景正文历史栈撤销；所有操作仅作用于当前场景，不跨场景或章节，变更经现有自动保存链持久化。
-## Requirements
 ### Requirement: 章内查找
 
 系统 SHALL 为当前激活场景的正文提供查找入口，接受关键词，在该场景 `content` 中定位所有匹配项。系统 MUST 标示匹配总数与当前项序号，并支持在匹配项之间逐个跳转。查找为纯读操作，MUST NOT 修改正文。

@@ -1,8 +1,5 @@
-# chapter-undo-history Specification
+## MODIFIED Requirements
 
-## Purpose
-为当前章节正文提供自建的多步撤销与重做历史；手动编辑和查找替换写入历史，AI 写回、流式生成、切章及撤销/重做自身不写入历史。
-## Requirements
 ### Requirement: 正文编辑多步撤销/重做
 
 系统 SHALL 为当前激活场景正文编辑维护一个撤销历史栈，支持多步撤销（Ctrl+Z）与重做（Ctrl+Y 或等价快捷键）。因受控 textarea 破坏了浏览器原生 undo，系统 MUST 接管这些快捷键（阻止默认行为）并从自建历史栈执行撤销/重做。撤销/重做后的正文 SHALL 经现有场景正文自动保存链持久化。

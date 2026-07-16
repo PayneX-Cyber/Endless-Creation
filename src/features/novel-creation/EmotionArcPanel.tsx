@@ -3,6 +3,7 @@ import { rendererBridge } from '../../services/rendererBridge';
 import type { Chapter, Novel } from '../../types/novel';
 import { createId } from './novelShared';
 import { orderedChapters } from './novelStructure';
+import { chapterText } from './sceneStructure';
 import {
   buildEmotionPrompt,
   mergeEmotionPoints,
@@ -91,7 +92,7 @@ export function EmotionArcPanel({ novel, resolveModel, onUpdateNovel }: Props) {
     if (busy) return;
     const ready = resolveModel(setError);
     if (!ready) return;
-    const eligible = targets.filter((chapter) => chapter.content.trim());
+    const eligible = targets.filter((chapter) => chapterText(chapter).trim());
     if (!eligible.length) {
       setError('没有可分析的正文。');
       return;
@@ -198,7 +199,7 @@ export function EmotionArcPanel({ novel, resolveModel, onUpdateNovel }: Props) {
     <div className="emotion-arc">
       <div className="novel-project-panel__head">
         <div className="novel-project-panel__heading"><h2>情感曲线</h2><p>查看全书各章的情绪基调与起伏</p></div>
-        {!busy && !results && <button className="novel-flow__primary novel-flow__primary--compact" disabled={!chapters.some((chapter) => chapter.content.trim())} onClick={() => void analyze(chapters)} type="button">分析情绪</button>}
+        {!busy && !results && <button className="novel-flow__primary novel-flow__primary--compact" disabled={!chapters.some((chapter) => chapterText(chapter).trim())} onClick={() => void analyze(chapters)} type="button">分析情绪</button>}
         {busy && <button className="novel-flow__ghost" onClick={stopAnalysis} type="button">停止分析</button>}
       </div>
       {error && <div className="emotion-arc__error" role="alert">{error}</div>}
@@ -234,8 +235,8 @@ export function EmotionArcPanel({ novel, resolveModel, onUpdateNovel }: Props) {
         <div className="emotion-arc__detail">
           <div><strong>{detailChapter.title || '未命名章节'}</strong><span>{detailPoint ? `${detailPoint.score} 分` : '暂无分值'}</span></div>
           {detailPoint?.reason && <p>{detailPoint.reason}</p>}
-          <button className="novel-flow__primary novel-flow__primary--compact" disabled={!detailChapter.content.trim()} onClick={() => void analyze([detailChapter])} type="button">重新分析本章</button>
-          {!detailChapter.content.trim() && <small>本章暂无正文</small>}
+          <button className="novel-flow__primary novel-flow__primary--compact" disabled={!chapterText(detailChapter).trim()} onClick={() => void analyze([detailChapter])} type="button">重新分析本章</button>
+          {!chapterText(detailChapter).trim() && <small>本章暂无正文</small>}
         </div>
       )}
       {results && !busy && (

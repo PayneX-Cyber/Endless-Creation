@@ -5,6 +5,7 @@ import type { Novel } from '../../types/novel';
 import { orderedChapters } from './novelStructure';
 import { countWords } from './novelShared';
 import { CHAPTER_STATUS_LABEL, CHAPTER_STATUS_ORDER, PROGRESS_LABELS, formatPercent, summarizeProgress } from './novelProgress';
+import { chapterText } from './sceneStructure';
 
 function briefTitle(title: string, max: number): string {
   const normalized = title.replace(/\s+/g, ' ').trim();
@@ -23,10 +24,10 @@ export function NovelStats({ novel }: { novel: Novel }) {
   const ordered = orderedChapters(novel);
   const totalChapters = ordered.length;
   const doneChapters = ordered
-    .map((chapter, displayIndex) => ({ chapter, displayIndex, words: countWords(chapter.content) }))
-    .filter((entry) => entry.chapter.content.trim() !== '');
+    .map((chapter, displayIndex) => ({ chapter, displayIndex, words: countWords(chapterText(chapter)) }))
+    .filter((entry) => chapterText(entry.chapter).trim() !== '');
   const doneCount = doneChapters.length;
-  const totalWords = ordered.reduce((sum, chapter) => sum + countWords(chapter.content), 0);
+  const totalWords = ordered.reduce((sum, chapter) => sum + countWords(chapterText(chapter)), 0);
   const progress = totalChapters ? Math.round((doneCount / totalChapters) * 100) : 0;
   const avgDoneWords = doneCount ? Math.round(doneChapters.reduce((sum, entry) => sum + entry.words, 0) / doneCount) : null;
   let longest = doneCount ? doneChapters[0] : null;

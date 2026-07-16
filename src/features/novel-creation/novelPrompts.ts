@@ -1,5 +1,6 @@
 import type { Chapter, Foreshadowing, Novel } from '../../types/novel';
 import { orderedChapters } from './novelStructure';
+import { chapterText, orderedScenes } from './sceneStructure';
 
 export type TextMessage = { role: 'system' | 'user'; content: string };
 export type OptimizeType = 'dialogue' | 'environment' | 'psychology' | 'action';
@@ -45,8 +46,17 @@ export function assertPinnedContextSelfCheck(): void {
 
 assertPinnedContextSelfCheck();
 
-export function buildContinueChapterPrompt(novel: Novel, chapter: Chapter): TextMessage[] {
-  const tail = chapter.content.slice(-1500);
+export function buildContinueChapterPrompt(novel: Novel, chapter: Chapter, sceneId?: string): TextMessage[] {
+  const scenes = orderedScenes(chapter);
+  const activeIndex = sceneId ? scenes.findIndex((scene) => scene.id === sceneId) : scenes.length - 1;
+  const activeScene = scenes[activeIndex >= 0 ? activeIndex : scenes.length - 1];
+  const currentAndPreviousScenes = scenes
+    .slice(0, activeIndex >= 0 ? activeIndex + 1 : scenes.length)
+    .map((scene) => scene.content)
+    .filter((content) => content.trim())
+    .join('\n\n');
+  const tail = currentAndPreviousScenes.slice(-1500);
+  const previousChapters = buildPreviousChapterContext(novel, chapter);
   return [
     { role: 'system', content: '你是小说续写助手，保持原文风格，直接输出正文，不解释。' },
     {
@@ -54,7 +64,10 @@ export function buildContinueChapterPrompt(novel: Novel, chapter: Chapter): Text
       content: [
         `小说标题：${novel.title}`,
         novel.summary ? `小说简介：${novel.summary}` : '',
+        `前文：\n${previousChapters}`,
         `当前章节：${chapter.title || '未命名章节'}`,
+        activeScene ? `当前场景：${activeScene.title.trim() || `场景 ${Math.max(1, activeIndex + 1)}`}` : '',
+        activeScene?.outline?.trim() ? `当前场景大纲：${activeScene.outline}` : '',
         '当前章节末尾：',
         tail || '本章还没有正文，请根据章节标题续写一段开头。',
         '请续写一段正文。',
@@ -62,6 +75,37 @@ export function buildContinueChapterPrompt(novel: Novel, chapter: Chapter): Text
     },
   ];
 }
+
+function assertSceneContinueContextSelfCheck(): void {
+  const chapter = {
+    id: 'chapter-1',
+    title: '章节',
+    scenes: [
+      { id: 'scene-1', title: '', content: '前序场景', order: 0 },
+      { id: 'scene-2', title: '', content: '当前场景', order: 1 },
+      { id: 'scene-3', title: '', content: '后续场景不应出现', order: 2 },
+    ],
+    order: 0,
+  } as Chapter;
+  const novel: Novel = {
+    id: 'novel-1',
+    title: '小说',
+    summary: '',
+    note: '',
+    volumes: [],
+    chapters: [chapter],
+    foreshadowings: [],
+    version: 8,
+    createdAt: '',
+    updatedAt: '',
+  };
+  const prompt = buildContinueChapterPrompt(novel, chapter, 'scene-2')[1].content;
+  if (!prompt.includes('前序场景') || !prompt.includes('当前场景') || prompt.includes('后续场景不应出现')) {
+    throw new Error('Scene continuation context self-check failed.');
+  }
+}
+
+assertSceneContinueContextSelfCheck();
 
 export function buildPolishChapterPrompt(novel: Novel, chapter: Chapter, text: string): TextMessage[] {
   return buildEditPrompt(novel, chapter, text, '润色下面正文：保持原意，优化表达、节奏和错别字，直接输出润色后的正文，不解释，不加标题。');
@@ -122,8 +166,9 @@ export function buildOutlinePrompt(novel: Novel): TextMessage[] {
 }
 
 export function buildChapterFromOutlinePrompt(novel: Novel, chapter: Chapter, previousChapter?: Chapter): TextMessage[] {
-  const tail = chapter.content.slice(-800);
-  const previousTail = previousChapter?.content.trim() ? previousChapter.content.trim().slice(-600) : '';
+  const tail = chapterText(chapter).slice(-800);
+  const previousText = previousChapter ? chapterText(previousChapter) : '';
+  const previousTail = previousText.trim() ? previousText.trim().slice(-600) : '';
   const pinnedContext = buildPinnedContext(novel);
   return [
     { role: 'system', content: '你是小说写作助手，按本章大纲写正文，直接输出正文，不解释，不加标题。' },
@@ -147,7 +192,7 @@ export function buildChapterFromOutlinePrompt(novel: Novel, chapter: Chapter, pr
 
 export function buildMissingOutlinePrompt(novel: Novel, chapters: Chapter[]): TextMessage[] {
   const chapterLines = chapters.map((chapter, index) => {
-    const status = chapter.content.trim() ? '已完成' : '未开始';
+    const status = chapterText(chapter).trim() ? '已完成' : '未开始';
     const outline = chapter.outline?.trim() ? `大纲：${chapter.outline.trim()}` : '大纲：缺失';
     return `第${index + 1}章 ${chapter.title || '未命名章节'}（${status}）\n${outline}`;
   });
@@ -316,7 +361,7 @@ export function buildChapterReviewPrompt(novel: Novel, chapter: Chapter): TextMe
         `当前章节：${chapter.title || '未命名章节'}`,
         chapter.outline ? `本章大纲：\n${chapter.outline}` : '',
         '本章正文：',
-        chapter.content,
+        chapterText(chapter),
         '请评审本章正文，指出优点、存在的问题（如偏离大纲、节奏拖沓、人物行为不合理等）以及修改建议。评审意见 200-400 字。',
       ].filter(Boolean).join('\n'),
     },
@@ -344,7 +389,7 @@ export function buildChapterConsistencyPrompt(novel: Novel, chapter: Chapter): T
         `当前章节：${chapter.title || '未命名章节'}`,
         chapter.outline ? `本章大纲：\n${chapter.outline}` : '',
         '本章正文：',
-        limitText(chapter.content, 5000),
+        limitText(chapterText(chapter), 5000),
         '请从四类维度做轻量一致性检查：1. 人物称呼、身份、关系漂移；2. 时间线、事件顺序冲突；3. 世界观、设定、规则矛盾；4. 本章是否明显违背蓝图或章节大纲。',
         '输出格式：总体判断、疑似矛盾、定位建议、修改建议。若未发现明显问题，请写「未发现明显一致性问题」，并给出 1-2 条保守提醒。',
       ].filter(Boolean).join('\n'),
@@ -368,7 +413,7 @@ export function buildChapterRhythmPrompt(novel: Novel, chapter: Chapter): TextMe
         `当前章节：${chapter.title || '未命名章节'}`,
         chapter.outline ? `本章大纲：\n${chapter.outline}` : '',
         '本章正文：',
-        limitText(chapter.content, 5000),
+        limitText(chapterText(chapter), 5000),
         '请从四类维度做轻量节奏检查：1. 开头是否拖沓或进入冲突过慢；2. 中段是否重复、解释过多、缺少推进；3. 结尾是否缺少钩子或收束过急；4. 段落节奏、信息密度、情绪起伏是否失衡。',
         '输出格式：总体判断、节奏问题、定位建议、调整建议。不要改写正文，不要给出完整替换稿。',
       ].filter(Boolean).join('\n'),
@@ -438,7 +483,7 @@ export function buildForeshadowingCandidatesPrompt(novel: Novel, chapter: Chapte
         `当前章节：${chapter.title || '未命名章节'}`,
         chapter.outline ? `本章大纲：\n${chapter.outline}` : '',
         '本章正文：',
-        limitText(chapter.content, 5000),
+        limitText(chapterText(chapter), 5000),
         '请从本章正文里识别最多 3 条新埋伏笔候选，按上述 JSON 数组格式输出。',
       ].filter(Boolean).join('\n'),
     },
@@ -470,7 +515,7 @@ export function buildForeshadowingPayoffCandidatesPrompt(novel: Novel, chapter: 
         '未回收伏笔列表：',
         plantedList,
         '本章正文：',
-        limitText(chapter.content, 5000),
+        limitText(chapterText(chapter), 5000),
         '请从未回收伏笔列表中识别最多 3 条可能已在本章回收的候选，按上述 JSON 数组格式输出。',
       ].filter(Boolean).join('\n'),
     },
@@ -542,11 +587,11 @@ function buildPreviousChapterContext(novel: Novel, currentChapter: Chapter): str
   let total = 0;
   const previous = ordered.slice(0, currentIndex).map((chapter, index) => ({ chapter, index }));
   for (const { chapter, index } of previous.reverse()) {
-    if (!chapter.content.trim()) continue;
+    if (!chapterText(chapter).trim()) continue;
     const block = [
       `第 ${index + 1} 章 · ${chapter.title || '未命名章节'}`,
       chapter.outline ? `大纲：${limitText(chapter.outline, 160)}` : '',
-      `正文尾部：\n${tailText(chapter.content, 400)}`,
+      `正文尾部：\n${tailText(chapterText(chapter), 400)}`,
     ].filter(Boolean).join('\n');
     if (total + block.length > 4000 && blocks.length) continue;
     blocks.push(block);

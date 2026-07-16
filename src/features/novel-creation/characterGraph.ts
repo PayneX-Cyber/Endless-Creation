@@ -1,5 +1,6 @@
 import type { CharacterGraph, GraphCharacter, GraphRelationship, Novel } from '../../types/novel';
 import { orderedChapters } from './novelStructure';
+import { chapterText } from './sceneStructure';
 export type { CharacterGraph, GraphCharacter, GraphRelationship } from '../../types/novel';
 
 export type TextMessage = { role: 'system' | 'user'; content: string };
@@ -28,10 +29,10 @@ function limitText(text: string, max: number): string {
 // 汇总用于推演的语料：蓝图 + 简介 + 创意 + 已完成章节正文（截断，控制 token）。
 function collectStoryContext(novel: Novel): string {
   const doneChapters = orderedChapters(novel)
-    .filter((chapter) => chapter.content.trim());
+    .filter((chapter) => chapterText(chapter).trim());
   const chapterBlocks = doneChapters.map((chapter, index) => {
     const title = chapter.title.trim() || `第 ${index + 1} 章`;
-    return `【${title}】\n${chapter.content.trim()}`;
+    return `【${title}】\n${chapterText(chapter)}`;
   });
   const joined = chapterBlocks.join('\n\n');
   return limitText(joined, 6000);
@@ -43,7 +44,7 @@ function collectCharacterEvidence(novel: Novel): string {
     novel.summary,
     novel.blueprint,
     novel.idea,
-    ...novel.chapters.map((chapter) => `${chapter.title}\n${chapter.outline ?? ''}\n${chapter.content}`),
+    ...novel.chapters.map((chapter) => `${chapter.title}\n${chapter.outline ?? ''}\n${chapterText(chapter)}`),
   ].join('\n');
 }
 
