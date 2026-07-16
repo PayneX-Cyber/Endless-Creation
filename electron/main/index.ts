@@ -120,6 +120,14 @@ interface ChapterVersion {
 
 type ChapterStatus = 'draft' | 'inProgress' | 'done';
 
+interface Volume {
+  id: string;
+  title: string;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 interface Chapter {
   id: string;
   title: string;
@@ -129,6 +137,7 @@ interface Chapter {
   selectedVersionId?: string;
   status?: ChapterStatus;
   wordTarget?: number;
+  volumeId?: string;
   order: number;
   createdAt: string;
   updatedAt: string;
@@ -194,6 +203,7 @@ interface Novel {
   blueprint?: string;
   wordTarget?: number;
   projectId?: string;
+  volumes: Volume[];
   chapters: Chapter[];
   foreshadowings: Foreshadowing[];
   settings?: SettingEntry[];
@@ -201,7 +211,7 @@ interface Novel {
   pinnedForeshadowingIds?: string[];
   emotionArc?: EmotionArc;
   characterGraph?: CharacterGraph;
-  version: 6;
+  version: 7;
   createdAt: string;
   updatedAt: string;
 }
@@ -715,15 +725,59 @@ function sanitizeCharacterGraph(value: unknown): CharacterGraph | undefined {
   return { characters: graph.characters, relationships: graph.relationships };
 }
 
+function sanitizeVolumes(value: unknown, now: string): Volume[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry): Volume | null => {
+      if (!entry || typeof entry !== 'object') return null;
+      const item = entry as Partial<Volume>;
+      if (typeof item.title !== 'string') return null;
+      return {
+        id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : randomUUID(),
+        title: item.title,
+        order: Number.isFinite(item.order) ? Number(item.order) : 0,
+        createdAt: typeof item.createdAt === 'string' ? item.createdAt : now,
+        updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : now,
+      };
+    })
+    .filter((volume): volume is Volume => volume !== null)
+    .sort((a, b) => a.order - b.order)
+    .map((volume, order) => ({ ...volume, order }));
+}
+
+function normalizeChapterGroupOrder(chapters: Chapter[], volumes: Volume[]): Chapter[] {
+  const volumeOrder = new Map(volumes.map((volume) => [volume.id, volume.order]));
+  const withPos = chapters.map((chapter, position) => ({ chapter, position }));
+  const groups = new Map<string, { chapter: Chapter; position: number }[]>();
+  for (const item of withPos) {
+    const key = item.chapter.volumeId && volumeOrder.has(item.chapter.volumeId) ? item.chapter.volumeId : '__unassigned__';
+    const bucket = groups.get(key) ?? [];
+    bucket.push(item);
+    groups.set(key, bucket);
+  }
+  const result: Chapter[] = [];
+  for (const bucket of groups.values()) {
+    bucket
+      .sort((a, b) => (a.chapter.order - b.chapter.order) || (a.position - b.position))
+      .forEach((item, order) => result.push({ ...item.chapter, order }));
+  }
+  return result;
+}
+
 function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
   if (!value || typeof value !== 'object') return null;
   const candidate = value as Partial<Novel>;
   const id = safeNovelId(candidate.id) ?? fallbackId;
   if (!id) return null;
   const now = new Date().toISOString();
-  const chapters = Array.isArray(candidate.chapters) ? candidate.chapters.map((chapter, index): Chapter | null => {
+  const volumes = sanitizeVolumes(candidate.volumes, now);
+  const volumeIds = new Set(volumes.map((volume) => volume.id));
+  const rawChapters = Array.isArray(candidate.chapters) ? candidate.chapters.map((chapter, index): Chapter | null => {
     if (!chapter || typeof chapter !== 'object') return null;
     const item = chapter as Partial<Chapter>;
+    const volumeId = typeof item.volumeId === 'string' && item.volumeId.trim() && volumeIds.has(item.volumeId.trim())
+      ? item.volumeId.trim()
+      : undefined;
     return {
       id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : randomUUID(),
       title: typeof item.title === 'string' ? item.title : '',
@@ -733,11 +787,13 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
       selectedVersionId: typeof item.selectedVersionId === 'string' ? item.selectedVersionId : undefined,
       status: item.status === 'draft' || item.status === 'inProgress' || item.status === 'done' ? item.status : undefined,
       wordTarget: typeof item.wordTarget === 'number' && Number.isFinite(item.wordTarget) && item.wordTarget > 0 ? item.wordTarget : undefined,
+      volumeId,
       order: Number.isFinite(item.order) ? Number(item.order) : index,
       createdAt: typeof item.createdAt === 'string' ? item.createdAt : now,
       updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : now,
     };
-  }).filter((chapter): chapter is Chapter => chapter !== null).sort((a, b) => a.order - b.order) : [];
+  }).filter((chapter): chapter is Chapter => chapter !== null) : [];
+  const chapters = normalizeChapterGroupOrder(rawChapters, volumes);
 
   return {
     id,
@@ -748,6 +804,7 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
     idea: typeof candidate.idea === 'string' ? candidate.idea : undefined,
     blueprint: typeof candidate.blueprint === 'string' ? candidate.blueprint : undefined,
     wordTarget: typeof candidate.wordTarget === 'number' && Number.isFinite(candidate.wordTarget) && candidate.wordTarget > 0 ? candidate.wordTarget : undefined,
+    volumes,
     chapters,
     foreshadowings: sanitizeForeshadowings(candidate.foreshadowings, now),
     settings: sanitizeSettings(candidate.settings, now),
@@ -755,7 +812,7 @@ function sanitizeNovel(value: unknown, fallbackId?: string): Novel | null {
     pinnedForeshadowingIds: sanitizeStringIds(candidate.pinnedForeshadowingIds),
     emotionArc: sanitizeEmotionArc(candidate.emotionArc),
     characterGraph: sanitizeCharacterGraph(candidate.characterGraph),
-    version: 6,
+    version: 7,
     createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : now,
     updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : now,
   };
@@ -871,12 +928,13 @@ async function createNovel(input: unknown): Promise<{ ok: boolean; message: stri
     title: typeof candidate.title === 'string' && candidate.title.trim() ? candidate.title.trim() : '\u672a\u547d\u540d\u5c0f\u8bf4',
     summary: typeof candidate.summary === 'string' ? candidate.summary : '',
     note: typeof candidate.note === 'string' ? candidate.note : '',
+    volumes: [],
     chapters: [],
     foreshadowings: [],
     settings: [],
     pinnedSettingIds: [],
     pinnedForeshadowingIds: [],
-    version: 6,
+    version: 7,
     createdAt: now,
     updatedAt: now,
   };

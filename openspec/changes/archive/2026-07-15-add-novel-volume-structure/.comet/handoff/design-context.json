@@ -1,0 +1,16 @@
+{
+  "change": "add-novel-volume-structure",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "3412c12778e872821607e3e8665877bcda94733e41e9cfdfbbd8ce6be165d78f",
+  "files": [
+    { "path": "openspec/changes/add-novel-volume-structure/proposal.md", "sha256": "cca51c420c050ba419e58ec082601b3c97e669b77a3b94f083ea20bebd196843" },
+    { "path": "openspec/changes/add-novel-volume-structure/design.md", "sha256": "4f29d28a4b751c1333449686122e49a38ee1c81770f30e12039151e79a9c4b12" },
+    { "path": "openspec/changes/add-novel-volume-structure/tasks.md", "sha256": "720961457f3b6bf4e250b3315cb4049d1c3e0a736ce475219303eb0054bdb295" },
+    { "path": "openspec/changes/add-novel-volume-structure/specs/chapter-reorder/spec.md", "sha256": "e79c95722815984ac2d21778511988aa27c9435e54b85b0e97a38c88df49d101" },
+    { "path": "openspec/changes/add-novel-volume-structure/specs/chapter-search/spec.md", "sha256": "65bcec37f4f278614b2a198da16605c2143dc4c921674ab61ad12713487a57b9" },
+    { "path": "openspec/changes/add-novel-volume-structure/specs/novel-volume-structure/spec.md", "sha256": "ad9903ea3ca2d6e6d4393cb295a7858ce49a2a601c69f4d0f0403d089050a8c2" }
+  ]
+}

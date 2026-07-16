@@ -10,6 +10,7 @@ import type { ChapterStatus as NovelChapterStatus } from '../../types/novel';
 import { ForeshadowingPanel, type ForeshadowingDraft, type ForeshadowingAiCandidate, type ForeshadowingPayoffAiCandidate } from './ForeshadowingPanel';
 import type { ChapterLocateRequest } from './novelNavigation';
 import { ChapterFindReplace, pushEditorHistory, redoEditorHistory, resetEditorHistory, undoEditorHistory, type EditorHistory, type EditorSnapshot, type TextMatch } from './novelEditorTools';
+import { groupChaptersByVolume } from './novelStructure';
 import './ChapterWorkbench.css';
 
 export type ReadyTextModel = { channelId: string; channelLabel?: string; baseUrl: string; apiKey: string; model: string };
@@ -177,6 +178,7 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
 
   const activeIndex = chapters.findIndex((chapter) => chapter.id === activeChapterId);
   const activeChapter = activeIndex >= 0 ? chapters[activeIndex] : null;
+  const chapterGroups = groupChaptersByVolume(novel);
 
   useEffect(() => {
     flushManualHistory();
@@ -1133,18 +1135,24 @@ export function ChapterWorkbench({ novel, projectId, chapters, activeChapterId, 
           </div>
           {chapters.length ? (
             <div className="novel-workbench__chapters">
-              {chapters.map((chapter, index) => {
-                const status = chapterStatus(chapter);
-                return (
-                  <button className={chapter.id === activeChapterId ? 'novel-workbench__chapter novel-workbench__chapter--active' : 'novel-workbench__chapter'} disabled={busy && generatingChapterId === null} id={`workbench-chapter-${chapter.id}`} key={chapter.id} onClick={() => selectChapter(chapter.id)} type="button">
-                    <span className="novel-workbench__chapter-row">
-                      <strong>第 {index + 1} 章 · {chapter.title || '未命名章节'}</strong>
-                      <span className={`novel-workbench__pill novel-workbench__pill--${status}`}>{statusLabel(status)}</span>
-                    </span>
-                    <span className="novel-workbench__chapter-outline">{brief(chapter.outline ?? '', 44) || '暂无大纲'}</span>
-                  </button>
-                );
-              })}
+              {chapterGroups.map((group) => group.chapters.length > 0 && (
+                <section className="novel-workbench__volume" key={group.volume?.id ?? 'unassigned'}>
+                  <h4>{group.volume?.title ?? '未分卷'}<span>{group.chapters.length} 章</span></h4>
+                  {group.chapters.map((chapter) => {
+                    const index = chapters.findIndex((item) => item.id === chapter.id);
+                    const status = chapterStatus(chapter);
+                    return (
+                      <button className={chapter.id === activeChapterId ? 'novel-workbench__chapter novel-workbench__chapter--active' : 'novel-workbench__chapter'} disabled={busy && generatingChapterId === null} id={`workbench-chapter-${chapter.id}`} key={chapter.id} onClick={() => selectChapter(chapter.id)} type="button">
+                        <span className="novel-workbench__chapter-row">
+                          <strong>第 {index + 1} 章 · {chapter.title || '未命名章节'}</strong>
+                          <span className={`novel-workbench__pill novel-workbench__pill--${status}`}>{statusLabel(status)}</span>
+                        </span>
+                        <span className="novel-workbench__chapter-outline">{brief(chapter.outline ?? '', 44) || '暂无大纲'}</span>
+                      </button>
+                    );
+                  })}
+                </section>
+              ))}
             </div>
           ) : (
             <div className="novel-workbench__side-empty">

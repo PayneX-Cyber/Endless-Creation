@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { rendererBridge } from '../../services/rendererBridge';
 import type { AiUsageRecord } from '../../types/apiProvider';
 import type { Novel } from '../../types/novel';
+import { orderedChapters } from './novelStructure';
 import { countWords } from './novelShared';
 import { CHAPTER_STATUS_LABEL, CHAPTER_STATUS_ORDER, PROGRESS_LABELS, formatPercent, summarizeProgress } from './novelProgress';
 
@@ -19,7 +20,7 @@ function formatNumber(value: number): string {
 export function NovelStats({ novel }: { novel: Novel }) {
   const [usageRecords, setUsageRecords] = useState<AiUsageRecord[]>([]);
   const usageNovelId = novel.id;
-  const ordered = [...novel.chapters].sort((a, b) => a.order - b.order);
+  const ordered = orderedChapters(novel);
   const totalChapters = ordered.length;
   const doneChapters = ordered
     .map((chapter, displayIndex) => ({ chapter, displayIndex, words: countWords(chapter.content) }))

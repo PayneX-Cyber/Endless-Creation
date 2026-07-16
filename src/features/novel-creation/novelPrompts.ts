@@ -1,4 +1,5 @@
 import type { Chapter, Foreshadowing, Novel } from '../../types/novel';
+import { orderedChapters } from './novelStructure';
 
 export type TextMessage = { role: 'system' | 'user'; content: string };
 export type OptimizeType = 'dialogue' | 'environment' | 'psychology' | 'action';
@@ -445,7 +446,7 @@ export function buildForeshadowingCandidatesPrompt(novel: Novel, chapter: Chapte
 }
 
 export function buildForeshadowingPayoffCandidatesPrompt(novel: Novel, chapter: Chapter, plantedForeshadowings: Foreshadowing[]): TextMessage[] {
-  const chapterLabels = new Map(novel.chapters.map((item, index) => [item.id, `第 ${index + 1} 章 · ${item.title || '未命名章节'}`]));
+  const chapterLabels = new Map(orderedChapters(novel).map((item, index) => [item.id, `第 ${index + 1} 章 · ${item.title || '未命名章节'}`]));
   const plantedList = plantedForeshadowings.map((item) => [
     `id: ${item.id}`,
     `标题: ${item.title}`,
@@ -534,11 +535,16 @@ export function parseForeshadowingPayoffCandidates(text: string, validIds: reado
 }
 
 function buildPreviousChapterContext(novel: Novel, currentChapter: Chapter): string {
+  const ordered = orderedChapters(novel);
+  const currentIndex = ordered.findIndex((item) => item.id === currentChapter.id);
+  if (currentIndex < 0) return '无已完成前文。';
   const blocks: string[] = [];
   let total = 0;
-  for (const chapter of novel.chapters.filter((item) => item.order < currentChapter.order && item.content.trim()).sort((a, b) => b.order - a.order)) {
+  const previous = ordered.slice(0, currentIndex).map((chapter, index) => ({ chapter, index }));
+  for (const { chapter, index } of previous.reverse()) {
+    if (!chapter.content.trim()) continue;
     const block = [
-      `第 ${chapter.order + 1} 章 · ${chapter.title || '未命名章节'}`,
+      `第 ${index + 1} 章 · ${chapter.title || '未命名章节'}`,
       chapter.outline ? `大纲：${limitText(chapter.outline, 160)}` : '',
       `正文尾部：\n${tailText(chapter.content, 400)}`,
     ].filter(Boolean).join('\n');

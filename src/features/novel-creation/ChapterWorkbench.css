@@ -127,6 +127,24 @@
   gap: 10px;
 }
 
+.novel-workbench__volume {
+  display: grid;
+  gap: 6px;
+}
+
+.novel-workbench__volume h4 {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 4px 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.novel-workbench__volume h4 span {
+  font-weight: 400;
+}
+
 .novel-workbench__chapter {
   display: grid;
   width: 100%;
