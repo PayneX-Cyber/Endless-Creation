@@ -298,6 +298,13 @@ function cleanOutlineTitle(raw: string): string {
   return raw.replace(/[*#]+/g, '').replace(/^[\s:：、.．\-—·]+/, '').trim();
 }
 
+function matchImportedChapterHeader(line: string): RegExpMatchArray | null {
+  const match = line.match(OUTLINE_HEADER_PATTERN);
+  if (!match || /^\s{0,3}#{1,6}\s+/.test(line)) return match;
+  const title = cleanOutlineTitle(match[1]);
+  return title.length <= 40 && !/[，,。！？!?；;]/.test(title) ? match : null;
+}
+
 export interface ParsedImportedChapter {
   title: string;
   content: string;
@@ -314,7 +321,7 @@ export function parseImportedManuscript(text: string): ParsedManuscript {
   const preambleLines: string[] = [];
   let current: { title: string; bodyLines: string[] } | null = null;
   for (const line of lines) {
-    const headerMatch = line.match(OUTLINE_HEADER_PATTERN);
+    const headerMatch = matchImportedChapterHeader(line);
     if (headerMatch) {
       if (current) chapters.push(current);
       current = { title: cleanOutlineTitle(headerMatch[1]), bodyLines: [] };
@@ -345,6 +352,21 @@ export function parseImportedManuscript(text: string): ParsedManuscript {
   });
   return { chapters: parsed, splitByHeaders: true };
 }
+
+function assertImportedManuscriptSelfCheck(): void {
+  const parsed = parseImportedManuscript([
+    '# 第一章 起航',
+    '第一章结束时，港口只剩最后一盏引航灯。',
+    '# 第二章 暗潮',
+    '潮声盖过了远处的警报。',
+  ].join('\n'));
+  if (parsed.chapters.length !== 2
+    || !parsed.chapters[0].content.includes('第一章结束时，港口只剩最后一盏引航灯。')) {
+    throw new Error('Imported manuscript self-check failed.');
+  }
+}
+
+assertImportedManuscriptSelfCheck();
 
 export function buildChapterReviewPrompt(novel: Novel, chapter: Chapter): TextMessage[] {
   return [

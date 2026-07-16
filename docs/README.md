@@ -92,6 +92,12 @@
 - [情感曲线规格](plans/2026-07-10-novel-emotion-arc-spec.md)
 - [情感曲线实施计划](superpowers/plans/2026-07-10-novel-emotion-arc.md)
 
+## 小说 v8 当前状态
+
+- `add-novel-volume-structure` 与 `add-chapter-scene-structure` 已归档并合入 `main`。
+- 卷 / 章 / 场景四级结构已完成真实 Electron 狗粮 QA。
+- [2026-07-16 小说 v8 全链路狗粮 QA](qa/2026-07-16-novel-v8-dogfood.md) 记录导入、写作、导出与重启恢复证据。
+
 ## QA
 
 | 文档 | 用途 | 状态 |
