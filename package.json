@@ -2,6 +2,7 @@
   "scripts": {
     "check": "npm run build",
     "test:ai-workflow": "node --test --test-concurrency=8 tools/ai-workflow/test/*.test.mjs",
+    "test:script": "node --test src/features/script-workbench/*.test.mjs",
     "check:ai-workflow": "npm run test:ai-workflow && npm run build",
     "dev": "vite",
     "dev:electron": "concurrently -k -n renderer,electron \"vite --host 127.0.0.1 --port 5174 --strictPort\" \"wait-on tcp:5174 && npm run build:electron && cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5174 electron .\"",
