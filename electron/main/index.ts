@@ -3,6 +3,8 @@ import type { OpenDialogOptions, SaveDialogOptions } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
+import { findSettingReferences } from './scriptReferences';
+import type { SettingReference } from './scriptReferences';
 
 const DEV_SERVER_URL = process.env.VITE_DEV_SERVER_URL;
 app.setName('Endless Creation');
@@ -14,6 +16,8 @@ const timedOutImageGenerationRequests = new Set<string>();
 const textGenerationControllers = new Map<string, AbortController>();
 const timedOutTextGenerationRequests = new Set<string>();
 const novelSaveQueues = new Map<string, Promise<unknown>>();
+const scriptSaveQueues = new Map<string, Promise<unknown>>();
+const projectSettingsSaveQueues = new Map<string, Promise<unknown>>();
 let aiUsageAppendQueue: Promise<void> = Promise.resolve();
 
 interface ApiProviderConfig {
@@ -229,6 +233,70 @@ type NovelSummary = Pick<Novel, 'id' | 'title' | 'summary' | 'projectId' | 'crea
   wordCount: number;
   filledChapterCount: number;
 };
+
+// 剧本域本地结构类型副本（electron tsconfig rootDir 限制，不 import src/types），
+// 与 src/types/script.ts 协议对称。
+interface ScriptScene {
+  id: string;
+  title: string;
+  content: string;
+  order: number;
+  referenceIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+interface Episode {
+  id: string;
+  title: string;
+  order: number;
+  scenes: ScriptScene[];
+  createdAt: string;
+  updatedAt: string;
+}
+interface Script {
+  id: string;
+  projectId: string;
+  title: string;
+  episodes: Episode[];
+  schemaVersion: 1;
+  createdAt: string;
+  updatedAt: string;
+}
+type ScriptSummary = Pick<Script, 'id' | 'projectId' | 'title' | 'createdAt' | 'updatedAt'> & {
+  episodeCount: number;
+  sceneCount: number;
+};
+type ProjectSettingType = 'character' | 'location';
+interface ProjectSettingEntry {
+  id: string;
+  projectId: string;
+  type: ProjectSettingType;
+  title: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+interface ProjectSettings {
+  projectId: string;
+  entries: ProjectSettingEntry[];
+  schemaVersion: 1;
+}
+interface OperationResult {
+  ok: boolean;
+  message?: string;
+}
+interface ScriptListResult extends OperationResult {
+  summaries?: ScriptSummary[];
+}
+interface ScriptResult extends OperationResult {
+  script?: Script;
+}
+interface ProjectSettingsResult extends OperationResult {
+  settings?: ProjectSettings;
+}
+interface DeleteSettingResult extends OperationResult {
+  references?: SettingReference[];
+}
 
 function createMainWindow(): void {
   mainWindow = new BrowserWindow({
@@ -1073,7 +1141,316 @@ function closeAfterNovelFlush(targetWindow: BrowserWindow): void {
   if (novelFlushCloseTimer) clearTimeout(novelFlushCloseTimer);
   novelFlushCloseTimer = null;
   isClosingAfterNovelFlush = true;
-  targetWindow.close();
+  // 等待剧本与设定 pending save 完成后再关闭，避免关窗吞掉在途落盘。
+  const pending = [
+    ...Array.from(scriptSaveQueues.values()),
+    ...Array.from(projectSettingsSaveQueues.values()),
+  ].map((queue) => queue.catch(() => undefined));
+  void Promise.all(pending).then(() => {
+    if (!targetWindow.isDestroyed()) targetWindow.close();
+  });
+}
+
+// ===== 剧本域与共享设定持久化 =====
+
+function getScriptsProjectDir(projectId: unknown): string {
+  return path.join(app.getPath('userData'), 'scripts', safeProjectId(projectId));
+}
+
+function safeScriptId(id: unknown): string | null {
+  if (typeof id !== 'string') return null;
+  const trimmed = id.trim();
+  return /^[a-zA-Z0-9._-]+$/.test(trimmed) ? trimmed : null;
+}
+
+function getScriptPath(projectId: unknown, scriptId: string): string {
+  return path.join(getScriptsProjectDir(projectId), scriptId, 'script.json');
+}
+
+function getProjectSettingsPath(projectId: unknown): string {
+  return path.join(app.getPath('userData'), 'project-settings', `${safeProjectId(projectId)}.json`);
+}
+
+function sanitizeScriptScene(value: unknown, index: number, now: string): ScriptScene | null {
+  if (!value || typeof value !== 'object') return null;
+  const item = value as Partial<ScriptScene>;
+  const id = typeof item.id === 'string' && item.id.trim() ? item.id.trim() : randomUUID();
+  return {
+    id,
+    title: typeof item.title === 'string' ? item.title : '',
+    content: typeof item.content === 'string' ? item.content : '',
+    order: Number.isFinite(item.order) ? Number(item.order) : index,
+    referenceIds: Array.isArray(item.referenceIds)
+      ? item.referenceIds.filter((refId): refId is string => typeof refId === 'string')
+      : [],
+    createdAt: typeof item.createdAt === 'string' ? item.createdAt : now,
+    updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : now,
+  };
+}
+
+function sanitizeEpisode(value: unknown, index: number, now: string): Episode | null {
+  if (!value || typeof value !== 'object') return null;
+  const item = value as Partial<Episode>;
+  const scenes = Array.isArray(item.scenes)
+    ? item.scenes
+        .map((scene, sceneIndex) => sanitizeScriptScene(scene, sceneIndex, now))
+        .filter((scene): scene is ScriptScene => scene !== null)
+        .sort((a, b) => a.order - b.order)
+        .map((scene, order) => ({ ...scene, order }))
+    : [];
+  if (scenes.length === 0) return null; // 不变量：每集至少一场
+  return {
+    id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : randomUUID(),
+    title: typeof item.title === 'string' ? item.title : '',
+    order: Number.isFinite(item.order) ? Number(item.order) : index,
+    scenes,
+    createdAt: typeof item.createdAt === 'string' ? item.createdAt : now,
+    updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : now,
+  };
+}
+
+function sanitizeScript(value: unknown, fallbackId?: string): Script | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<Script>;
+  if (candidate.schemaVersion !== 1) return null; // 只校验支持的版本
+  const id = typeof candidate.id === 'string' && candidate.id.trim()
+    ? candidate.id.trim()
+    : (fallbackId ?? '');
+  if (!id) return null;
+  const now = new Date().toISOString();
+  const episodes = Array.isArray(candidate.episodes)
+    ? candidate.episodes
+        .map((episode, index) => sanitizeEpisode(episode, index, now))
+        .filter((episode): episode is Episode => episode !== null)
+        .sort((a, b) => a.order - b.order)
+        .map((episode, order) => ({ ...episode, order }))
+    : [];
+  if (episodes.length === 0) return null; // 不变量：每剧本至少一集
+  return {
+    id,
+    projectId: safeProjectId(candidate.projectId),
+    title: typeof candidate.title === 'string' && candidate.title.trim() ? candidate.title : '未命名剧本',
+    episodes,
+    schemaVersion: 1,
+    createdAt: typeof candidate.createdAt === 'string' ? candidate.createdAt : now,
+    updatedAt: typeof candidate.updatedAt === 'string' ? candidate.updatedAt : now,
+  };
+}
+
+function toScriptSummary(script: Script): ScriptSummary {
+  return {
+    id: script.id,
+    projectId: script.projectId,
+    title: script.title,
+    createdAt: script.createdAt,
+    updatedAt: script.updatedAt,
+    episodeCount: script.episodes.length,
+    sceneCount: script.episodes.reduce((sum, episode) => sum + episode.scenes.length, 0),
+  };
+}
+
+async function readScriptFile(projectId: unknown, scriptId: string): Promise<Script> {
+  const raw = await fs.readFile(getScriptPath(projectId, scriptId), 'utf-8');
+  const script = sanitizeScript(JSON.parse(raw), scriptId);
+  if (!script) throw new Error('剧本文件损坏或版本不受支持。');
+  return script;
+}
+
+async function listScripts(projectId: unknown): Promise<ScriptListResult> {
+  try {
+    const entries = await fs.readdir(getScriptsProjectDir(projectId), { withFileTypes: true });
+    const scripts = await Promise.all(entries.filter((entry) => entry.isDirectory()).map(async (entry) => {
+      try {
+        return toScriptSummary(await readScriptFile(projectId, entry.name));
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') console.warn('Failed to list script:', error);
+        return null;
+      }
+    }));
+    const summaries = scripts
+      .filter((summary): summary is ScriptSummary => summary !== null)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    return { ok: true, summaries };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { ok: true, summaries: [] };
+    return { ok: false, message: '加载剧本列表失败。', summaries: [] };
+  }
+}
+
+async function createScript(input: unknown): Promise<ScriptResult> {
+  const candidate = input && typeof input === 'object' ? input as { projectId?: unknown; title?: unknown } : {};
+  const now = new Date().toISOString();
+  const sceneId = randomUUID();
+  const episodeId = randomUUID();
+  const script: Script = {
+    id: `script-${randomUUID()}`,
+    projectId: safeProjectId(candidate.projectId),
+    title: typeof candidate.title === 'string' && candidate.title.trim() ? candidate.title : '未命名剧本',
+    episodes: [{
+      id: episodeId,
+      title: '',
+      order: 0,
+      scenes: [{ id: sceneId, title: '', content: '', order: 0, referenceIds: [], createdAt: now, updatedAt: now }],
+      createdAt: now,
+      updatedAt: now,
+    }],
+    schemaVersion: 1,
+    createdAt: now,
+    updatedAt: now,
+  };
+  return saveScript(script);
+}
+
+async function loadScript(projectId: unknown, scriptId: unknown): Promise<ScriptResult> {
+  const safeId = safeScriptId(scriptId);
+  if (!safeId) return { ok: false, message: '剧本 ID 无效。' };
+  try {
+    return { ok: true, script: await readScriptFile(projectId, safeId) };
+  } catch (error) {
+    const message = (error as NodeJS.ErrnoException).code === 'ENOENT' ? '剧本文件缺失。' : '剧本文件损坏。';
+    return { ok: false, message };
+  }
+}
+
+async function saveScript(value: unknown): Promise<ScriptResult> {
+  const script = sanitizeScript(value);
+  if (!script) return { ok: false, message: '剧本数据无效。' };
+  script.updatedAt = new Date().toISOString();
+  const queueKey = `${script.projectId}:${script.id}`;
+  const previous = scriptSaveQueues.get(queueKey) ?? Promise.resolve();
+  const next = previous.catch(() => undefined).then(async () => {
+    const scriptDir = path.dirname(getScriptPath(script.projectId, script.id));
+    const target = getScriptPath(script.projectId, script.id);
+    const temp = `${target}.tmp`;
+    await fs.mkdir(scriptDir, { recursive: true });
+    await fs.writeFile(temp, JSON.stringify(script, null, 2), 'utf-8');
+    await fs.rename(temp, target);
+    return script;
+  });
+  scriptSaveQueues.set(queueKey, next.catch(() => undefined));
+  try {
+    return { ok: true, script: await next };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : '保存剧本失败。' };
+  }
+}
+
+async function deleteScript(projectId: unknown, scriptId: unknown): Promise<OperationResult> {
+  const safeId = safeScriptId(scriptId);
+  if (!safeId) return { ok: false, message: '剧本 ID 无效。' };
+  await scriptSaveQueues.get(`${safeProjectId(projectId)}:${safeId}`)?.catch(() => undefined);
+  try {
+    await fs.rm(path.dirname(getScriptPath(projectId, safeId)), { recursive: true, force: false });
+    return { ok: true, message: '剧本已删除。' };
+  } catch (error) {
+    return { ok: false, message: (error as NodeJS.ErrnoException).code === 'ENOENT' ? '剧本不存在。' : '删除剧本失败。' };
+  }
+}
+
+function sanitizeProjectSettingEntry(value: unknown, projectId: string, now: string): ProjectSettingEntry | null {
+  if (!value || typeof value !== 'object') return null;
+  const item = value as Partial<ProjectSettingEntry>;
+  if (item.type !== 'character' && item.type !== 'location') return null;
+  const title = typeof item.title === 'string' ? item.title : '';
+  if (!title.trim()) return null;
+  return {
+    id: typeof item.id === 'string' && item.id.trim() ? item.id.trim() : randomUUID(),
+    projectId,
+    type: item.type,
+    title,
+    body: typeof item.body === 'string' ? item.body : '',
+    createdAt: typeof item.createdAt === 'string' ? item.createdAt : now,
+    updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : now,
+  };
+}
+
+function emptyProjectSettings(projectId: string): ProjectSettings {
+  return { projectId, entries: [], schemaVersion: 1 };
+}
+
+function sanitizeProjectSettings(value: unknown, projectId: string): ProjectSettings | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<ProjectSettings>;
+  if (candidate.schemaVersion !== 1) return null;
+  const now = new Date().toISOString();
+  const entries = Array.isArray(candidate.entries)
+    ? candidate.entries
+        .map((entry) => sanitizeProjectSettingEntry(entry, projectId, now))
+        .filter((entry): entry is ProjectSettingEntry => entry !== null)
+    : [];
+  return { projectId, entries, schemaVersion: 1 };
+}
+
+async function loadProjectSettings(projectId: unknown): Promise<ProjectSettingsResult> {
+  const safeId = safeProjectId(projectId);
+  try {
+    const raw = await fs.readFile(getProjectSettingsPath(projectId), 'utf-8');
+    const settings = sanitizeProjectSettings(JSON.parse(raw), safeId);
+    if (!settings) return { ok: false, message: '设定文件损坏或版本不受支持。' };
+    return { ok: true, settings };
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return { ok: true, settings: emptyProjectSettings(safeId) };
+    return { ok: false, message: '加载共享设定失败。' };
+  }
+}
+
+async function writeProjectSettings(settings: ProjectSettings): Promise<ProjectSettingsResult> {
+  const queueKey = settings.projectId;
+  const previous = projectSettingsSaveQueues.get(queueKey) ?? Promise.resolve();
+  const next = previous.catch(() => undefined).then(async () => {
+    const target = getProjectSettingsPath(settings.projectId);
+    const temp = `${target}.tmp`;
+    await fs.mkdir(path.dirname(target), { recursive: true });
+    await fs.writeFile(temp, JSON.stringify(settings, null, 2), 'utf-8');
+    await fs.rename(temp, target);
+    return settings;
+  });
+  projectSettingsSaveQueues.set(queueKey, next.catch(() => undefined));
+  try {
+    return { ok: true, settings: await next };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : '保存共享设定失败。' };
+  }
+}
+
+async function saveProjectSettings(value: unknown): Promise<ProjectSettingsResult> {
+  const candidate = value && typeof value === 'object' ? value as { projectId?: unknown } : {};
+  const settings = sanitizeProjectSettings(value, safeProjectId(candidate.projectId));
+  if (!settings) return { ok: false, message: '共享设定数据无效。' };
+  return writeProjectSettings(settings);
+}
+
+async function deleteProjectSetting(projectId: unknown, settingId: unknown): Promise<DeleteSettingResult> {
+  const safeId = safeProjectId(projectId);
+  if (typeof settingId !== 'string' || !settingId.trim()) return { ok: false, message: '设定 ID 无效。' };
+  const loaded = await loadProjectSettings(projectId);
+  if (!loaded.ok || !loaded.settings) return { ok: false, message: loaded.message ?? '加载共享设定失败。' };
+  // 从磁盘重新读取当前项目全部 Script 扫描引用，不信任 renderer 快照。
+  let scripts: Script[] = [];
+  try {
+    const entries = await fs.readdir(getScriptsProjectDir(projectId), { withFileTypes: true });
+    const loadedScripts = await Promise.all(entries.filter((entry) => entry.isDirectory()).map(async (entry) => {
+      try {
+        return await readScriptFile(projectId, entry.name);
+      } catch {
+        return null;
+      }
+    }));
+    scripts = loadedScripts.filter((script): script is Script => script !== null);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return { ok: false, message: '扫描剧本引用失败。' };
+  }
+  const references = findSettingReferences(scripts, settingId);
+  if (references.length > 0) {
+    return { ok: false, message: '无法删除：仍被场次引用。', references };
+  }
+  const nextSettings: ProjectSettings = {
+    ...loaded.settings,
+    entries: loaded.settings.entries.filter((entry) => entry.id !== settingId),
+  };
+  const saved = await writeProjectSettings(nextSettings);
+  if (!saved.ok) return { ok: false, message: saved.message };
+  return { ok: true, message: '设定已删除。' };
 }
 
 function sanitizeExportFileName(name: string): string {
@@ -1119,6 +1496,14 @@ function registerIpcHandlers(): void {
     const targetWindow = BrowserWindow.fromWebContents(event.sender);
     if (targetWindow) closeAfterNovelFlush(targetWindow);
   });
+  ipcMain.handle('script:list', (_event, projectId: unknown) => listScripts(projectId));
+  ipcMain.handle('script:create', (_event, input: unknown) => createScript(input));
+  ipcMain.handle('script:load', (_event, projectId: unknown, scriptId: unknown) => loadScript(projectId, scriptId));
+  ipcMain.handle('script:save', (_event, script: unknown) => saveScript(script));
+  ipcMain.handle('script:delete', (_event, projectId: unknown, scriptId: unknown) => deleteScript(projectId, scriptId));
+  ipcMain.handle('project-settings:load', (_event, projectId: unknown) => loadProjectSettings(projectId));
+  ipcMain.handle('project-settings:save', (_event, settings: unknown) => saveProjectSettings(settings));
+  ipcMain.handle('project-settings:delete', (_event, projectId: unknown, settingId: unknown) => deleteProjectSetting(projectId, settingId));
   ipcMain.handle('app:select-generated-images-directory', async (_event, currentPath: unknown): Promise<{ ok: boolean; message: string; path?: string }> => {
     const options: OpenDialogOptions = {
       title: '选择图片保存位置',
