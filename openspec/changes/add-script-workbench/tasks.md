@@ -3,8 +3,8 @@
 - [x] 1.1 定义剧本域类型（`Script`/`Episode`/`ScriptScene`）与项目级共享设定类型（`ProjectSettingEntry`），含 `schemaVersion` 基线，独立于 `Novel`/`Chapter`/`Scene`，不改动小说类型文件
 - [x] 1.2 main 进程新增剧本文件存储（按 `projectId` 隔离，临时文件 + rename 原子写、按实体串行保存队列），实现 list/create/load/save/delete handler；create 时生成稳定 ID、时间戳、第 1 集与第 1 场
 - [x] 1.3 main 进程新增共享设定文件存储（按 `projectId` 隔离空库、原子写），实现 load/save/deleteSetting handler；deleteSetting 前从磁盘重新读取当前项目全部 Script 扫描 `referenceIds`，命中引用则返回 `{ok:false}` 与引用位置摘要，不执行删除
-- [ ] 1.4 preload 新增独立 `script` 与 `projectSettings` 命名空间并补 bridge 类型；renderer 新增 `scriptService`/`projectSettingsService` 与 `rendererBridge` 双路径（Electron IPC + `endless-creation.scripts.<projectId>` / `endless-creation.project-settings.<projectId>` 的 Web fallback，返回同形状结果，不作为 Electron 写盘失败的降级）
-- [ ] 1.5 复用关闭前 flush 机制，等待剧本与设定 pending save 完成后再关闭窗口
+- [x] 1.4 preload 新增独立 `script` 与 `projectSettings` 命名空间并补 bridge 类型；renderer 新增 `scriptService`/`projectSettingsService` 与 `rendererBridge` 双路径（Electron IPC + `endless-creation.scripts.<projectId>` / `endless-creation.project-settings.<projectId>` 的 Web fallback，返回同形状结果，不作为 Electron 写盘失败的降级）
+- [x] 1.5 复用关闭前 flush 机制，等待剧本与设定 pending save 完成后再关闭窗口
 
 ## 2. 剧本工作台 UI 与核心闭环
 
