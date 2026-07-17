@@ -1,8 +1,427 @@
-/* 剧本工作台布局与状态样式（Task 6 生产级细化前的基线）。 */
+/* 剧本工作台：四列桌面布局（剧本库 / 集与场次 / 编辑器 / 设定与引用）。 */
 .script-workbench {
   min-width: 0;
   min-height: 0;
   height: 100%;
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(180px, 240px) minmax(0, 1fr) minmax(220px, 280px);
+  gap: 1px;
+  background: var(--border);
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.script-workbench > * {
+  background: var(--bg);
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+.script-library,
+.script-structure,
+.script-editor,
+.script-side {
   display: flex;
   flex-direction: column;
+  padding: 12px;
+  gap: 10px;
+}
+
+.script-side {
+  gap: 16px;
+}
+
+.script-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.script-panel-head h2,
+.script-panel-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+}
+
+/* ===== 列表通用 ===== */
+.script-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.script-list li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--radius-sm);
+  padding: 2px;
+}
+
+.script-list li.is-active {
+  background: var(--accent-soft);
+}
+
+.script-list-item {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--ink);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.script-list-item:hover {
+  background: var(--surface);
+}
+
+.script-list-title {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.script-list-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.script-list-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.script-list-actions button {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.script-list-actions button:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.script-list-actions button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ===== 按钮 ===== */
+.script-btn-primary,
+.script-btn-ghost,
+.script-btn-danger {
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.script-btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.script-btn-ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--ink);
+}
+
+.script-btn-ghost:hover {
+  background: var(--surface);
+}
+
+.script-btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.script-input,
+.script-scene-title,
+.script-content,
+.script-settings-body {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  padding: 6px 8px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.script-input:focus,
+.script-scene-title:focus,
+.script-content:focus,
+.script-settings-body:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* ===== 编辑器 ===== */
+.script-editor {
+  gap: 8px;
+}
+
+.script-editor-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.script-scene-title {
+  flex: 1;
+}
+
+.script-save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.script-save-status.is-saving {
+  color: var(--warning);
+}
+
+.script-save-status.is-failed {
+  color: var(--danger);
+}
+
+.script-save-status.is-dirty {
+  color: var(--warning);
+}
+
+.script-content {
+  flex: 1;
+  min-height: 240px;
+  resize: none;
+  line-height: 1.7;
+}
+
+/* ===== 结构区 ===== */
+.script-structure {
+  gap: 16px;
+}
+
+.script-episodes,
+.script-scenes {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ===== 设定与引用 ===== */
+.script-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.script-settings-type,
+.script-ref-filter {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.script-settings-type label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
+.script-settings-body {
+  min-height: 60px;
+  resize: vertical;
+}
+
+.script-settings-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.script-setting-tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+  margin-right: 6px;
+}
+
+.script-ref-filter button {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.script-ref-filter button.is-active {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.script-ref-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.script-ref-list label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.script-ref-list label:hover {
+  background: var(--surface);
+}
+
+/* ===== 状态与提示 ===== */
+.script-empty {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 8px 6px;
+}
+
+.script-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 12px;
+  margin: 0;
+}
+
+.script-error button {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* ===== 撤销 Toast ===== */
+.script-undo-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--chrome);
+  color: var(--ink);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  box-shadow: var(--shadow);
+  z-index: 40;
+  font-size: 13px;
+}
+
+/* ===== 确认对话框 ===== */
+.script-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.script-dialog {
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  padding: 20px;
+  width: min(360px, 90vw);
+  box-shadow: var(--shadow);
+}
+
+.script-dialog h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.script-dialog p {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.script-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ===== 窄窗口降级：辅助栏折叠为堆叠 ===== */
+@media (max-width: 1100px) {
+  .script-workbench {
+    grid-template-columns: minmax(160px, 200px) minmax(0, 1fr);
+    grid-auto-rows: min-content;
+  }
+
+  .script-side {
+    grid-column: 1 / -1;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .script-side > * {
+    flex: 1 1 260px;
+  }
 }

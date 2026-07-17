@@ -6,6 +6,7 @@ import appLogoUrl from '../assets/endless-creation-logo.png';
 import { AssetManagement } from '../features/asset-management';
 import { ImageWorkbench } from '../features/image-workbench';
 import { NovelCreation } from '../features/novel-creation';
+import { ScriptWorkbench } from '../features/script-workbench';
 import { CanvasLibrary, CanvasWorkbench } from '../features/canvas-workbench';
 import { SettingsPage } from '../features/settings';
 import {
@@ -324,6 +325,8 @@ export function App() {
         <ImageWorkbench projectId={activeProjectId ?? 'default'} />
       ) : activeNavId === 'novel' ? (
         <NovelCreation projectId={activeProjectId ?? 'default'} />
+      ) : activeNavId === 'script-workbench' ? (
+        <ScriptWorkbench projectId={activeProjectId ?? 'default'} />
       ) : activeNavId === 'assets' || activeNavId.startsWith('asset-') ? (
         <AssetManagement projectId={activeProjectId ?? 'default'} />
       ) : activeNavId === 'canvas' ? (
