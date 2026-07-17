@@ -1,0 +1,15 @@
+{
+  "change": "add-script-workbench",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "0f635630e1bea2eab4b1673cc428f95c2ae74483e680f4bd41c3d3b6b45a8a7b",
+  "files": [
+    { "path": "openspec/changes/add-script-workbench/proposal.md", "sha256": "9e93685d17926bd094d504f0533468a715b881813092f9f3ab564f23e7c70a2e" },
+    { "path": "openspec/changes/add-script-workbench/design.md", "sha256": "cb56e1ffe4f4f65935ad1305cf474d108a202c1f3b87665f1f8f818691e789c4" },
+    { "path": "openspec/changes/add-script-workbench/tasks.md", "sha256": "def0e56f5e13337287b3983ca0307e0f60cf8f074f79d093636675bceea206bf" },
+    { "path": "openspec/changes/add-script-workbench/specs/project-shared-settings/spec.md", "sha256": "9cd50990437051271b378c81a83bab2e388a0068e3e7326b77b46b795e581b2d" },
+    { "path": "openspec/changes/add-script-workbench/specs/script-workbench/spec.md", "sha256": "6f24ccab0280bd2389eee013821db3c8df86e0cdc826389c7fc7592ba9bc985e" }
+  ]
+}

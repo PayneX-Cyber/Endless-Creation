@@ -33,6 +33,8 @@ export interface ScriptSummary {
   title: string;
   createdAt: string;
   updatedAt: string;
+  episodeCount: number;
+  sceneCount: number;
 }
 
 export interface ProjectSettingEntry {
