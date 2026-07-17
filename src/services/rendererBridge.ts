@@ -12,11 +12,25 @@ import type {
   TextStreamEvent,
 } from '../types/apiProvider';
 import type { Chapter, CharacterGraph, ChapterVersion, EmotionArc, Novel, NovelListResult, NovelResult, Scene, Volume } from '../types/novel';
+import type {
+  DeleteSettingResult,
+  OperationResult,
+  ProjectSettings,
+  ProjectSettingsResult,
+  Script,
+  ScriptListResult,
+  ScriptResult,
+  ScriptSummary,
+  SettingReference,
+} from '../types/script';
+import { createInitialScript } from '../features/script-workbench/scriptDomain';
 import type { ThemeMode } from '../types/workspace';
 
 const THEME_STORAGE_KEY = 'ec-theme';
 const WEB_NOVELS_STORAGE_KEY = 'endless-creation.novels';
 const WEB_AI_USAGE_STORAGE_KEY = 'endless-creation.ai-usage-records';
+const scriptStorageKey = (projectId: string) => `endless-creation.scripts.${projectId || 'default'}`;
+const projectSettingsStorageKey = (projectId: string) => `endless-creation.project-settings.${projectId || 'default'}`;
 
 /**
  * Renderer boundary for browser/Electron-renderer capabilities.
@@ -394,6 +408,84 @@ export const rendererBridge = {
     writeWebNovels(readWebNovels().filter((novel) => novel.id !== id));
     return { ok: true, message: 'web fallback' };
   },
+
+  async listScripts(projectId: string): Promise<ScriptListResult> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) return electronBridge.script.listScripts(projectId);
+    const summaries = readWebScripts(projectId)
+      .map(toScriptSummary)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    return { ok: true, summaries };
+  },
+
+  async createScript(input: { projectId: string; title?: string }): Promise<ScriptResult> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) return electronBridge.script.createScript(input);
+    const script = createInitialScript(input.projectId || 'default', input.title);
+    writeWebScripts(input.projectId, [script, ...readWebScripts(input.projectId)]);
+    return { ok: true, script };
+  },
+
+  async loadScript(projectId: string, scriptId: string): Promise<ScriptResult> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) return electronBridge.script.loadScript(projectId, scriptId);
+    const script = readWebScripts(projectId).find((item) => item.id === scriptId);
+    return script ? { ok: true, script } : { ok: false, message: '剧本不存在。' };
+  },
+
+  async saveScript(script: Script): Promise<ScriptResult> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) return electronBridge.script.saveScript(script);
+    try {
+      const next = { ...script, updatedAt: new Date().toISOString() };
+      const scripts = readWebScripts(next.projectId);
+      const index = scripts.findIndex((item) => item.id === next.id);
+      const updated = index >= 0 ? scripts.map((item) => (item.id === next.id ? next : item)) : [next, ...scripts];
+      writeWebScripts(next.projectId, updated);
+      return { ok: true, script: next };
+    } catch {
+      return { ok: false, message: '保存剧本失败。' };
+    }
+  },
+
+  async deleteScript(projectId: string, scriptId: string): Promise<OperationResult> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) return electronBridge.script.deleteScript(projectId, scriptId);
+    try {
+      writeWebScripts(projectId, readWebScripts(projectId).filter((script) => script.id !== scriptId));
+      return { ok: true, message: '剧本已删除。' };
+    } catch {
+      return { ok: false, message: '删除剧本失败。' };
+    }
+  },
+
+  async loadProjectSettings(projectId: string): Promise<ProjectSettingsResult> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) return electronBridge.projectSettings.load(projectId);
+    return { ok: true, settings: readWebProjectSettings(projectId) };
+  },
+
+  async saveProjectSettings(settings: ProjectSettings): Promise<ProjectSettingsResult> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) return electronBridge.projectSettings.save(settings);
+    try {
+      writeWebProjectSettings(settings);
+      return { ok: true, settings };
+    } catch {
+      return { ok: false, message: '保存共享设定失败。' };
+    }
+  },
+
+  async deleteProjectSetting(projectId: string, settingId: string): Promise<DeleteSettingResult> {
+    const electronBridge = getElectronBridge();
+    if (electronBridge) return electronBridge.projectSettings.delete(projectId, settingId);
+    // Web fallback: 扫描本项目全部剧本，命中引用则拒绝删除（与 main 权威扫描对称）。
+    const references = findWebSettingReferences(readWebScripts(projectId), settingId);
+    if (references.length > 0) return { ok: false, message: '无法删除：仍被场次引用。', references };
+    const settings = readWebProjectSettings(projectId);
+    writeWebProjectSettings({ ...settings, entries: settings.entries.filter((entry) => entry.id !== settingId) });
+    return { ok: true, message: '设定已删除。' };
+  },
 };
 
 function getElectronBridge() {
@@ -694,4 +786,79 @@ function countWords(text: string): number {
 
 function createWebNovelId(): string {
   return `novel-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function toScriptSummary(script: Script): ScriptSummary {
+  return {
+    id: script.id,
+    projectId: script.projectId,
+    title: script.title,
+    createdAt: script.createdAt,
+    updatedAt: script.updatedAt,
+    episodeCount: script.episodes.length,
+    sceneCount: script.episodes.reduce((sum, episode) => sum + episode.scenes.length, 0),
+  };
+}
+
+function isWebScript(value: unknown): value is Script {
+  return Boolean(
+    value
+      && typeof value === 'object'
+      && typeof (value as Script).id === 'string'
+      && Array.isArray((value as Script).episodes)
+      && (value as Script).schemaVersion === 1,
+  );
+}
+
+function readWebScripts(projectId: string): Script[] {
+  try {
+    const raw = globalThis.localStorage?.getItem(scriptStorageKey(projectId));
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter(isWebScript) : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeWebScripts(projectId: string, scripts: Script[]): void {
+  globalThis.localStorage?.setItem(scriptStorageKey(projectId), JSON.stringify(scripts));
+}
+
+function readWebProjectSettings(projectId: string): ProjectSettings {
+  const empty: ProjectSettings = { projectId: projectId || 'default', entries: [], schemaVersion: 1 };
+  try {
+    const raw = globalThis.localStorage?.getItem(projectSettingsStorageKey(projectId));
+    if (!raw) return empty;
+    const parsed = JSON.parse(raw) as Partial<ProjectSettings>;
+    if (parsed.schemaVersion !== 1 || !Array.isArray(parsed.entries)) return empty;
+    return { projectId: projectId || 'default', entries: parsed.entries, schemaVersion: 1 };
+  } catch {
+    return empty;
+  }
+}
+
+function writeWebProjectSettings(settings: ProjectSettings): void {
+  globalThis.localStorage?.setItem(projectSettingsStorageKey(settings.projectId), JSON.stringify(settings));
+}
+
+// Web fallback 引用扫描，与 electron/main/scriptReferences.ts 对称，只依赖 referenceIds。
+function findWebSettingReferences(scripts: Script[], settingId: string): SettingReference[] {
+  const references: SettingReference[] = [];
+  for (const script of scripts) {
+    for (const episode of script.episodes) {
+      for (const scene of episode.scenes) {
+        if (scene.referenceIds.includes(settingId)) {
+          references.push({
+            scriptId: script.id,
+            scriptTitle: script.title,
+            episodeId: episode.id,
+            episodeTitle: episode.title,
+            sceneId: scene.id,
+            sceneTitle: scene.title,
+          });
+        }
+      }
+    }
+  }
+  return references;
 }

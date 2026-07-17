@@ -57,6 +57,18 @@ const bridge: EndlessCreationBridge = {
     },
     finishFlushBeforeClose: () => ipcRenderer.invoke('novel:flush-before-close-done'),
   },
+  script: {
+    listScripts: (projectId) => ipcRenderer.invoke('script:list', projectId),
+    createScript: (input) => ipcRenderer.invoke('script:create', input),
+    loadScript: (projectId, scriptId) => ipcRenderer.invoke('script:load', projectId, scriptId),
+    saveScript: (script) => ipcRenderer.invoke('script:save', script),
+    deleteScript: (projectId, scriptId) => ipcRenderer.invoke('script:delete', projectId, scriptId),
+  },
+  projectSettings: {
+    load: (projectId) => ipcRenderer.invoke('project-settings:load', projectId),
+    save: (settings) => ipcRenderer.invoke('project-settings:save', settings),
+    delete: (projectId, settingId) => ipcRenderer.invoke('project-settings:delete', projectId, settingId),
+  },
 };
 
 contextBridge.exposeInMainWorld('endlessCreationBridge', bridge);

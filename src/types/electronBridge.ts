@@ -1,5 +1,14 @@
 import type { AiUsageListResult, ApiConnectionTestResult, ApiImageGenerationCancelResult, ApiImageGenerationRequest, ApiImageGenerationResult, ApiProviderConfig, ApiTextGenerationCancelResult, ApiTextGenerationRequest, ApiTextGenerationResult, TextStreamEvent } from './apiProvider';
 import type { Novel, NovelListResult, NovelResult } from './novel';
+import type {
+  DeleteSettingResult,
+  OperationResult,
+  ProjectSettings,
+  ProjectSettingsResult,
+  Script,
+  ScriptListResult,
+  ScriptResult,
+} from './script';
 
 export interface EndlessCreationBridge {
   app: {
@@ -44,5 +53,17 @@ export interface EndlessCreationBridge {
     deleteNovel(id: string): Promise<{ ok: boolean; message: string }>;
     onFlushBeforeClose?(callback: () => Promise<void> | void): () => void;
     finishFlushBeforeClose?(): Promise<void>;
+  };
+  script: {
+    listScripts(projectId: string): Promise<ScriptListResult>;
+    createScript(input: { projectId: string; title?: string }): Promise<ScriptResult>;
+    loadScript(projectId: string, scriptId: string): Promise<ScriptResult>;
+    saveScript(script: Script): Promise<ScriptResult>;
+    deleteScript(projectId: string, scriptId: string): Promise<OperationResult>;
+  };
+  projectSettings: {
+    load(projectId: string): Promise<ProjectSettingsResult>;
+    save(settings: ProjectSettings): Promise<ProjectSettingsResult>;
+    delete(projectId: string, settingId: string): Promise<DeleteSettingResult>;
   };
 }

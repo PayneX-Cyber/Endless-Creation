@@ -220,6 +220,96 @@ export type NovelSummary = Pick<Novel, 'id' | 'title' | 'summary' | 'createdAt' 
   wordCount: number;
 };
 
+export interface ScriptScene {
+  id: string;
+  title: string;
+  content: string;
+  order: number;
+  referenceIds: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Episode {
+  id: string;
+  title: string;
+  order: number;
+  scenes: ScriptScene[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Script {
+  id: string;
+  projectId: string;
+  title: string;
+  episodes: Episode[];
+  schemaVersion: 1;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ScriptSummary = Pick<Script, 'id' | 'projectId' | 'title' | 'createdAt' | 'updatedAt'> & {
+  episodeCount: number;
+  sceneCount: number;
+};
+
+export type ProjectSettingType = 'character' | 'location';
+
+export interface ProjectSettingEntry {
+  id: string;
+  projectId: string;
+  type: ProjectSettingType;
+  title: string;
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectSettings {
+  projectId: string;
+  entries: ProjectSettingEntry[];
+  schemaVersion: 1;
+}
+
+export interface SettingReference {
+  scriptId: string;
+  scriptTitle: string;
+  episodeId: string;
+  episodeTitle: string;
+  sceneId: string;
+  sceneTitle: string;
+}
+
+export interface ScriptListResult {
+  ok: boolean;
+  message?: string;
+  summaries?: ScriptSummary[];
+}
+
+export interface ScriptResult {
+  ok: boolean;
+  message?: string;
+  script?: Script;
+}
+
+export interface OperationResult {
+  ok: boolean;
+  message?: string;
+}
+
+export interface ProjectSettingsResult {
+  ok: boolean;
+  message?: string;
+  settings?: ProjectSettings;
+}
+
+export interface DeleteSettingResult {
+  ok: boolean;
+  message?: string;
+  references?: SettingReference[];
+}
+
 export interface EndlessCreationBridge {
   app: {
     getVersion(): Promise<string>;
@@ -263,6 +353,18 @@ export interface EndlessCreationBridge {
     deleteNovel(id: string): Promise<{ ok: boolean; message: string }>;
     onFlushBeforeClose?(callback: () => Promise<void> | void): () => void;
     finishFlushBeforeClose?(): Promise<void>;
+  };
+  script: {
+    listScripts(projectId: string): Promise<ScriptListResult>;
+    createScript(input: { projectId: string; title?: string }): Promise<ScriptResult>;
+    loadScript(projectId: string, scriptId: string): Promise<ScriptResult>;
+    saveScript(script: Script): Promise<ScriptResult>;
+    deleteScript(projectId: string, scriptId: string): Promise<OperationResult>;
+  };
+  projectSettings: {
+    load(projectId: string): Promise<ProjectSettingsResult>;
+    save(settings: ProjectSettings): Promise<ProjectSettingsResult>;
+    delete(projectId: string, settingId: string): Promise<DeleteSettingResult>;
   };
 }
 
