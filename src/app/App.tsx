@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentType, SVGProps } from 'react';
 import type { ThemeMode } from '../types/workspace';
 import { rendererBridge } from '../services/rendererBridge';
@@ -50,6 +50,7 @@ type ActiveNavId =
   | 'assets';
 
 type PrimaryNavId = ActiveNavId;
+type BeforeWorkspaceChange = () => Promise<boolean>;
 
 const sidebarNavItems: Array<{ id: PrimaryNavId; Icon: SidebarIcon; label: string }> = [
   { id: 'home', Icon: HomeIcon, label: '首页' },
@@ -78,6 +79,7 @@ export function App() {
   const [isProjectCenterOpen, setProjectCenterOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const projectMenuRef = useRef<HTMLDivElement>(null);
+  const beforeWorkspaceChangeRef = useRef<BeforeWorkspaceChange | null>(null);
   const ThemeIcon = theme === 'dark' ? SunIcon : MoonIcon;
   const isSidebarVisuallyCollapsed = isSidebarCollapsed;
 
@@ -107,16 +109,37 @@ export function App() {
     return () => document.removeEventListener('mousedown', closeOnOutsideClick);
   }, [isProjectMenuOpen]);
 
-  function switchProject(projectId: string) {
-    setActiveProjectId(projectId);
-    setRecentProjectIds((ids) => promoteRecentProject(ids, projectId));
+  const registerBeforeWorkspaceChange = useCallback((handler: BeforeWorkspaceChange | null) => {
+    beforeWorkspaceChangeRef.current = handler;
+  }, []);
+
+  async function prepareWorkspaceChange(): Promise<boolean> {
+    return beforeWorkspaceChangeRef.current ? beforeWorkspaceChangeRef.current() : true;
   }
 
-  function enterWorkbench(projectId: string, navId: ActiveNavId) {
-    switchProject(projectId);
+  async function switchProject(projectId: string): Promise<boolean> {
+    if (projectId === activeProjectId) return true;
+    if (!await prepareWorkspaceChange()) return false;
+    setActiveProjectId(projectId);
+    setRecentProjectIds((ids) => promoteRecentProject(ids, projectId));
+    return true;
+  }
+
+  async function enterWorkbench(projectId: string, navId: ActiveNavId) {
+    if (!await switchProject(projectId)) return;
     setProjectCenterOpen(false);
     setProjectMenuOpen(false);
     if (navId === 'canvas') setActiveCanvasIdsByProject((ids) => ({ ...ids, [projectId]: ids[projectId] ?? 'canvas-2' }));
+    setActiveNavId(navId);
+  }
+
+  async function navigateTo(navId: ActiveNavId) {
+    if ((navId === 'canvas' || navId === 'script-workbench') && !activeProjectId) {
+      setProjectCenterOpen(true);
+      return;
+    }
+    if (navId === activeNavId) return;
+    if (!await prepareWorkspaceChange()) return;
     setActiveNavId(navId);
   }
 
@@ -184,13 +207,7 @@ export function App() {
                   aria-current={isActive ? 'page' : undefined}
                   aria-label={isSidebarVisuallyCollapsed ? item.label : undefined}
                   className={`canvasflow-nav__item ${isActive ? 'canvasflow-nav__item--active' : ''}`}
-                  onClick={() => {
-                    if (item.id === 'canvas' && !activeProjectId) {
-                      setProjectCenterOpen(true);
-                      return;
-                    }
-                    setActiveNavId(item.id);
-                  }}
+                  onClick={() => { void navigateTo(item.id); }}
                   type="button"
                 >
                   <span className="canvasflow-nav__icon" aria-hidden="true"><Icon /></span>
@@ -241,8 +258,9 @@ export function App() {
                       type="button"
                       role="menuitem"
                       onClick={() => {
-                        switchProject(project.id);
-                        setProjectMenuOpen(false);
+                        void (async () => {
+                          if (await switchProject(project.id)) setProjectMenuOpen(false);
+                        })();
                       }}
                     >
                       <span className="canvasflow-project-menu__check" aria-hidden="true">{isActive ? '✓' : ''}</span>
@@ -326,7 +344,15 @@ export function App() {
       ) : activeNavId === 'novel' ? (
         <NovelCreation projectId={activeProjectId ?? 'default'} />
       ) : activeNavId === 'script-workbench' ? (
-        <ScriptWorkbench projectId={activeProjectId ?? 'default'} />
+        activeProjectId ? (
+          <ScriptWorkbench
+            key={activeProjectId}
+            projectId={activeProjectId}
+            registerBeforeWorkspaceChange={registerBeforeWorkspaceChange}
+          />
+        ) : (
+          <main className="blank-workspace" aria-label="空白工作区" />
+        )
       ) : activeNavId === 'assets' || activeNavId.startsWith('asset-') ? (
         <AssetManagement projectId={activeProjectId ?? 'default'} />
       ) : activeNavId === 'canvas' ? (
@@ -353,9 +379,9 @@ export function App() {
         activeProjectId={activeProjectId}
         recentProjectIds={recentProjectIds}
         onClose={() => setProjectCenterOpen(false)}
-        onSwitchProject={switchProject}
-        onEnterCanvas={(projectId) => enterWorkbench(projectId, 'canvas')}
-        onWriteNovel={(projectId) => enterWorkbench(projectId, 'novel')}
+        onSwitchProject={(projectId) => { void switchProject(projectId); }}
+        onEnterCanvas={(projectId) => { void enterWorkbench(projectId, 'canvas'); }}
+        onWriteNovel={(projectId) => { void enterWorkbench(projectId, 'novel'); }}
       />
     </div>
   );

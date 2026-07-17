@@ -622,7 +622,7 @@ Run: `git diff --check`
 
 Expected: 无输出。
 
-- [ ] **Step 2: Web fallback 验收**
+- [x] **Step 2: Web fallback 验收**
 
 浏览器预览逐项验证：
 
@@ -634,7 +634,7 @@ Expected: 无输出。
 - 删除被引用设定被拒并展示位置
 - 删除 Script 后即时撤销完整恢复，切换项目后撤销失效
 
-- [ ] **Step 3: Electron 真机验收**
+- [x] **Step 3: Electron 真机验收**
 
 使用隔离 `userData`，不得污染用户真实配置。验证磁盘：
 

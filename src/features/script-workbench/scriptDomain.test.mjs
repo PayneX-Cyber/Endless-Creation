@@ -131,3 +131,56 @@ test('撤销快照保留完整正文且与 draft 隔离', () => {
   assert.equal(snapshot.episodes[0].scenes[0].content, '完整正文');
   assert.equal(snapshot.id, source.id);
 });
+
+test('restoreEpisode only restores the deleted episode and preserves later edits', async () => {
+  const { restoreEpisode } = await import('./scriptDomain.ts');
+  assert.equal(typeof restoreEpisode, 'function');
+
+  const withTwoEpisodes = addEpisode(createInitialScript('default'));
+  const deletedEpisode = structuredClone(withTwoEpisodes.episodes[1]);
+  const afterDelete = removeEpisode(withTwoEpisodes, deletedEpisode.id);
+  const remainingEpisode = afterDelete.episodes[0];
+  const editedAfterDelete = updateScene(
+    afterDelete,
+    remainingEpisode.id,
+    remainingEpisode.scenes[0].id,
+    { content: 'edited after delete' },
+  );
+
+  const restored = restoreEpisode(editedAfterDelete, deletedEpisode, 1);
+  assert.equal(restored.episodes.length, 2);
+  assert.equal(restored.episodes[0].scenes[0].content, 'edited after delete');
+  assert.equal(restored.episodes[1].id, deletedEpisode.id);
+});
+
+test('restoreScene only restores the deleted scene and preserves later edits', async () => {
+  const { restoreScene } = await import('./scriptDomain.ts');
+  assert.equal(typeof restoreScene, 'function');
+
+  const base = createInitialScript('default');
+  const episodeId = base.episodes[0].id;
+  const { script: withTwoScenes } = addScene(base, episodeId);
+  const deletedScene = structuredClone(withTwoScenes.episodes[0].scenes[1]);
+  const afterDelete = removeScene(withTwoScenes, episodeId, deletedScene.id);
+  const remainingScene = afterDelete.episodes[0].scenes[0];
+  const editedAfterDelete = updateScene(
+    afterDelete,
+    episodeId,
+    remainingScene.id,
+    { content: 'edited after scene delete' },
+  );
+
+  const restored = restoreScene(editedAfterDelete, episodeId, deletedScene, 1);
+  assert.equal(restored.episodes[0].scenes.length, 2);
+  assert.equal(restored.episodes[0].scenes[0].content, 'edited after scene delete');
+  assert.equal(restored.episodes[0].scenes[1].id, deletedScene.id);
+});
+
+test('findMissingReferenceIds reports references absent from settings', async () => {
+  const { findMissingReferenceIds } = await import('./scriptDomain.ts');
+  assert.equal(typeof findMissingReferenceIds, 'function');
+
+  const script = createInitialScript('default');
+  script.episodes[0].scenes[0].referenceIds = ['setting-ok', 'setting-missing'];
+  assert.deepEqual(findMissingReferenceIds(script, ['setting-ok']), ['setting-missing']);
+});

@@ -51,7 +51,7 @@ export interface EndlessCreationBridge {
     loadNovel(id: string): Promise<NovelResult>;
     saveNovel(novel: Novel): Promise<NovelResult>;
     deleteNovel(id: string): Promise<{ ok: boolean; message: string }>;
-    onFlushBeforeClose?(callback: () => Promise<void> | void): () => void;
+    onFlushBeforeClose?(callback: () => Promise<boolean | void> | boolean | void): () => void;
     finishFlushBeforeClose?(): Promise<void>;
   };
   script: {

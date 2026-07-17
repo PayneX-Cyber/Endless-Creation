@@ -47,3 +47,18 @@ export function findSettingReferences(scripts: RefScript[], settingId: string): 
   }
   return references;
 }
+
+export function findMissingSettingIds(scripts: RefScript[], validSettingIds: Iterable<string>): string[] {
+  const validIds = new Set(validSettingIds);
+  const missing = new Set<string>();
+  for (const script of scripts) {
+    for (const episode of script.episodes) {
+      for (const scene of episode.scenes) {
+        for (const settingId of scene.referenceIds) {
+          if (!validIds.has(settingId)) missing.add(settingId);
+        }
+      }
+    }
+  }
+  return [...missing];
+}

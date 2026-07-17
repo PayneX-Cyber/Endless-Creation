@@ -63,3 +63,9 @@ test('同一设定在多场次命中各返回一条', () => {
   assert.equal(references.length, 1);
   assert.equal(references[0].sceneId, 'scene-b');
 });
+
+test('findMissingSettingIds reports dangling references', async () => {
+  const { findMissingSettingIds } = await import('./scriptReferences.ts');
+  assert.equal(typeof findMissingSettingIds, 'function');
+  assert.deepEqual(findMissingSettingIds([scriptB], ['setting-1']), ['setting-2']);
+});

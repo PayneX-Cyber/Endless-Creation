@@ -23,7 +23,8 @@ import type {
   ScriptSummary,
   SettingReference,
 } from '../types/script';
-import { createInitialScript } from '../features/script-workbench/scriptDomain';
+import { createInitialScript, findMissingReferenceIds } from '../features/script-workbench/scriptDomain';
+import { createWebScriptFallback } from '../features/script-workbench/webScriptFallback';
 import type { ThemeMode } from '../types/workspace';
 
 const THEME_STORAGE_KEY = 'ec-theme';
@@ -394,7 +395,9 @@ export const rendererBridge = {
   },
 
 
-  onNovelFlushBeforeClose(callback: () => Promise<void> | void): (() => void) | undefined {
+  onNovelFlushBeforeClose(
+    callback: () => Promise<boolean | void> | boolean | void,
+  ): (() => void) | undefined {
     return getElectronBridge()?.novel.onFlushBeforeClose?.(callback);
   },
 
@@ -421,9 +424,11 @@ export const rendererBridge = {
   async createScript(input: { projectId: string; title?: string }): Promise<ScriptResult> {
     const electronBridge = getElectronBridge();
     if (electronBridge) return electronBridge.script.createScript(input);
-    const script = createInitialScript(input.projectId || 'default', input.title);
-    writeWebScripts(input.projectId, [script, ...readWebScripts(input.projectId)]);
-    return { ok: true, script };
+    return createWebScriptFallback(
+      () => createInitialScript(input.projectId || 'default', input.title),
+      () => readWebScripts(input.projectId),
+      (scripts) => writeWebScripts(input.projectId, scripts),
+    );
   },
 
   async loadScript(projectId: string, scriptId: string): Promise<ScriptResult> {
@@ -438,6 +443,14 @@ export const rendererBridge = {
     if (electronBridge) return electronBridge.script.saveScript(script);
     try {
       const next = { ...script, updatedAt: new Date().toISOString() };
+      const settings = readWebProjectSettings(next.projectId);
+      const missingSettingIds = findMissingReferenceIds(
+        next,
+        settings.entries.map((entry) => entry.id),
+      );
+      if (missingSettingIds.length > 0) {
+        return { ok: false, message: '剧本包含已删除的设定引用，请移除后重试。' };
+      }
       const scripts = readWebScripts(next.projectId);
       const index = scripts.findIndex((item) => item.id === next.id);
       const updated = index >= 0 ? scripts.map((item) => (item.id === next.id ? next : item)) : [next, ...scripts];

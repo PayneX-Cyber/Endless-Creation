@@ -99,6 +99,15 @@ export function removeEpisode(script: Script, episodeId: string): Script {
   );
 }
 
+export function restoreEpisode(script: Script, episode: Episode, index: number): Script {
+  if (script.episodes.some((item) => item.id === episode.id)) return script;
+  const episodes = sortByOrder(script.episodes);
+  const insertAt = Math.max(0, Math.min(index, episodes.length));
+  const next = [...episodes];
+  next.splice(insertAt, 0, structuredClone(episode));
+  return withEpisodes(script, normalizeOrder(next));
+}
+
 export function addScene(script: Script, episodeId: string): { script: Script; sceneId: string } {
   const episode = script.episodes.find((item) => item.id === episodeId);
   if (!episode) return { script, sceneId: '' };
@@ -153,6 +162,35 @@ export function removeScene(script: Script, episodeId: string, sceneId: string):
       updatedAt: now(),
     };
   });
+}
+
+export function restoreScene(
+  script: Script,
+  episodeId: string,
+  scene: ScriptScene,
+  index: number,
+): Script {
+  return mapEpisode(script, episodeId, (episode) => {
+    if (episode.scenes.some((item) => item.id === scene.id)) return episode;
+    const scenes = sortByOrder(episode.scenes);
+    const insertAt = Math.max(0, Math.min(index, scenes.length));
+    const next = [...scenes];
+    next.splice(insertAt, 0, structuredClone(scene));
+    return { ...episode, scenes: normalizeOrder(next), updatedAt: now() };
+  });
+}
+
+export function findMissingReferenceIds(script: Script, validSettingIds: Iterable<string>): string[] {
+  const validIds = new Set(validSettingIds);
+  const missing = new Set<string>();
+  for (const episode of script.episodes) {
+    for (const scene of episode.scenes) {
+      for (const settingId of scene.referenceIds) {
+        if (!validIds.has(settingId)) missing.add(settingId);
+      }
+    }
+  }
+  return [...missing];
 }
 
 export function cloneScriptSnapshot(script: Script): Script {

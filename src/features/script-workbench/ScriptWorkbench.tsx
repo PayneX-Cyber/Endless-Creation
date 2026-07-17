@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ProjectSettings, ProjectSettingEntry, Script, ScriptSummary, SettingReference } from '../../types/script';
+import type {
+  Episode,
+  ProjectSettings,
+  ProjectSettingEntry,
+  Script,
+  ScriptScene,
+  ScriptSummary,
+  SettingReference,
+} from '../../types/script';
+import { rendererBridge } from '../../services/rendererBridge';
 import { scriptService } from '../../services/scriptService';
 import { projectSettingsService } from '../../services/projectSettingsService';
 import {
@@ -11,6 +20,8 @@ import {
   removeEpisode,
   removeScene,
   renameEpisode,
+  restoreEpisode,
+  restoreScene,
   updateScene,
 } from './scriptDomain';
 import {
@@ -28,18 +39,41 @@ import './ScriptWorkbench.css';
 
 type SaveStatus = 'saved' | 'dirty' | 'saving' | 'failed';
 
+type UndoState =
+  | {
+      kind: 'script';
+      message: string;
+      snapshot: Script;
+    }
+  | {
+      kind: 'episode';
+      message: string;
+      scriptId: string;
+      episode: Episode;
+      index: number;
+    }
+  | {
+      kind: 'scene';
+      message: string;
+      scriptId: string;
+      episodeId: string;
+      scene: ScriptScene;
+      index: number;
+    };
+
 export interface ScriptWorkbenchProps {
   projectId: string;
+  registerBeforeWorkspaceChange?: (handler: (() => Promise<boolean>) | null) => void;
 }
 
-export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
+export function ScriptWorkbench({ projectId, registerBeforeWorkspaceChange }: ScriptWorkbenchProps) {
   const [summaries, setSummaries] = useState<ScriptSummary[]>([]);
   const [draft, setDraft] = useState<Script | null>(null);
   const [activeScriptId, setActiveScriptId] = useState<string | null>(null);
   const [activeEpisodeId, setActiveEpisodeId] = useState<string | null>(null);
   const [activeSceneId, setActiveSceneId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
-  const [undoSnapshot, setUndoSnapshot] = useState<Script | null>(null);
+  const [undoState, setUndoState] = useState<UndoState | null>(null);
   const [settings, setSettings] = useState<ProjectSettings | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [editorError, setEditorError] = useState<string | null>(null);
@@ -48,6 +82,7 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
 
   const latestDraftRef = useRef<Script | null>(null);
   const latestSaveStatusRef = useRef<SaveStatus>('saved');
+  const saveInFlightRef = useRef<Promise<boolean> | null>(null);
   const revisionRef = useRef(0);
   const projectIdRef = useRef(projectId);
 
@@ -59,8 +94,9 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
     latestSaveStatusRef.current = saveStatus;
   }, [saveStatus]);
 
-  const refreshSummaries = useCallback(async () => {
-    const result = await scriptService.listScripts(projectId);
+  const refreshSummaries = useCallback(async (targetProjectId = projectId) => {
+    const result = await scriptService.listScripts(targetProjectId);
+    if (projectIdRef.current !== targetProjectId) return;
     if (result.ok) {
       setSummaries(result.summaries ?? []);
       setListError(null);
@@ -69,15 +105,22 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
     }
   }, [projectId]);
 
-  const refreshSettings = useCallback(async () => {
-    const result = await projectSettingsService.load(projectId);
-    if (result.ok && result.settings) setSettings(result.settings);
+  const refreshSettings = useCallback(async (targetProjectId = projectId) => {
+    const result = await projectSettingsService.load(targetProjectId);
+    if (projectIdRef.current !== targetProjectId) return;
+    if (result.ok && result.settings) {
+      setSettings(result.settings);
+    } else if (!result.ok) {
+      setEditorError(result.message ?? '加载共享设定失败。');
+    }
   }, [projectId]);
 
-  // 项目切换：先失效撤销与选择，再加载新项目摘要与设定。
+  // 项目切换由 App 在更新 projectId 前执行 flush；此处只重置并加载新上下文。
   useEffect(() => {
     projectIdRef.current = projectId;
-    setUndoSnapshot(null);
+    setUndoState(null);
+    setSummaries([]);
+    setSettings(null);
     setDraft(null);
     setActiveScriptId(null);
     setActiveEpisodeId(null);
@@ -85,8 +128,11 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
     setSaveStatus('saved');
     latestSaveStatusRef.current = 'saved';
     latestDraftRef.current = null;
-    void refreshSummaries();
-    void refreshSettings();
+    revisionRef.current = 0;
+    setListError(null);
+    setEditorError(null);
+    void refreshSummaries(projectId);
+    void refreshSettings(projectId);
   }, [projectId, refreshSummaries, refreshSettings]);
 
   // 选中剧本时加载完整树 draft。
@@ -100,11 +146,13 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
     setEditorError(null);
     (async () => {
       const result = await scriptService.loadScript(projectId, activeScriptId);
-      if (cancelled) return;
+      if (cancelled || projectIdRef.current !== projectId) return;
       if (result.ok && result.script) {
+        latestDraftRef.current = result.script;
         setDraft(result.script);
         setSaveStatus('saved');
         latestSaveStatusRef.current = 'saved';
+        revisionRef.current = 0;
         setActiveEpisodeId(result.script.episodes[0]?.id ?? null);
         setActiveSceneId(result.script.episodes[0]?.scenes[0]?.id ?? null);
       } else {
@@ -117,25 +165,61 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
     };
   }, [activeScriptId, projectId]);
 
-  const saveDraft = useCallback(async (target?: Script): Promise<void> => {
+  const saveDraft = useCallback((target?: Script): Promise<boolean> => {
     const script = target ?? latestDraftRef.current;
-    if (!script) return;
+    if (!script) return Promise.resolve(true);
     const revisionAtStart = revisionRef.current;
     setSaveStatus('saving');
     latestSaveStatusRef.current = 'saving';
-    try {
-      const result = await scriptService.saveScript(script);
-      if (!result.ok) throw new Error(result.message);
-      if (revisionRef.current === revisionAtStart) {
-        setSaveStatus('saved');
-        latestSaveStatusRef.current = 'saved';
+    const operation = (async () => {
+      try {
+        const result = await scriptService.saveScript(script);
+        if (!result.ok) throw new Error(result.message);
+        if (revisionRef.current === revisionAtStart) {
+          setSaveStatus('saved');
+          latestSaveStatusRef.current = 'saved';
+        }
+        void refreshSummaries(script.projectId);
+        return true;
+      } catch {
+        setSaveStatus('failed');
+        latestSaveStatusRef.current = 'failed';
+        return false;
       }
-      void refreshSummaries();
-    } catch {
-      setSaveStatus('failed');
-      latestSaveStatusRef.current = 'failed';
-    }
+    })();
+    saveInFlightRef.current = operation;
+    void operation.finally(() => {
+      if (saveInFlightRef.current === operation) saveInFlightRef.current = null;
+    });
+    return operation;
   }, [refreshSummaries]);
+
+  const flushLatestDraft = useCallback(async (): Promise<boolean> => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const inFlight = saveInFlightRef.current;
+      if (inFlight) await inFlight;
+      const status = latestSaveStatusRef.current;
+      const script = latestDraftRef.current;
+      if (!script || status === 'saved') return true;
+      if (status === 'dirty' || status === 'failed') {
+        const revisionAtStart = revisionRef.current;
+        if (!await saveDraft(script)) return false;
+        if (
+          revisionRef.current === revisionAtStart
+          && latestSaveStatusRef.current === 'saved'
+        ) {
+          return true;
+        }
+      }
+    }
+    return latestDraftRef.current === null || latestSaveStatusRef.current === 'saved';
+  }, [saveDraft]);
+
+  const prepareWorkspaceChange = useCallback(async (): Promise<boolean> => {
+    const saved = await flushLatestDraft();
+    if (saved) setUndoState(null);
+    return saved;
+  }, [flushLatestDraft]);
 
   // 600ms 防抖保存。
   useEffect(() => {
@@ -158,41 +242,65 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [saveDraft]);
 
-  // 生命周期 flush：卸载 / beforeunload / 隐藏。撤销快照随生命周期失效。
   useEffect(() => {
-    function flushLatest() {
-      if (latestSaveStatusRef.current !== 'dirty' || !latestDraftRef.current) return;
-      void scriptService.saveScript(latestDraftRef.current);
+    registerBeforeWorkspaceChange?.(prepareWorkspaceChange);
+    return () => registerBeforeWorkspaceChange?.(null);
+  }, [prepareWorkspaceChange, registerBeforeWorkspaceChange]);
+
+  // 生命周期 flush：Electron close / 卸载 / beforeunload / 隐藏。
+  useEffect(() => {
+    function flushWithoutWaiting() {
+      setUndoState(null);
+      void flushLatestDraft();
     }
     function flushOnVisibility() {
       if (document.visibilityState === 'hidden') {
-        setUndoSnapshot(null);
-        flushLatest();
+        flushWithoutWaiting();
       }
     }
-    window.addEventListener('beforeunload', flushLatest);
+    const removeCloseFlush = rendererBridge.onNovelFlushBeforeClose(async () => {
+      setUndoState(null);
+      return flushLatestDraft();
+    });
+    window.addEventListener('beforeunload', flushWithoutWaiting);
     document.addEventListener('visibilitychange', flushOnVisibility);
     return () => {
-      setUndoSnapshot(null);
-      flushLatest();
-      window.removeEventListener('beforeunload', flushLatest);
+      setUndoState(null);
+      flushWithoutWaiting();
+      removeCloseFlush?.();
+      window.removeEventListener('beforeunload', flushWithoutWaiting);
       document.removeEventListener('visibilitychange', flushOnVisibility);
     };
-  }, []);
+  }, [flushLatestDraft]);
 
-  const updateDraft = useCallback((update: (script: Script) => Script) => {
-    setDraft((current) => {
-      if (!current) return current;
-      revisionRef.current += 1;
-      setSaveStatus('dirty');
-      latestSaveStatusRef.current = 'dirty';
-      return update(current);
-    });
+  const updateDraft = useCallback((update: (script: Script) => Script): Script | null => {
+    const current = latestDraftRef.current;
+    if (!current) return null;
+    const next = update(current);
+    revisionRef.current += 1;
+    latestDraftRef.current = next;
+    setDraft(next);
+    setSaveStatus('dirty');
+    latestSaveStatusRef.current = 'dirty';
+    return next;
   }, []);
 
   // ===== 剧本 CRUD =====
 
+  const handleSelectScript = useCallback(async (scriptId: string) => {
+    if (scriptId === activeScriptId) return;
+    if (!await prepareWorkspaceChange()) {
+      setEditorError('当前剧本保存失败，已取消切换。');
+      return;
+    }
+    setActiveScriptId(scriptId);
+  }, [activeScriptId, prepareWorkspaceChange]);
+
   const handleCreateScript = useCallback(async () => {
+    if (!await prepareWorkspaceChange()) {
+      setEditorError('当前剧本保存失败，已取消新建。');
+      return;
+    }
     const result = await scriptService.createScript({ projectId });
     if (result.ok && result.script) {
       await refreshSummaries();
@@ -200,7 +308,7 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
     } else {
       setListError(result.message ?? '新建剧本失败。');
     }
-  }, [projectId, refreshSummaries]);
+  }, [prepareWorkspaceChange, projectId, refreshSummaries]);
 
   const handleRenameScript = useCallback((scriptId: string, title: string) => {
     const trimmed = title.trim();
@@ -220,6 +328,10 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
   }, [draft, projectId, refreshSummaries, updateDraft]);
 
   const performDeleteScript = useCallback(async (summary: ScriptSummary) => {
+    if (activeScriptId === summary.id && !await flushLatestDraft()) {
+      setEditorError('当前剧本保存失败，已取消删除。');
+      return;
+    }
     const loaded = await scriptService.loadScript(projectId, summary.id);
     if (!loaded.ok || !loaded.script) {
       setListError(loaded.message ?? '删除前加载剧本失败。');
@@ -235,9 +347,13 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
       setActiveScriptId(null);
       setDraft(null);
     }
-    setUndoSnapshot(snapshot);
+    setUndoState({
+      kind: 'script',
+      message: `已删除《${snapshot.title}》`,
+      snapshot,
+    });
     await refreshSummaries();
-  }, [activeScriptId, projectId, refreshSummaries]);
+  }, [activeScriptId, flushLatestDraft, projectId, refreshSummaries]);
 
   const requestDeleteScript = useCallback((summary: ScriptSummary) => {
     setConfirmState({
@@ -252,14 +368,50 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
   }, [performDeleteScript]);
 
   const handleUndoDelete = useCallback(async () => {
-    if (!undoSnapshot) return;
-    const restored = await scriptService.saveScript(undoSnapshot);
-    setUndoSnapshot(null);
-    if (restored.ok && restored.script) {
-      await refreshSummaries();
-      setActiveScriptId(restored.script.id);
+    if (!undoState) return;
+    const currentUndo = undoState;
+    if (currentUndo.kind === 'script') {
+      if (!await flushLatestDraft()) {
+        setEditorError('当前剧本保存失败，已取消撤销切换。');
+        return;
+      }
+      const restored = await scriptService.saveScript(currentUndo.snapshot);
+      if (restored.ok && restored.script) {
+        setUndoState(null);
+        await refreshSummaries();
+        setActiveScriptId(restored.script.id);
+      } else {
+        setListError(restored.message ?? '撤销删除失败。');
+      }
+      return;
     }
-  }, [undoSnapshot, refreshSummaries]);
+
+    const current = latestDraftRef.current;
+    if (!current || current.id !== currentUndo.scriptId) {
+      setUndoState(null);
+      return;
+    }
+    const next = currentUndo.kind === 'episode'
+      ? restoreEpisode(current, currentUndo.episode, currentUndo.index)
+      : restoreScene(
+          current,
+          currentUndo.episodeId,
+          currentUndo.scene,
+          currentUndo.index,
+        );
+    updateDraft(() => next);
+    if (currentUndo.kind === 'episode') {
+      setActiveEpisodeId(currentUndo.episode.id);
+      setActiveSceneId(currentUndo.episode.scenes[0]?.id ?? null);
+    } else {
+      setActiveEpisodeId(currentUndo.episodeId);
+      setActiveSceneId(currentUndo.scene.id);
+    }
+    setUndoState(null);
+    if (!await saveDraft(next)) {
+      setEditorError('撤销已恢复到草稿，但保存失败，请重试。');
+    }
+  }, [flushLatestDraft, refreshSummaries, saveDraft, undoState, updateDraft]);
 
   // ===== 集 / 场 CRUD =====
 
@@ -281,20 +433,41 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
     updateDraft((script) => moveEpisode(script, episodeId, direction));
   }, [updateDraft]);
 
-  const handleRemoveEpisode = useCallback((episodeId: string) => {
-    try {
-      updateDraft((script) => {
-        const next = removeEpisode(script, episodeId);
-        if (activeEpisodeId === episodeId) {
-          const fallback = next.episodes[0];
-          setActiveEpisodeId(fallback?.id ?? null);
-          setActiveSceneId(fallback?.scenes[0]?.id ?? null);
+  const requestRemoveEpisode = useCallback((episodeId: string) => {
+    const current = latestDraftRef.current;
+    if (!current) return;
+    const episodeIndex = current.episodes.findIndex((episode) => episode.id === episodeId);
+    const episode = current.episodes[episodeIndex];
+    if (!episode) return;
+    setConfirmState({
+      title: '删除集',
+      message: `确定删除《${episode.title.trim() || `第 ${episodeIndex + 1} 集`}》及其全部场次？删除后可即时撤销。`,
+      confirmLabel: '删除',
+      onConfirm: () => {
+        setConfirmState(null);
+        const source = latestDraftRef.current;
+        if (!source) return;
+        const deletedEpisode = structuredClone(episode);
+        try {
+          const next = removeEpisode(source, episodeId);
+          updateDraft(() => next);
+          if (activeEpisodeId === episodeId) {
+            const fallback = next.episodes[0];
+            setActiveEpisodeId(fallback?.id ?? null);
+            setActiveSceneId(fallback?.scenes[0]?.id ?? null);
+          }
+          setUndoState({
+            kind: 'episode',
+            message: `已删除《${episode.title.trim() || `第 ${episodeIndex + 1} 集`}》`,
+            scriptId: source.id,
+            episode: deletedEpisode,
+            index: episodeIndex,
+          });
+        } catch (error) {
+          setEditorError(error instanceof Error ? error.message : '无法删除该集。');
         }
-        return next;
-      });
-    } catch (error) {
-      setEditorError(error instanceof Error ? error.message : '无法删除该集。');
-    }
+      },
+    });
   }, [activeEpisodeId, updateDraft]);
 
   const handleAddScene = useCallback((episodeId: string) => {
@@ -312,19 +485,41 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
     updateDraft((script) => moveScene(script, episodeId, sceneId, direction));
   }, [updateDraft]);
 
-  const handleRemoveScene = useCallback((episodeId: string, sceneId: string) => {
-    try {
-      updateDraft((script) => {
-        const next = removeScene(script, episodeId, sceneId);
-        if (activeSceneId === sceneId) {
-          const episode = next.episodes.find((item) => item.id === episodeId);
-          setActiveSceneId(episode?.scenes[0]?.id ?? null);
+  const requestRemoveScene = useCallback((episodeId: string, sceneId: string) => {
+    const current = latestDraftRef.current;
+    const episode = current?.episodes.find((item) => item.id === episodeId);
+    const sceneIndex = episode?.scenes.findIndex((scene) => scene.id === sceneId) ?? -1;
+    const scene = sceneIndex >= 0 ? episode?.scenes[sceneIndex] : null;
+    if (!current || !episode || !scene) return;
+    setConfirmState({
+      title: '删除场次',
+      message: `确定删除《${scene.title.trim() || `场景 ${sceneIndex + 1}`}》？删除后可即时撤销。`,
+      confirmLabel: '删除',
+      onConfirm: () => {
+        setConfirmState(null);
+        const source = latestDraftRef.current;
+        if (!source) return;
+        const deletedScene = structuredClone(scene);
+        try {
+          const next = removeScene(source, episodeId, sceneId);
+          updateDraft(() => next);
+          if (activeSceneId === sceneId) {
+            const nextEpisode = next.episodes.find((item) => item.id === episodeId);
+            setActiveSceneId(nextEpisode?.scenes[0]?.id ?? null);
+          }
+          setUndoState({
+            kind: 'scene',
+            message: `已删除《${scene.title.trim() || `场景 ${sceneIndex + 1}`}》`,
+            scriptId: source.id,
+            episodeId,
+            scene: deletedScene,
+            index: sceneIndex,
+          });
+        } catch (error) {
+          setEditorError(error instanceof Error ? error.message : '无法删除该场次。');
         }
-        return next;
-      });
-    } catch (error) {
-      setEditorError(error instanceof Error ? error.message : '无法删除该场次。');
-    }
+      },
+    });
   }, [activeSceneId, updateDraft]);
 
   const handleSceneTitleChange = useCallback((title: string) => {
@@ -353,13 +548,18 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
   // ===== 共享设定 CRUD =====
 
   const persistSettings = useCallback(async (next: ProjectSettings) => {
+    if (next.projectId !== projectIdRef.current) return;
     setSettings(next);
     const result = await projectSettingsService.save(next);
-    if (!result.ok) setEditorError(result.message ?? '保存共享设定失败。');
+    if (!result.ok) {
+      setEditorError(result.message ?? '保存共享设定失败。');
+    }
   }, []);
 
   const handleUpsertSetting = useCallback((entry: ProjectSettingEntry) => {
-    const base: ProjectSettings = settings ?? { projectId, entries: [], schemaVersion: 1 };
+    const base: ProjectSettings = settings?.projectId === projectId
+      ? settings
+      : { projectId, entries: [], schemaVersion: 1 };
     const exists = base.entries.some((item) => item.id === entry.id);
     const entries = exists
       ? base.entries.map((item) => (item.id === entry.id ? entry : item))
@@ -375,6 +575,10 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
       onConfirm: () => {
         setConfirmState(null);
         void (async () => {
+          if (!await flushLatestDraft()) {
+            setEditorError('当前剧本保存失败，已取消删除设定。');
+            return;
+          }
           const result = await projectSettingsService.delete(projectId, settingId);
           if (result.ok) {
             await refreshSettings();
@@ -385,7 +589,7 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
         })();
       },
     });
-  }, [projectId, refreshSettings]);
+  }, [flushLatestDraft, projectId, refreshSettings]);
 
   const activeEpisode = draft?.episodes.find((item) => item.id === activeEpisodeId) ?? null;
   const activeScene = activeEpisode?.scenes.find((item) => item.id === activeSceneId) ?? null;
@@ -396,7 +600,7 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
         summaries={summaries}
         activeScriptId={activeScriptId}
         error={listError}
-        onSelect={setActiveScriptId}
+        onSelect={(scriptId) => { void handleSelectScript(scriptId); }}
         onCreate={() => { void handleCreateScript(); }}
         onRename={handleRenameScript}
         onDelete={requestDeleteScript}
@@ -416,7 +620,7 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
               onAddEpisode={handleAddEpisode}
               onRenameEpisode={handleRenameEpisode}
               onMoveEpisode={handleMoveEpisode}
-              onRemoveEpisode={handleRemoveEpisode}
+              onRemoveEpisode={requestRemoveEpisode}
             />
             {activeEpisode && (
               <SceneList
@@ -425,7 +629,7 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
                 onSelectScene={setActiveSceneId}
                 onAddScene={() => handleAddScene(activeEpisode.id)}
                 onMoveScene={(sceneId, direction) => handleMoveScene(activeEpisode.id, sceneId, direction)}
-                onRemoveScene={(sceneId) => handleRemoveScene(activeEpisode.id, sceneId)}
+                onRemoveScene={(sceneId) => requestRemoveScene(activeEpisode.id, sceneId)}
               />
             )}
           </>
@@ -460,11 +664,11 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
         />
       </div>
 
-      {undoSnapshot && (
+      {undoState && (
         <UndoToast
-          message={`已删除《${undoSnapshot.title}》`}
+          message={undoState.message}
           onUndo={() => { void handleUndoDelete(); }}
-          onDismiss={() => setUndoSnapshot(null)}
+          onDismiss={() => setUndoState(null)}
         />
       )}
 
@@ -478,7 +682,7 @@ export function ScriptWorkbench({ projectId }: ScriptWorkbenchProps) {
 function formatReferences(references?: SettingReference[]): string {
   if (!references || references.length === 0) return '';
   const positions = references
-    .map((ref) => `${ref.scriptTitle} / ${ref.episodeTitle} / ${ref.sceneTitle || '未命名场次'}`)
+    .map((ref) => `${ref.scriptTitle || '未命名剧本'} / ${ref.episodeTitle || '未命名集'} / ${ref.sceneTitle || '未命名场次'}`)
     .join('；');
   return `引用位置：${positions}`;
 }
