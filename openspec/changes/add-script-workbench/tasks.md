@@ -8,7 +8,7 @@
 
 ## 2. 剧本工作台 UI 与核心闭环
 
-- [ ] 2.1 `App.tsx` 新增 `script-workbench` 路由分支，渲染 `ScriptWorkbench` 并传入 `activeProjectId`；视频工作台/提示词库入口保持不动
+- [x] 2.1 `App.tsx` 新增 `script-workbench` 路由分支，渲染 `ScriptWorkbench` 并传入 `activeProjectId`；视频工作台/提示词库入口保持不动
 - [x] 2.2 实现 `ScriptWorkbench` 编排层：加载当前项目剧本摘要与共享设定、管理 `scriptId/episodeId/sceneId`、加载并持有完整 Script draft、统一防抖保存 / `Ctrl+S` 立即保存 / 保存状态（未保存/保存中/已保存/保存失败保留 draft 可重试）/ 项目切换或路由离开前 flush
 - [x] 2.3 实现 `ScriptLibraryPanel`（剧本列表、新建、重命名、切换、删除确认）+ `EpisodeList` + `SceneList`（增删改 + 上移/下移，不引入拖拽库；不允许删最后一集/最后一场；新建集自动含一个空场次）
 - [x] 2.4 实现 `ScriptEditor`（标题绑定 `Scene.title`、纯文本区绑定 `Scene.content`，受控 draft、防抖保存、纯文本无富文本/版本/`@` 标记）
