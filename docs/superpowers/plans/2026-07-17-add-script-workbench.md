@@ -2,6 +2,7 @@
 change: add-script-workbench
 design-doc: docs/superpowers/specs/2026-07-16-add-script-workbench-design.md
 base-ref: f1a46651981a4634e51440292517d5b3728864e8
+archived-with: 2026-07-22-add-script-workbench
 ---
 
 # 剧本工作台核心闭环实现计划
@@ -29,6 +30,7 @@ base-ref: f1a46651981a4634e51440292517d5b3728864e8
 - 不新增 vitest；纯函数测试使用 Node 24 内置 `node --test`。
 - 中文 UI 改动后必须运行文本完整性扫描；最终必须运行 `npm.cmd run build`。
 
+archived-with: 2026-07-22-add-script-workbench
 ---
 
 ## 文件结构总览
@@ -54,6 +56,7 @@ base-ref: f1a46651981a4634e51440292517d5b3728864e8
 | `src/app/App.tsx` | 接通既有 `script-workbench` 导航分支 | 修改 |
 | `package.json` | 新增 `test:script` | 修改 |
 
+archived-with: 2026-07-22-add-script-workbench
 ---
 
 ### Task 1: 剧本域纯函数与 Node 原生测试（OpenSpec 1.1）
@@ -194,6 +197,7 @@ git add package.json src/types/script.ts src/features/script-workbench/scriptDom
 git commit -m "feat: add script domain invariants"
 ```
 
+archived-with: 2026-07-22-add-script-workbench
 ---
 
 ### Task 2: Electron Script 与 SharedSettings 持久化（OpenSpec 1.2 / 1.3）
@@ -331,6 +335,7 @@ git add electron/main/index.ts electron/main/scriptReferences.ts electron/main/s
 git commit -m "feat: persist project scripts and shared settings"
 ```
 
+archived-with: 2026-07-22-add-script-workbench
 ---
 
 ### Task 3: Preload、Renderer Bridge 与薄 Service（OpenSpec 1.4 / 1.5）
@@ -402,6 +407,7 @@ git add electron/preload/bridgeTypes.ts electron/preload/index.ts src/types/elec
 git commit -m "feat: bridge script persistence to renderer"
 ```
 
+archived-with: 2026-07-22-add-script-workbench
 ---
 
 ### Task 4: ScriptWorkbench 单一 draft、保存链与核心编辑 UI（OpenSpec 2.1-2.5）
@@ -492,6 +498,7 @@ git add src/features/script-workbench/ScriptWorkbench.tsx src/features/script-wo
 git commit -m "feat: add script authoring workbench"
 ```
 
+archived-with: 2026-07-22-add-script-workbench
 ---
 
 ### Task 5: SharedSettings、ReferencePanel 与引用完整性 UI（OpenSpec 3.1-3.3）
@@ -535,6 +542,7 @@ git add src/features/script-workbench/ScriptWorkbench.tsx src/features/script-wo
 git commit -m "feat: add shared settings and scene references"
 ```
 
+archived-with: 2026-07-22-add-script-workbench
 ---
 
 ### Task 6: 路由与生产级工作台样式整合（OpenSpec 2.1 / 3.3）
@@ -596,6 +604,7 @@ git add src/app/App.tsx src/features/script-workbench
 git commit -m "feat: connect and style script workbench"
 ```
 
+archived-with: 2026-07-22-add-script-workbench
 ---
 
 ### Task 7: 全链验证与 OpenSpec 收口（OpenSpec 4.1-4.4）
@@ -659,6 +668,7 @@ git status --short
 git commit -m "feat: add script workbench core loop"
 ```
 
+archived-with: 2026-07-22-add-script-workbench
 ---
 
 ## Self-Review

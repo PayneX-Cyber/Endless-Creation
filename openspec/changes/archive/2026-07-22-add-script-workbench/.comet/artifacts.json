@@ -4,5 +4,6 @@
   "openspec_tasks": "openspec/changes/add-script-workbench/tasks.md",
   "openspec_delta_spec": "openspec/changes/add-script-workbench/specs/project-shared-settings/spec.md",
   "handoff_context": "openspec/changes/add-script-workbench/.comet/handoff/design-context.json",
-  "handoff_markdown": "openspec/changes/add-script-workbench/.comet/handoff/design-context.md"
+  "handoff_markdown": "openspec/changes/add-script-workbench/.comet/handoff/design-context.md",
+  "archive_directory": "openspec/changes/archive/2026-07-22-add-script-workbench"
 }

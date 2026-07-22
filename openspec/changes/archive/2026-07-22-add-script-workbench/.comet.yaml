@@ -18,7 +18,7 @@ verification_report: docs/superpowers/reports/2026-07-17-add-script-workbench-ve
 branch_status: handled
 created_at: 2026-07-16
 verified_at: 2026-07-17
-archived: false
+archived: true
 direct_override: null
 handoff_context: openspec/changes/add-script-workbench/.comet/handoff/design-context.json
 handoff_hash: 0f635630e1bea2eab4b1673cc428f95c2ae74483e680f4bd41c3d3b6b45a8a7b

@@ -2,6 +2,8 @@
 comet_change: add-script-workbench
 role: technical-design
 canonical_spec: openspec
+archived-with: 2026-07-22-add-script-workbench
+status: final
 ---
 
 # 剧本工作台核心闭环 — 技术设计
